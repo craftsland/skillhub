@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
@@ -65,6 +65,11 @@ export interface SeedSkillOptions {
   description?: string
   version?: string
   readmeHeading?: string
+  readmeBody?: string
+  extraFiles?: Array<{
+    path: string
+    content: string
+  }>
 }
 
 function asApiErrorBody(value: unknown): string {
@@ -130,8 +135,13 @@ function buildSkillPackageZipBuffer(suffix: string, options?: SeedSkillOptions):
 
     execFileSync('mkdir', ['-p', packageDir])
     writeFileSync(path.join(packageDir, 'SKILL.md'), skillMd, 'utf8')
-    writeFileSync(path.join(packageDir, 'README.md'), `# ${readmeHeading}\n`, 'utf8')
-    execFileSync('zip', ['-q', '-r', zipPath, 'SKILL.md', 'README.md'], { cwd: packageDir })
+    writeFileSync(path.join(packageDir, 'README.md'), options?.readmeBody ?? `# ${readmeHeading}\n`, 'utf8')
+    for (const extraFile of options?.extraFiles ?? []) {
+      const targetPath = path.join(packageDir, extraFile.path)
+      mkdirSync(path.dirname(targetPath), { recursive: true })
+      writeFileSync(targetPath, extraFile.content, 'utf8')
+    }
+    execFileSync('zip', ['-q', '-r', zipPath, '.'], { cwd: packageDir })
     return readFileSync(zipPath)
   } finally {
     rmSync(tempRoot, { recursive: true, force: true })
@@ -146,8 +156,13 @@ function createSkillPackageZipFile(suffix: string, options?: SeedSkillOptions): 
 
   execFileSync('mkdir', ['-p', packageDir])
   writeFileSync(path.join(packageDir, 'SKILL.md'), skillMd, 'utf8')
-  writeFileSync(path.join(packageDir, 'README.md'), `# ${readmeHeading}\n`, 'utf8')
-  execFileSync('zip', ['-q', '-r', zipPath, 'SKILL.md', 'README.md'], { cwd: packageDir })
+  writeFileSync(path.join(packageDir, 'README.md'), options?.readmeBody ?? `# ${readmeHeading}\n`, 'utf8')
+  for (const extraFile of options?.extraFiles ?? []) {
+    const targetPath = path.join(packageDir, extraFile.path)
+    mkdirSync(path.dirname(targetPath), { recursive: true })
+    writeFileSync(targetPath, extraFile.content, 'utf8')
+  }
+  execFileSync('zip', ['-q', '-r', zipPath, '.'], { cwd: packageDir })
 
   return {
     filePath: zipPath,

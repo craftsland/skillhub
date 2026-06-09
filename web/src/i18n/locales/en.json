@@ -784,6 +784,8 @@
     "documentationSource": "Source: {{path}}",
     "documentationUnavailableTitle": "Documentation is unavailable",
     "documentationUnavailable": "The documentation file could not be loaded. You can still inspect the package contents in the file list.",
+    "packageLinkMissingTitle": "File not found",
+    "packageLinkMissingDescription": "This link points to a file that is not included in the current skill version.",
     "authorLabel": "By {{name}}",
     "expandOverview": "Expand full overview",
     "collapseOverview": "Collapse content",
