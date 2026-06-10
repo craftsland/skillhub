@@ -3,7 +3,7 @@ import * as mod from './search-bar'
 
 /**
  * search-bar.tsx exports the SearchBar component. The component delegates
- * its max-length constraint to the shared MAX_SEARCH_QUERY_LENGTH constant
+ * its max-length constraint to the shared namespace-aware search input limit
  * (tested in search-query.test.ts). Controlled/uncontrolled mode logic and
  * submit/clear handlers are component-internal with no exported helpers.
  *

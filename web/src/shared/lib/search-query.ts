@@ -1,4 +1,6 @@
 export const MAX_SEARCH_QUERY_LENGTH = 50
+export const MAX_NAMESPACE_SLUG_LENGTH = 64
+export const MAX_SEARCH_INPUT_LENGTH = MAX_NAMESPACE_SLUG_LENGTH + MAX_SEARCH_QUERY_LENGTH + 2
 
 export function normalizeSearchQuery(query: string): string {
   return query.trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
@@ -12,10 +14,10 @@ export interface NamespaceSearchInput {
 const LEADING_NAMESPACE_PATTERN = /^@([a-zA-Z0-9][a-zA-Z0-9-]{0,63})(?:\s+|$)(.*)$/
 
 export function parseNamespaceSearchInput(input: string): NamespaceSearchInput {
-  const normalized = normalizeSearchQuery(input)
-  const match = normalized.match(LEADING_NAMESPACE_PATTERN)
+  const trimmed = input.trim()
+  const match = trimmed.match(LEADING_NAMESPACE_PATTERN)
   if (!match) {
-    return { namespace: '', query: normalized }
+    return { namespace: '', query: normalizeSearchQuery(trimmed) }
   }
 
   return {

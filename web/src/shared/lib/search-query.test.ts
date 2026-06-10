@@ -29,6 +29,16 @@ describe('parseNamespaceSearchInput', () => {
     })
   })
 
+  it('extracts a sixty-four character namespace before limiting the keyword', () => {
+    const namespace = 'a'.repeat(64)
+    const query = 'release-notes '.repeat(8)
+
+    expect(parseNamespaceSearchInput(`@${namespace} ${query}`)).toEqual({
+      namespace,
+      query: query.trim().slice(0, MAX_SEARCH_QUERY_LENGTH),
+    })
+  })
+
   it('leaves ordinary search text unchanged', () => {
     expect(parseNamespaceSearchInput('meeting assistant')).toEqual({
       namespace: '',
