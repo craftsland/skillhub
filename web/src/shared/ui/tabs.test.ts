@@ -1,3 +1,5 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs'
 
@@ -27,5 +29,30 @@ describe('Tabs components', () => {
   it('exports TabsContent as a named function', () => {
     expect(typeof TabsContent).toBe('function')
     expect(TabsContent.name).toBe('TabsContent')
+  })
+
+  it('renders semantic tablist, tab, and tabpanel roles', () => {
+    const html = renderToStaticMarkup(
+      createElement(Tabs, {
+        defaultValue: 'clawhub',
+        children: [
+          createElement(TabsList, {
+            key: 'list',
+            children: [
+              createElement(TabsTrigger, { key: 'clawhub', value: 'clawhub', children: 'ClawHub CLI' }),
+              createElement(TabsTrigger, { key: 'skillhub', value: 'skillhub', children: 'SkillHub CLI' }),
+            ],
+          }),
+          createElement(TabsContent, { key: 'clawhub-content', value: 'clawhub', children: 'clawhub command' }),
+          createElement(TabsContent, { key: 'skillhub-content', value: 'skillhub', children: 'skillhub command' }),
+        ],
+      }),
+    )
+
+    expect(html).toContain('role="tablist"')
+    expect(html).toContain('role="tab"')
+    expect(html).toContain('aria-selected="true"')
+    expect(html).toContain('aria-selected="false"')
+    expect(html).toContain('role="tabpanel"')
   })
 })

@@ -189,6 +189,7 @@
     "noStarredResults": "No starred skills found",
     "noStarredResultsFor": "No starred skills match \"{{q}}\"",
     "noStarredSkills": "You have not starred any skills yet",
+    "namespaceFilter": "@{{namespace}}",
     "enterKeyword": "Please enter a search keyword",
     "results": "{{count}} skills found",
     "resultCount": "Found <1>{{count}}</1> results",
@@ -339,6 +340,12 @@
   "mySkills": {
     "title": "My Skills",
     "subtitle": "Manage your published skills",
+    "searchPlaceholder": "Search by name, slug, or description",
+    "namespaceFilterLabel": "Filter by namespace",
+    "namespaceFilterAll": "All namespaces",
+    "clearSearch": "Clear filters",
+    "emptySearchTitle": "No matching skills",
+    "emptySearchDescription": "Try adjusting your keyword or switching namespace.",
     "filters": {
       "ALL": "All",
       "PENDING_REVIEW": "Pending Review",
@@ -784,6 +791,8 @@
     "documentationSource": "Source: {{path}}",
     "documentationUnavailableTitle": "Documentation is unavailable",
     "documentationUnavailable": "The documentation file could not be loaded. You can still inspect the package contents in the file list.",
+    "packageLinkMissingTitle": "File not found",
+    "packageLinkMissingDescription": "This link points to a file that is not included in the current skill version.",
     "authorLabel": "By {{name}}",
     "expandOverview": "Expand full overview",
     "collapseOverview": "Collapse content",
@@ -801,6 +810,8 @@
     "namespaceLabel": "Namespace",
     "loginToRate": "Login to star and rate",
     "install": "Install",
+    "installMethodClawhub": "ClawHub CLI",
+    "installMethodSkillhub": "SkillHub CLI",
     "download": "Download",
     "labelsSectionTitle": "Labels",
     "labelsSectionDescription": "Attach or remove recommended labels that help users filter and discover this skill.",
@@ -1277,7 +1288,8 @@
     "prev": "Previous",
     "next": "Next",
     "pagePrefix": "Page",
-    "pageSuffix": ""
+    "pageSuffix": "",
+    "goToPage": "Go to page {{page}}"
   },
   "user": {
     "menu": {

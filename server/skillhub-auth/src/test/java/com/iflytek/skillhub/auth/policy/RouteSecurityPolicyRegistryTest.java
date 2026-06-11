@@ -74,6 +74,23 @@ class RouteSecurityPolicyRegistryTest {
     }
 
     @Test
+    void authorizationPolicies_shouldNotDeclareNamespaceBundleDownloadRoutes() {
+        String v1Route = "/api/v1/namespaces/*/skills/" + "download";
+        String webRoute = "/api/web/namespaces/*/skills/" + "download";
+        boolean matchedV1 = registry.authorizationPolicies().stream()
+                .anyMatch(policy -> policy.method() == HttpMethod.GET
+                        && v1Route.equals(policy.pattern()));
+        boolean matchedWeb = registry.authorizationPolicies().stream()
+                .anyMatch(policy -> policy.method() == HttpMethod.GET
+                        && webRoute.equals(policy.pattern()));
+
+        assertFalse(matchedV1);
+        assertFalse(matchedWeb);
+        assertFalse(registry.authorizeApiToken("GET", "/api/v1/namespaces/global/skills/" + "download", Set.of()).allowed());
+        assertFalse(registry.authorizeApiToken("GET", "/api/web/namespaces/global/skills/" + "download", Set.of()).allowed());
+    }
+
+    @Test
     void apiTokenPolicySupportsNativeCliRoutes() {
         assertTrue(registry.authorizeApiToken("GET", "/api/cli/v1/auth/whoami", Set.of()).allowed());
         assertTrue(registry.authorizeApiToken("GET", "/api/cli/v1/skills/search", Set.of()).allowed());

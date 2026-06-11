@@ -75,7 +75,8 @@ class MySkillAppServiceTest {
                 skillStarRepository,
                 skillSubscriptionRepository,
                 mySkillQueryRepository,
-                skillLifecycleProjectionService
+                skillLifecycleProjectionService,
+                namespaceRepository
         );
     }
 
@@ -273,9 +274,8 @@ class MySkillAppServiceTest {
 
         given(skillRepository.findByOwnerId("user-1", PageRequest.of(0, 10)))
                 .willReturn(new PageImpl<>(List.of(skill), PageRequest.of(0, 10), 1));
+        given(skillVersionRepository.findBySkillIdAndStatus(6L, SkillVersionStatus.PUBLISHED)).willReturn(List.of(publishedVersion));
         given(skillVersionRepository.findBySkillId(6L)).willReturn(List.of(rejectedVersion, publishedVersion));
-        given(skillVersionRepository.findBySkillIdAndStatus(6L, SkillVersionStatus.PUBLISHED))
-                .willReturn(List.of(publishedVersion));
         given(namespaceRepository.findByIdIn(List.of(101L))).willReturn(List.of(namespace(101L, "team-ai")));
 
         var result = service.listMySkills("user-1", 0, 10);
@@ -285,6 +285,84 @@ class MySkillAppServiceTest {
         assertThat(result.items().get(0).headlineVersion().version()).isEqualTo("2.0.0");
         assertThat(result.items().get(0).ownerPreviewVersion()).isNull();
     }
+
+    @Test
+    void listMySkills_filtersByKeywordAcrossDisplayNameSlugAndSummary() {
+        Skill alpha = createSkill(1L, 101L, "alpha-tool", "user-1");
+        alpha.setDisplayName("Alpha Assistant");
+        Skill beta = createSkill(2L, 101L, "beta-tool", "user-1");
+        beta.setDisplayName("Beta Tool");
+        beta.setSummary("This tool helps with alpha testing");
+        Skill gamma = createSkill(3L, 101L, "gamma-tool", "user-1");
+        gamma.setDisplayName("Gamma Service");
+        SkillVersion publishedVersion = createVersion(1L, 10L, "1.0.0", SkillVersionStatus.PUBLISHED, "2026-03-15T09:30:00Z");
+
+        given(skillRepository.findByOwnerId("user-1")).willReturn(List.of(alpha, beta, gamma));
+        given(skillVersionRepository.findBySkillId(1L)).willReturn(List.of(publishedVersion));
+        given(skillVersionRepository.findBySkillId(2L)).willReturn(List.of());
+        given(namespaceRepository.findByIdIn(List.of(101L))).willReturn(List.of(namespace(101L, "team-ai")));
+
+        var result = service.listMySkills("user-1", 0, 10, null, "alpha", null, Set.of("USER"));
+
+        assertThat(result.total()).isEqualTo(2);
+        assertThat(result.items()).extracting("slug")
+                .containsExactlyInAnyOrder("alpha-tool", "beta-tool");
+    }
+
+    @Test
+    void listMySkills_filtersByNamespaceSlug() {
+        Skill aiSkill = createSkill(1L, 101L, "ai-tool", "user-1");
+        Skill mlSkill = createSkill(2L, 102L, "ml-tool", "user-1");
+        SkillVersion v1 = createVersion(1L, 10L, "1.0.0", SkillVersionStatus.PUBLISHED, "2026-03-15T09:30:00Z");
+
+        given(skillRepository.findByOwnerId("user-1")).willReturn(List.of(aiSkill, mlSkill));
+        given(skillVersionRepository.findBySkillId(1L)).willReturn(List.of(v1));
+        given(namespaceRepository.findBySlug("team-ai")).willReturn(java.util.Optional.of(namespace(101L, "team-ai")));
+        given(namespaceRepository.findByIdIn(List.of(101L))).willReturn(List.of(namespace(101L, "team-ai")));
+
+        var result = service.listMySkills("user-1", 0, 10, null, null, "team-ai", Set.of("USER"));
+
+        assertThat(result.total()).isEqualTo(1);
+        assertThat(result.items()).extracting("slug").containsExactly("ai-tool");
+    }
+
+    @Test
+    void listMySkills_returnsEmptyWhenNamespaceSlugNotFound() {
+        Skill skill = createSkill(1L, 101L, "ai-tool", "user-1");
+
+        given(skillRepository.findByOwnerId("user-1")).willReturn(List.of(skill));
+        given(namespaceRepository.findBySlug("missing-namespace")).willReturn(java.util.Optional.empty());
+
+        var result = service.listMySkills("user-1", 0, 10, null, null, "missing-namespace", Set.of("USER"));
+
+        assertThat(result.total()).isZero();
+        assertThat(result.items()).isEmpty();
+    }
+
+    @Test
+    void listMySkills_combinesKeywordNamespaceAndStatusFilters() {
+        Skill aiAlpha = createSkill(1L, 101L, "ai-alpha", "user-1");
+        aiAlpha.setDisplayName("AI Alpha");
+        Skill aiBeta = createSkill(2L, 101L, "ai-beta", "user-1");
+        aiBeta.setDisplayName("AI Beta");
+        Skill mlAlpha = createSkill(3L, 102L, "ml-alpha", "user-1");
+        mlAlpha.setDisplayName("ML Alpha");
+        SkillVersion v1 = createVersion(1L, 10L, "1.0.0", SkillVersionStatus.PUBLISHED, "2026-03-15T09:30:00Z");
+        SkillVersion v2 = createVersion(2L, 20L, "1.0.0", SkillVersionStatus.REJECTED, "2026-03-15T09:30:00Z");
+        SkillVersion v3 = createVersion(3L, 30L, "1.0.0", SkillVersionStatus.PUBLISHED, "2026-03-15T09:30:00Z");
+
+        given(skillRepository.findByOwnerId("user-1")).willReturn(List.of(aiAlpha, aiBeta, mlAlpha));
+        given(skillVersionRepository.findBySkillIdAndStatus(1L, SkillVersionStatus.PUBLISHED)).willReturn(List.of(v1));
+        given(skillVersionRepository.findBySkillId(1L)).willReturn(List.of(v1));
+        given(namespaceRepository.findBySlug("team-ai")).willReturn(java.util.Optional.of(namespace(101L, "team-ai")));
+        given(namespaceRepository.findByIdIn(List.of(101L))).willReturn(List.of(namespace(101L, "team-ai")));
+
+        var result = service.listMySkills("user-1", 0, 10, "PUBLISHED", "alpha", "team-ai", Set.of("USER"));
+
+        assertThat(result.total()).isEqualTo(1);
+        assertThat(result.items()).extracting("slug").containsExactly("ai-alpha");
+    }
+
 
     private Skill createSkill(Long id, Long namespaceId, String slug, String ownerId) {
         Skill skill = new Skill(namespaceId, slug, ownerId, SkillVisibility.PUBLIC);

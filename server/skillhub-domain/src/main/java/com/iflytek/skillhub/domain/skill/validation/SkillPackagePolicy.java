@@ -64,7 +64,19 @@ public final class SkillPackagePolicy {
             throw new IllegalArgumentException("Package entry path must be normalized: " + rawPath);
         }
 
-        return canonical;
+        return canonicalizeSkillMdPath(canonical);
+    }
+
+    public static String canonicalizeSkillMdPath(String normalizedPath) {
+        int slashIndex = normalizedPath.lastIndexOf('/');
+        String fileName = slashIndex >= 0 ? normalizedPath.substring(slashIndex + 1) : normalizedPath;
+        if (!SKILL_MD_PATH.equalsIgnoreCase(fileName)) {
+            return normalizedPath;
+        }
+        if (slashIndex < 0) {
+            return SKILL_MD_PATH;
+        }
+        return normalizedPath.substring(0, slashIndex + 1) + SKILL_MD_PATH;
     }
 
     public static boolean hasAllowedExtension(String path) {

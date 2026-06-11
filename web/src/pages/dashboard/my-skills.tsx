@@ -1,22 +1,28 @@
-import { useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useCallback, useEffect, useState } from 'react'
+import { useLocation, useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/features/auth/use-auth'
 import { Button } from '@/shared/ui/button'
 import { Card } from '@/shared/ui/card'
+import { Input } from '@/shared/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { EmptyState } from '@/shared/components/empty-state'
 import { ConfirmDialog } from '@/shared/components/confirm-dialog'
 import { DashboardPageHeader } from '@/shared/components/dashboard-page-header'
 import { Pagination } from '@/shared/components/pagination'
 import { useArchiveSkill, useUnarchiveSkill, useWithdrawSkillReview } from '@/shared/hooks/use-skill-queries'
+import { useMyNamespaces } from '@/shared/hooks/use-namespace-queries'
 import { useMySkills, useSubmitPromotion } from '@/shared/hooks/use-user-queries'
+import { useDebounce } from '@/shared/hooks/use-debounce'
 import { getHeadlineVersion, getPublishedVersion, getOwnerPreviewVersion, hasPendingOwnerPreview } from '@/shared/lib/skill-lifecycle'
 import { formatCompactCount } from '@/shared/lib/number-format'
 import { toast } from '@/shared/lib/toast'
+import { buildReturnTo } from '@/shared/lib/auth-route'
 import { ApiError } from '@/api/client'
 import { getMySkillEmptyStateKey, getMySkillFilters, type MySkillFilter } from './my-skill-filters'
 
 const PAGE_SIZE = 10
+const ALL_NAMESPACES_VALUE = '__all_namespaces__'
 
 /**
  * Dashboard page for skills owned by the current user.
@@ -36,18 +42,61 @@ function getPromotionConflictKey(error: ApiError): 'promotion.duplicate_pending'
 
 export function MySkillsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const search = useSearch({ from: '/dashboard/skills' })
   const { t } = useTranslation()
   const { hasRole } = useAuth()
-  const [page, setPage] = useState(0)
-  const [filter, setFilter] = useState<MySkillFilter>('ALL')
+
+  // The URL is the source of truth for page / filter / namespace / keyword so the
+  // search context survives navigating into a skill and back via the returnTo link.
+  const page = search.page ?? 0
+  const filter = (search.filter as MySkillFilter) ?? 'ALL'
+  const namespaceFilter = search.namespace ?? ''
+  const keyword = search.q ?? ''
+
+  // Keep an instant-feedback copy of the keyword input, debounced before it is
+  // pushed to the URL so each keystroke does not create a history entry or query.
+  const [keywordInput, setKeywordInput] = useState(keyword)
+  const debouncedKeyword = useDebounce(keywordInput.trim(), 300)
+
   const [archiveTarget, setArchiveTarget] = useState<{ namespace: string; slug: string; name: string } | null>(null)
   const [unarchiveTarget, setUnarchiveTarget] = useState<{ namespace: string; slug: string; name: string } | null>(null)
   const [withdrawTarget, setWithdrawTarget] = useState<{ namespace: string; slug: string; name: string; version: string } | null>(null)
   const [promotionTarget, setPromotionTarget] = useState<{ skillId: number; versionId: number; name: string; version: string } | null>(null)
-  const { data: skillPage, isLoading } = useMySkills({ page, size: PAGE_SIZE, filter: filter === 'ALL' ? undefined : filter })
+
+  const updateSearch = useCallback((next: Partial<typeof search>, options?: { replace?: boolean }) => {
+    navigate({
+      to: '/dashboard/skills',
+      search: (prev) => ({ ...prev, ...next }),
+      replace: options?.replace,
+    })
+  }, [navigate])
+
+  // Push the debounced keyword to the URL (reset page to 0 when search changes)
+  useEffect(() => {
+    if (debouncedKeyword !== keyword) {
+      updateSearch({ q: debouncedKeyword || undefined, page: 0 }, { replace: true })
+    }
+  }, [debouncedKeyword, keyword, updateSearch])
+
+  // Sync keywordInput when navigating back via returnTo
+  useEffect(() => {
+    setKeywordInput(keyword)
+  }, [keyword])
+
+  const { data: skillPage, isLoading } = useMySkills({
+    page,
+    size: PAGE_SIZE,
+    filter: filter === 'ALL' ? undefined : filter,
+    q: keyword || undefined,
+    namespace: namespaceFilter || undefined,
+  })
+  const { data: namespaceOptions } = useMyNamespaces()
+
   const skills = skillPage?.items ?? []
   const totalPages = skillPage ? Math.max(Math.ceil(skillPage.total / skillPage.size), 1) : 1
   const availableFilters = getMySkillFilters(hasRole('SUPER_ADMIN'))
+  const hasActiveSearch = keyword.trim() !== '' || namespaceFilter !== ''
   const emptyStateKey = getMySkillEmptyStateKey(filter)
   const archiveMutation = useArchiveSkill()
   const unarchiveMutation = useUnarchiveSkill()
@@ -57,8 +106,13 @@ export function MySkillsPage() {
   const handleSkillClick = (namespace: string, slug: string) => {
     navigate({
       to: `/space/${namespace}/${encodeURIComponent(slug)}`,
-      search: { returnTo: '/dashboard/skills' },
+      search: { returnTo: buildReturnTo(location) },
     })
+  }
+
+  const handleClearSearch = () => {
+    setKeywordInput('')
+    updateSearch({ q: undefined, namespace: undefined, page: 0 })
   }
 
   const handleUpdateSkill = (namespace: string, visibility?: string) => {
@@ -238,21 +292,61 @@ export function MySkillsPage() {
         )}
       />
 
-      <div className="flex flex-wrap gap-2">
-        {availableFilters.map((option) => (
-          <Button
-            key={option}
-            type="button"
-            size="sm"
-            variant={filter === option ? 'default' : 'outline'}
-            onClick={() => {
-              setFilter(option)
-              setPage(0)
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Input
+            type="search"
+            value={keywordInput}
+            onChange={(event) => setKeywordInput(event.target.value)}
+            placeholder={t('mySkills.searchPlaceholder')}
+            aria-label={t('mySkills.searchPlaceholder')}
+            className="sm:max-w-md"
+          />
+          <Select
+            value={namespaceFilter || ALL_NAMESPACES_VALUE}
+            onValueChange={(value) => {
+              updateSearch({ namespace: value === ALL_NAMESPACES_VALUE ? undefined : value, page: 0 })
             }}
           >
-            {t(`mySkills.filters.${option}`)}
-          </Button>
-        ))}
+            <SelectTrigger aria-label={t('mySkills.namespaceFilterLabel')} className="sm:max-w-[14rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_NAMESPACES_VALUE}>{t('mySkills.namespaceFilterAll')}</SelectItem>
+              {(namespaceOptions ?? []).map((ns: { id: number; slug: string }) => (
+                <SelectItem key={ns.id} value={ns.slug}>
+                  @{ns.slug}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {hasActiveSearch ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={handleClearSearch}
+            >
+              {t('mySkills.clearSearch')}
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {availableFilters.map((option) => (
+            <Button
+              key={option}
+              type="button"
+              size="sm"
+              variant={filter === option ? 'default' : 'outline'}
+              onClick={() => {
+                updateSearch({ filter: option === 'ALL' ? undefined : option, page: 0 })
+              }}
+            >
+              {t(`mySkills.filters.${option}`)}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {skillPage && skillPage.total > 0 ? (
@@ -400,17 +494,23 @@ export function MySkillsPage() {
           </div>
 
           {skillPage.total > PAGE_SIZE ? (
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+            <Pagination page={page} totalPages={totalPages} onPageChange={(next) => updateSearch({ page: next })} />
           ) : null}
         </>
       ) : (
         <EmptyState
-          title={t(emptyStateKey.title)}
-          description={t(emptyStateKey.description)}
+          title={hasActiveSearch ? t('mySkills.emptySearchTitle') : t(emptyStateKey.title)}
+          description={hasActiveSearch ? t('mySkills.emptySearchDescription') : t(emptyStateKey.description)}
           action={
-            <Button size="lg" onClick={() => navigate({ to: '/dashboard/publish' })}>
-              {t('mySkills.publishSkill')}
-            </Button>
+            hasActiveSearch ? (
+              <Button size="lg" variant="outline" onClick={handleClearSearch}>
+                {t('mySkills.clearSearch')}
+              </Button>
+            ) : (
+              <Button size="lg" onClick={() => navigate({ to: '/dashboard/publish' })}>
+                {t('mySkills.publishSkill')}
+              </Button>
+            )
           }
         />
       )}

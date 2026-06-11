@@ -45,7 +45,7 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid={contentTestId}>
+      <DialogContent data-testid={contentTestId} aria-label={title}>
         <DialogHeader className="min-w-0 text-center sm:text-center">
           <DialogTitle className="text-center">{title}</DialogTitle>
           {description && <DialogDescription className="text-center break-all">{description}</DialogDescription>}

@@ -1,11 +1,24 @@
+/** @vitest-environment jsdom */
+
 import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { MouseEvent } from 'react'
+import type { SkillFile } from '@/api/types'
+
+const toastMocks = vi.hoisted(() => ({
+  success: vi.fn(),
+  error: vi.fn(),
+}))
 
 const navigateMock = vi.fn()
 const hasRoleMock = vi.fn<(role: string) => boolean>((role: string) => role === 'USER')
 const useSkillDetailMock = vi.fn()
 const useSkillLabelsMock = vi.fn()
 const useSkillVersionsMock = vi.fn()
+const useSkillFilesMock = vi.fn()
+const useSkillReadmeMock = vi.fn()
+const useSkillFileMock = vi.fn()
 let authState: {
   user: { userId: string; platformRoles: string[] } | null
   hasRole: (role: string) => boolean
@@ -47,7 +60,7 @@ vi.mock('@/features/report/use-skill-reports', () => ({
 }))
 
 vi.mock('@/shared/lib/toast', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: toastMocks.success, error: toastMocks.error },
 }))
 
 vi.mock('@/api/client', () => ({
@@ -76,7 +89,47 @@ vi.mock('@/shared/lib/number-format', () => ({
 }))
 
 vi.mock('@/features/skill/markdown-renderer', () => ({
-  MarkdownRenderer: () => <div>markdown</div>,
+  MarkdownRenderer: ({
+    content,
+    onLinkClick,
+  }: {
+    content: string
+    onLinkClick?: (href: string, event: MouseEvent<HTMLAnchorElement>) => void
+  }) => (
+    <div>
+      <div>markdown:{content}</div>
+      <a href="docs/usage.md" onClick={(event) => onLinkClick?.('docs/usage.md', event)}>
+        Usage
+      </a>
+      <a href="docs/missing.md" onClick={(event) => onLinkClick?.('docs/missing.md', event)}>
+        Missing
+      </a>
+      <a
+        href="#"
+        onClick={(event) => {
+          event.preventDefault()
+          onLinkClick?.('https://example.com', event)
+        }}
+      >
+        External
+      </a>
+      <a
+        href="#intro"
+        onClick={(event) => {
+          event.preventDefault()
+          onLinkClick?.('#intro', event)
+        }}
+      >
+        Anchor
+      </a>
+    </div>
+  ),
+}))
+
+vi.mock('@/features/skill/file-preview-dialog', () => ({
+  FilePreviewDialog: ({ open, node }: { open: boolean; node: { path: string } | null }) => (
+    open && node ? <div role="dialog">preview:{node.path}</div> : null
+  ),
 }))
 
 vi.mock('@/features/skill/file-tree', () => ({
@@ -107,9 +160,9 @@ vi.mock('@/shared/hooks/use-skill-queries', () => ({
   useDetachSkillLabel: () => ({ mutate: vi.fn(), isPending: false }),
   useSkillVersions: (...args: unknown[]) => useSkillVersionsMock(...args),
   useSkillVersionDetail: () => ({ data: undefined }),
-  useSkillFiles: () => ({ data: [] }),
-  useSkillReadme: () => ({ data: '# Demo', error: null }),
-  useSkillFile: () => ({ data: null, isLoading: false, error: null }),
+  useSkillFiles: (...args: unknown[]) => useSkillFilesMock(...args),
+  useSkillReadme: (...args: unknown[]) => useSkillReadmeMock(...args),
+  useSkillFile: (...args: unknown[]) => useSkillFileMock(...args),
   useArchiveSkill: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteSkill: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteSkillVersion: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -165,9 +218,26 @@ function createSkill(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function createSkillFile(filePath: string): SkillFile {
+  return {
+    id: filePath.length,
+    filePath,
+    fileSize: 128,
+    contentType: 'text/markdown',
+    sha256: `sha-${filePath}`,
+  }
+}
+
 describe('SkillDetailPage', () => {
+  afterEach(() => cleanup())
+
   beforeEach(() => {
     navigateMock.mockReset()
+    useSkillFilesMock.mockReset()
+    useSkillReadmeMock.mockReset()
+    useSkillFileMock.mockReset()
+    toastMocks.success.mockReset()
+    toastMocks.error.mockReset()
     hasRoleMock.mockImplementation((role: string) => role === 'USER')
     authState = {
       user: { userId: 'owner-1', platformRoles: ['USER'] },
@@ -196,6 +266,9 @@ describe('SkillDetailPage', () => {
     useSkillLabelsMock.mockReturnValue({
       data: undefined,
     })
+    useSkillFilesMock.mockReturnValue({ data: [] })
+    useSkillReadmeMock.mockReturnValue({ data: '# Demo', error: null })
+    useSkillFileMock.mockReturnValue({ data: null, isLoading: false, error: null })
   })
 
   it('shows hard delete action for the skill owner', () => {
@@ -400,5 +473,54 @@ describe('SkillDetailPage', () => {
 
     expect(html).toContain('break-all')
     expect(html).toContain('leading-snug')
+  })
+
+  it('opens a file preview when overview markdown relative link matches a package file', () => {
+    useSkillFilesMock.mockReturnValue({
+      data: [
+        createSkillFile('README.md'),
+        createSkillFile('docs/usage.md'),
+      ],
+    })
+
+    render(<SkillDetailPage />)
+    fireEvent.click(screen.getByRole('link', { name: 'Usage' }))
+
+    expect(screen.getByRole('dialog').textContent).toContain('preview:docs/usage.md')
+    expect(toastMocks.error).not.toHaveBeenCalled()
+  })
+
+  it('keeps the viewer on the detail page and shows a toast for missing package files', () => {
+    useSkillFilesMock.mockReturnValue({
+      data: [
+        createSkillFile('README.md'),
+        createSkillFile('docs/usage.md'),
+      ],
+    })
+
+    render(<SkillDetailPage />)
+    fireEvent.click(screen.getByRole('link', { name: 'Missing' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(toastMocks.error).toHaveBeenCalledWith(
+      'skillDetail.packageLinkMissingTitle',
+      'skillDetail.packageLinkMissingDescription',
+    )
+  })
+
+  it('leaves external links and same-document anchors alone', () => {
+    useSkillFilesMock.mockReturnValue({
+      data: [
+        createSkillFile('README.md'),
+        createSkillFile('docs/usage.md'),
+      ],
+    })
+
+    render(<SkillDetailPage />)
+    fireEvent.click(screen.getByRole('link', { name: 'External' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Anchor' }))
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(toastMocks.error).not.toHaveBeenCalled()
   })
 })

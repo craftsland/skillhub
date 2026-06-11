@@ -1024,12 +1024,18 @@ export const governanceApi = {
 }
 
 export const meApi = {
-  async getSkills(params?: { page?: number; size?: number; filter?: string }): Promise<{ items: SkillSummary[]; total: number; page: number; size: number }> {
+  async getSkills(params?: { page?: number; size?: number; filter?: string; q?: string; namespace?: string }): Promise<{ items: SkillSummary[]; total: number; page: number; size: number }> {
     const searchParams = new URLSearchParams()
     searchParams.set('page', String(params?.page ?? 0))
     searchParams.set('size', String(params?.size ?? 10))
     if (params?.filter) {
       searchParams.set('filter', params.filter)
+    }
+    if (params?.q) {
+      searchParams.set('q', params.q)
+    }
+    if (params?.namespace) {
+      searchParams.set('namespace', params.namespace)
     }
     return fetchJson<{ items: SkillSummary[]; total: number; page: number; size: number }>(`${WEB_API_PREFIX}/me/skills?${searchParams.toString()}`)
   },

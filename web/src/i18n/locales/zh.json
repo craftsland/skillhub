@@ -189,6 +189,7 @@
     "noStarredResults": "未找到已收藏技能",
     "noStarredResultsFor": "已收藏技能中没有与 \"{{q}}\" 相关的结果",
     "noStarredSkills": "你还没有收藏任何技能",
+    "namespaceFilter": "@{{namespace}}",
     "enterKeyword": "请输入搜索关键词",
     "results": "找到 {{count}} 个技能",
     "resultCount": "找到 <1>{{count}}</1> 个结果",
@@ -339,6 +340,12 @@
   "mySkills": {
     "title": "我的技能",
     "subtitle": "管理你发布的技能",
+    "searchPlaceholder": "搜索技能名称、Slug 或描述",
+    "namespaceFilterLabel": "按命名空间过滤",
+    "namespaceFilterAll": "全部命名空间",
+    "clearSearch": "清除筛选",
+    "emptySearchTitle": "未找到匹配的技能",
+    "emptySearchDescription": "试试调整关键字或切换命名空间",
     "filters": {
       "ALL": "全部",
       "PENDING_REVIEW": "待审核",
@@ -784,6 +791,8 @@
     "documentationSource": "来源：{{path}}",
     "documentationUnavailableTitle": "文档暂时不可用",
     "documentationUnavailable": "当前无法读取这个技能版本的文档文件。你仍然可以在文件列表里查看包内容。",
+    "packageLinkMissingTitle": "文件未找到",
+    "packageLinkMissingDescription": "该链接指向的文件不在当前技能版本中。",
     "authorLabel": "作者 {{name}}",
     "expandOverview": "展开全文",
     "collapseOverview": "收起内容",
@@ -801,6 +810,8 @@
     "namespaceLabel": "命名空间",
     "loginToRate": "登录后可以收藏和评分",
     "install": "安装",
+    "installMethodClawhub": "ClawHub CLI",
+    "installMethodSkillhub": "SkillHub CLI",
     "download": "下载",
     "labelsSectionTitle": "标签管理",
     "labelsSectionDescription": "为这个技能挂载或移除推荐标签，帮助用户筛选和发现。",
@@ -1278,7 +1289,8 @@
     "prev": "上一页",
     "next": "下一页",
     "pagePrefix": "第",
-    "pageSuffix": "页"
+    "pageSuffix": "页",
+    "goToPage": "第 {{page}} 页"
   },
   "user": {
     "menu": {

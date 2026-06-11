@@ -916,6 +916,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/web/namespaces/{slug}/transfer-ownership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferOwnership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/namespaces/{slug}/transfer-ownership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferOwnership_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/web/namespaces/{slug}/restore": {
         parameters: {
             query?: never;
@@ -3685,6 +3717,21 @@ export interface components {
             /** Format: int64 */
             targetNamespaceId?: number;
         };
+        TransferOwnershipRequest: {
+            newOwnerId: string;
+        };
+        ApiResponseMessageResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["MessageResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        MessageResponse: {
+            message?: string;
+        };
         BatchMemberRequest: {
             members: components["schemas"]["MemberRequest"][];
         };
@@ -3780,18 +3827,6 @@ export interface components {
         };
         AuthorizeRequest: {
             userCode?: string;
-        };
-        ApiResponseMessageResponse: {
-            /** Format: int32 */
-            code?: number;
-            msg?: string;
-            data?: components["schemas"]["MessageResponse"];
-            /** Format: date-time */
-            timestamp?: string;
-            requestId?: string;
-        };
-        MessageResponse: {
-            message?: string;
         };
         SessionBootstrapRequest: {
             provider: string;
@@ -3977,8 +4012,8 @@ export interface components {
             valid?: boolean;
             errors?: string[];
             warnings?: string[];
-            resolvedSlug?: string | null;
-            resolvedVersion?: string | null;
+            resolvedSlug?: string;
+            resolvedVersion?: string;
         };
         UpdateProfileRequest: {
             displayName?: string;
@@ -7031,6 +7066,58 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseNamespaceResponse"];
+                };
+            };
+        };
+    };
+    transferOwnership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferOwnershipRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMessageResponse"];
+                };
+            };
+        };
+    };
+    transferOwnership_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferOwnershipRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMessageResponse"];
                 };
             };
         };

@@ -86,6 +86,21 @@ class SkillPackageArchiveExtractorTest {
     }
 
     @Test
+    void canonicalizesCaseInsensitiveSkillMdAtRoot() throws Exception {
+        byte[] zipBytes = createZip(Map.of(
+                "skill.md", "---\nname: test\n---\n".getBytes(),
+                "README.md", "# readme".getBytes()
+        ));
+        MockMultipartFile file = new MockMultipartFile("file", "test.zip", "application/zip", zipBytes);
+
+        SkillPackageArchiveExtractor.ExtractionResult result = extractor.extractWithWarnings(file);
+
+        assertTrue(result.entries().stream().anyMatch(e -> e.path().equals("SKILL.md")));
+        assertTrue(result.entries().stream().noneMatch(e -> e.path().equals("skill.md")));
+        assertTrue(result.warnings().isEmpty());
+    }
+
+    @Test
     void doesNotStripWhenMultipleRootEntries() throws Exception {
         byte[] zipBytes = createZip(Map.of(
                 "SKILL.md", "---\nname: test\n---\n".getBytes(),
@@ -131,6 +146,23 @@ class SkillPackageArchiveExtractorTest {
     void promotesSkillMdFromSubdirectoryAndDiscardsRootFiles() throws Exception {
         byte[] zipBytes = createZip(Map.of(
                 "my-skill/SKILL.md", "---\nname: test\n---\n".getBytes(),
+                "my-skill/README.md", "# readme".getBytes(),
+                "other.txt", "stray file".getBytes()
+        ));
+        MockMultipartFile file = new MockMultipartFile("file", "test.zip", "application/zip", zipBytes);
+
+        SkillPackageArchiveExtractor.ExtractionResult result = extractor.extractWithWarnings(file);
+
+        assertEquals(2, result.entries().size());
+        assertTrue(result.entries().stream().anyMatch(e -> e.path().equals("SKILL.md")));
+        assertTrue(result.entries().stream().anyMatch(e -> e.path().equals("README.md")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("other.txt")));
+    }
+
+    @Test
+    void promotesCaseInsensitiveSkillMdFromSubdirectory() throws Exception {
+        byte[] zipBytes = createZip(Map.of(
+                "my-skill/skill.md", "---\nname: test\n---\n".getBytes(),
                 "my-skill/README.md", "# readme".getBytes(),
                 "other.txt", "stray file".getBytes()
         ));

@@ -11,6 +11,10 @@ function latestSeed(seed: PreparedSearchSeed) {
   }
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 let seeded: PreparedSearchSeed | undefined
 
 test.describe('Public Skill Detail Anonymous Access (Real API)', () => {
@@ -36,11 +40,25 @@ test.describe('Public Skill Detail Anonymous Access (Real API)', () => {
 
     await card.click()
 
-    await expect(page).toHaveURL(new RegExp(`/space/${current.skill.namespace}/${current.skill.slug}$`))
+    await expect(page).toHaveURL(new RegExp(`/space/${current.skill.namespace}/${current.skill.slug}(\\?|$)`))
     await expect(page).not.toHaveURL(/\/login\?returnTo=/)
     await expect(page.getByRole('heading', { name: current.skillName, exact: true })).toBeVisible()
     await expect(page.getByText('Install', { exact: true })).toBeVisible()
-    await expect(page.getByText(new RegExp(`npx clawhub install ${current.skill.slug}`))).toBeVisible()
+    const clawhubTarget = current.skill.namespace === 'global'
+      ? current.skill.slug
+      : `${current.skill.namespace}--${current.skill.slug}`
+    const skillhubNamespace = current.skill.namespace === 'global'
+      ? ''
+      : ` --namespace ${current.skill.namespace}`
+
+    await expect(page.getByRole('tab', { name: 'ClawHub CLI' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByText(new RegExp(`npx clawhub install ${escapeRegExp(clawhubTarget)} --registry`))).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'SkillHub CLI' })).toBeVisible()
+
+    await page.getByRole('tab', { name: 'SkillHub CLI' }).click()
+
+    await expect(page.getByRole('tab', { name: 'SkillHub CLI' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByText(new RegExp(`npx @astron-team/skillhub@latest install ${escapeRegExp(current.skill.slug)}${escapeRegExp(skillhubNamespace)} --registry`))).toBeVisible()
     await expect(page.getByRole('button', { name: 'Copy' }).first()).toBeVisible()
   })
 })

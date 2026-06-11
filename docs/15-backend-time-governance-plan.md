@@ -57,6 +57,10 @@
 - 数据库列统一为 `TIMESTAMPTZ`
 - 读写都按 UTC 绝对时间处理
 
+进度登记：
+
+- `audit_log.created_at` 已通过 V42 迁移到 `TIMESTAMPTZ`，详见 `docs/16-backend-time-inventory.md` §3.1
+
 ### 3.2 业务输入时间
 
 适用场景：

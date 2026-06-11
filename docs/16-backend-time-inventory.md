@@ -131,6 +131,8 @@
   - `review_task.submitted_at / reviewed_at`
   - `promotion_request.submitted_at / reviewed_at`
   - `idempotency_record.created_at / expires_at`
+- `V42__audit_log_created_at_timestamptz.sql`
+  - `audit_log.created_at`
 
 ### 3.2 当前状态
 

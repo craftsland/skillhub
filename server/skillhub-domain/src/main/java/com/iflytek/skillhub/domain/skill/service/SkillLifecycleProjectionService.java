@@ -67,9 +67,9 @@ public class SkillLifecycleProjectionService {
         VersionProjection publishedVersion = toProjection(published);
         VersionProjection ownerPreviewVersion = toProjection(preview);
         VersionProjection headlineVersion = publishedVersion != null ? publishedVersion : ownerPreviewVersion;
-        ResolutionMode resolutionMode = published != null ? ResolutionMode.PUBLISHED
-                : preview != null ? ResolutionMode.OWNER_PREVIEW
-                : ResolutionMode.NONE;
+        ResolutionMode resolutionMode = headlineVersion == null ? ResolutionMode.NONE
+                : publishedVersion != null ? ResolutionMode.PUBLISHED
+                : ResolutionMode.OWNER_PREVIEW;
         return new Projection(headlineVersion, publishedVersion, ownerPreviewVersion, resolutionMode);
     }
 

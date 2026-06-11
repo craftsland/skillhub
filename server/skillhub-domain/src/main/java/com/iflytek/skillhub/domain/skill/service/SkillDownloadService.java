@@ -4,7 +4,6 @@ import com.iflytek.skillhub.domain.event.SkillDownloadedEvent;
 import com.iflytek.skillhub.domain.namespace.Namespace;
 import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
-import com.iflytek.skillhub.domain.namespace.NamespaceType;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.skill.*;
@@ -169,16 +168,20 @@ public class SkillDownloadService {
 
         // Only increment download count for PUBLISHED versions
         if (version.getStatus() == SkillVersionStatus.PUBLISHED) {
-            skillRepository.incrementDownloadCount(skill.getId());
-            skillVersionStatsRepository.incrementDownloadCount(version.getId(), skill.getId());
-            eventPublisher.publishEvent(new SkillDownloadedEvent(skill.getId(), version.getId()));
+            recordPublishedDownload(skill, version);
         }
         return result;
     }
 
+    private void recordPublishedDownload(Skill skill, SkillVersion version) {
+        skillRepository.incrementDownloadCount(skill.getId());
+        skillVersionStatsRepository.incrementDownloadCount(version.getId(), skill.getId());
+        eventPublisher.publishEvent(new SkillDownloadedEvent(skill.getId(), version.getId()));
+    }
+
     private DownloadResult buildDownloadResult(Skill skill, SkillVersion version) {
 
-        String storageKey = String.format("packages/%d/%d/bundle.zip", skill.getId(), version.getId());
+        String storageKey = buildBundleStorageKey(skill, version);
 
         DownloadResult result;
         if (objectStorageService.exists(storageKey)) {
@@ -203,6 +206,10 @@ public class SkillDownloadService {
             result = buildBundleFromFiles(skill, version);
         }
         return result;
+    }
+
+    private String buildBundleStorageKey(Skill skill, SkillVersion version) {
+        return String.format("packages/%d/%d/bundle.zip", skill.getId(), version.getId());
     }
 
     private DownloadResult buildBundleFromFiles(Skill skill, SkillVersion version) {
@@ -268,7 +275,7 @@ public class SkillDownloadService {
                                    Skill skill,
                                    String currentUserId,
                                    Map<Long, NamespaceRole> userNsRoles) {
-        if (currentUserId == null && !isAnonymousDownloadAllowed(namespace, skill)) {
+        if (currentUserId == null && !isAnonymousDownloadAllowed(skill)) {
             throw new DomainForbiddenException("error.skill.access.denied", skill.getSlug());
         }
         if (!visibilityChecker.canAccess(skill, currentUserId, userNsRoles)) {
@@ -276,9 +283,8 @@ public class SkillDownloadService {
         }
     }
 
-    private boolean isAnonymousDownloadAllowed(Namespace namespace, Skill skill) {
-        return namespace.getType() == NamespaceType.GLOBAL
-                && skill.getVisibility() == SkillVisibility.PUBLIC;
+    private boolean isAnonymousDownloadAllowed(Skill skill) {
+        return skill.getVisibility() == SkillVisibility.PUBLIC;
     }
 
     private Skill resolveVisibleSkill(Long namespaceId, String slug, String currentUserId) {

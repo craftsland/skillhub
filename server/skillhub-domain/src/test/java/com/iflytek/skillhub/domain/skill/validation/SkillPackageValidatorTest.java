@@ -41,6 +41,35 @@ class SkillPackageValidatorTest {
     }
 
     @Test
+    void normalizesSkillMdFilenameCase() {
+        assertEquals("SKILL.md", SkillPackagePolicy.normalizeEntryPath("skill.md"));
+        assertEquals("SKILL.md", SkillPackagePolicy.normalizeEntryPath("Skill.MD"));
+        assertEquals("nested/SKILL.md", SkillPackagePolicy.normalizeEntryPath("nested/skill.md"));
+    }
+
+    @Test
+    void acceptsSkillMdFilenameWithDifferentCase() {
+        String skillMdContent = """
+            ---
+            name: test-skill
+            description: A test skill
+            version: 1.0.0
+            ---
+            # Test Skill
+            """;
+
+        List<PackageEntry> entries = List.of(
+            new PackageEntry("skill.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown"),
+            new PackageEntry("README.md", "readme".getBytes(), 6, "text/markdown")
+        );
+
+        ValidationResult result = validator.validate(entries);
+
+        assertTrue(result.passed());
+        assertTrue(result.errors().isEmpty());
+    }
+
+    @Test
     void testMissingSkillMd() {
         List<PackageEntry> entries = List.of(
             new PackageEntry("README.md", "readme".getBytes(), 6, "text/markdown")

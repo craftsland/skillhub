@@ -1,7 +1,13 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { InstallCommand, buildInstallCommand, buildInstallTarget, getBaseUrl } from './install-command'
+import {
+  InstallCommand,
+  buildInstallCommand,
+  buildInstallTarget,
+  buildSkillhubInstallCommand,
+  getBaseUrl,
+} from './install-command'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -62,6 +68,18 @@ describe('install-command', () => {
     )
   })
 
+  it('builds a one-line SkillHub npx command for the global namespace', () => {
+    expect(buildSkillhubInstallCommand('global', 'my-skill', 'https://skill.xfyun.cn')).toBe(
+      'npx @astron-team/skillhub@latest install my-skill --registry https://skill.xfyun.cn',
+    )
+  })
+
+  it('builds a one-line SkillHub npx command with namespace for team skills', () => {
+    expect(buildSkillhubInstallCommand('team-alpha', 'my-skill', 'https://skill.xfyun.cn')).toBe(
+      'npx @astron-team/skillhub@latest install my-skill --namespace team-alpha --registry https://skill.xfyun.cn',
+    )
+  })
+
   it('uses the runtime app base url when available', () => {
     setMockWindow('https://app.example.com')
 
@@ -91,5 +109,34 @@ describe('install-command', () => {
     expect(html).toContain('px-4 py-3')
     expect(html).toContain('leading-relaxed')
     expect(html).toContain('break-all')
+  })
+
+  it('renders install method tabs with only a short active underline', () => {
+    setMockWindow('https://app.example.com')
+
+    const html = renderToStaticMarkup(createElement(InstallCommand, {
+      namespace: 'global',
+      slug: 'meeting-minutes-generator',
+    }))
+
+    expect(html).toContain('after:w-6')
+    expect(html).toContain('after:h-0.5')
+    expect(html).not.toContain('rounded-lg border bg-background/80 p-1')
+    expect(html).not.toContain('flex-1 rounded-md')
+  })
+
+  it('renders ClawHub CLI as the default install method', () => {
+    setMockWindow('https://app.example.com')
+
+    const html = renderToStaticMarkup(createElement(InstallCommand, {
+      namespace: 'team-alpha',
+      slug: 'meeting-minutes-generator',
+    }))
+
+    expect(html).toContain('skillDetail.installMethodClawhub')
+    expect(html).toContain('skillDetail.installMethodSkillhub')
+    expect(html).toContain('aria-selected="true"')
+    expect(html).toContain('npx clawhub install team-alpha--meeting-minutes-generator --registry https://app.example.com')
+    expect(html).not.toContain('npx @astron-team/skillhub@latest install meeting-minutes-generator --namespace team-alpha --registry https://app.example.com')
   })
 })

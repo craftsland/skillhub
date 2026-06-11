@@ -8,6 +8,8 @@ const useMySkillsMock = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+  useLocation: () => ({ pathname: '/dashboard/skills' }),
+  useSearch: () => ({}),
 }))
 
 vi.mock('react-i18next', async () => {
@@ -67,6 +69,14 @@ vi.mock('@/shared/hooks/use-skill-queries', () => ({
 vi.mock('@/shared/hooks/use-user-queries', () => ({
   useMySkills: () => useMySkillsMock(),
   useSubmitPromotion: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
+vi.mock('@/shared/hooks/use-namespace-queries', () => ({
+  useMyNamespaces: () => ({ data: [] }),
+}))
+
+vi.mock('@/shared/hooks/use-debounce', () => ({
+  useDebounce: (value: string) => value,
 }))
 
 vi.mock('@/shared/lib/skill-lifecycle', () => ({

@@ -34,6 +34,8 @@ public class MeController extends BaseApiController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String filter,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String namespace,
             @AuthenticationPrincipal PlatformPrincipal principal) {
         if (principal == null) {
             throw new UnauthorizedException("error.auth.required");
@@ -41,7 +43,7 @@ public class MeController extends BaseApiController {
 
         return ok(
                 "response.success.read",
-                mySkillAppService.listMySkills(principal.userId(), page, size, filter, principal.platformRoles())
+                mySkillAppService.listMySkills(principal.userId(), page, size, filter, q, namespace, principal.platformRoles())
         );
     }
 

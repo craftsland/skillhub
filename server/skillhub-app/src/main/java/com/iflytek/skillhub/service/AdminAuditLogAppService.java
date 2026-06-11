@@ -8,8 +8,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.sql.Timestamp;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
 
@@ -109,7 +112,7 @@ public class AdminAuditLogAppService {
                         rs.getString("request_id"),
                         rs.getString("target_type"),
                         toResourceId(rs.getObject("target_id")),
-                        toInstant(rs.getTimestamp("created_at")))
+                        readInstant(rs, "created_at"))
         );
 
         return new PageResponse<>(items, total == null ? 0 : total, page, size);
@@ -151,13 +154,19 @@ public class AdminAuditLogAppService {
         }
         if (startTime != null) {
             clause.append(" AND al.created_at >= :startTime");
-            parameters.addValue("startTime", Timestamp.from(startTime));
+            parameters.addValue("startTime", toUtcOffsetDateTime(startTime));
         }
         if (endTime != null) {
             clause.append(" AND al.created_at <= :endTime");
-            parameters.addValue("endTime", Timestamp.from(endTime));
+            parameters.addValue("endTime", toUtcOffsetDateTime(endTime));
         }
         return clause.toString();
+    }
+
+    // Bind via OffsetDateTime so pgjdbc sends a TIMESTAMPTZ literal anchored to UTC,
+    // bypassing JVM-default-timezone interpretation that caused the 8h-offset bug.
+    private static OffsetDateTime toUtcOffsetDateTime(Instant instant) {
+        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
     private String renderDetails(String detailJson, String targetType, Object targetId) {
@@ -170,8 +179,11 @@ public class AdminAuditLogAppService {
         return targetType + ":" + targetId;
     }
 
-    private Instant toInstant(Timestamp timestamp) {
-        return timestamp == null ? null : timestamp.toInstant();
+    // Read via getObject(OffsetDateTime.class) to bypass JVM-TZ interpretation
+    // that caused the 8h-offset bug (getTimestamp() applies JVM default TZ).
+    private static Instant readInstant(ResultSet rs, String column) throws SQLException {
+        OffsetDateTime odt = rs.getObject(column, OffsetDateTime.class);
+        return odt == null ? null : odt.toInstant();
     }
 
     private String toResourceId(Object targetId) {

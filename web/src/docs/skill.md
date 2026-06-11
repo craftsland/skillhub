@@ -138,7 +138,8 @@ If a request fails with `403`, check:
 
 ## Skill Package Contract
 
-SkillHub expects OpenSkills-style packages with `SKILL.md` as the entry point.
+SkillHub expects OpenSkills-style packages with canonical `SKILL.md` as the entry point. Uploads
+accept filename case variants such as `skill.md` and normalize them to `SKILL.md`.
 
 ## Publishing Guidance
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iflytek.skillhub.config.SkillPublishProperties;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
+import com.iflytek.skillhub.domain.skill.validation.SkillPackagePolicy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -85,7 +86,7 @@ public class MultipartPackageExtractor {
                         normalizedPath,
                         content,
                         content.length,
-                        SkillPackageContentTypeResolver.determineContentType(normalizedPath)
+                        determineContentType(normalizedPath)
                 ));
             }
         }
@@ -110,7 +111,15 @@ public class MultipartPackageExtractor {
             throw new DomainBadRequestException("error.skill.publish.package.invalid",
                     "Unsafe package path: " + path);
         }
-        return path;
+        return SkillPackagePolicy.canonicalizeSkillMdPath(path);
     }
 
+    private String determineContentType(String filename) {
+        if (filename.endsWith(".py")) return "text/x-python";
+        if (filename.endsWith(".json")) return "application/json";
+        if (filename.endsWith(".yaml") || filename.endsWith(".yml")) return "application/x-yaml";
+        if (filename.endsWith(".txt")) return "text/plain";
+        if (filename.endsWith(".md")) return "text/markdown";
+        return "application/octet-stream";
+    }
 }

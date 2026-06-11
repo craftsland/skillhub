@@ -43,6 +43,7 @@ interface TabsListProps {
 export function TabsList({ children, className }: TabsListProps) {
   return (
     <div
+      role="tablist"
       className={cn(
         'inline-flex items-center gap-6 border-b text-sm',
         className
@@ -69,6 +70,8 @@ export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={isActive}
       onClick={() => context.setValue(value)}
       data-state={isActive ? 'active' : 'inactive'}
       className={cn(
@@ -96,5 +99,5 @@ export function TabsContent({ value, children, className }: TabsContentProps) {
 
   if (context.value !== value) return null
 
-  return <div className={cn('animate-fade-in', className)}>{children}</div>
+  return <div role="tabpanel" className={cn('animate-fade-in', className)}>{children}</div>
 }

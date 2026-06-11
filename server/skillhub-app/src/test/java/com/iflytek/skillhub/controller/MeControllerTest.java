@@ -56,7 +56,7 @@ class MeControllerTest {
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
 
-        given(mySkillAppService.listMySkills("user-42", 1, 5, null, Set.of("USER")))
+        given(mySkillAppService.listMySkills("user-42", 1, 5, null, null, null, Set.of("USER")))
                 .willReturn(new PageResponse<>(
                         List.of(new SkillSummaryResponse(
                                 7L,
@@ -103,7 +103,7 @@ class MeControllerTest {
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
         );
 
-        given(mySkillAppService.listMySkills("user-42", 0, 10, "HIDDEN", Set.of("SUPER_ADMIN")))
+        given(mySkillAppService.listMySkills("user-42", 0, 10, "HIDDEN", null, null, Set.of("SUPER_ADMIN")))
                 .willReturn(new PageResponse<>(List.of(), 0, 0, 10));
 
         mockMvc.perform(get("/api/v1/me/skills")

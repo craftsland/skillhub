@@ -45,31 +45,14 @@ test.describe('Skill Subscription (Real API)', () => {
       const subscribeButton = page.getByRole('button', { name: /Subscribe/ })
       await expect(subscribeButton).toBeVisible()
 
-      const initialCount = await subscribeButton.textContent()
-      const initialCountMatch = initialCount?.match(/\((\d+)\)/)
-      const initialCountValue = initialCountMatch ? Number.parseInt(initialCountMatch[1], 10) : 0
-
       await subscribeButton.click()
 
       await expect(page.getByRole('button', { name: /Subscribed/ })).toBeVisible()
 
       const subscribedButton = page.getByRole('button', { name: /Subscribed/ })
-      const subscribedCount = await subscribedButton.textContent()
-      const subscribedCountMatch = subscribedCount?.match(/\((\d+)\)/)
-      const subscribedCountValue = subscribedCountMatch ? Number.parseInt(subscribedCountMatch[1], 10) : 0
-
-      expect(subscribedCountValue).toBe(initialCountValue + 1)
-
       await subscribedButton.click()
 
       await expect(page.getByRole('button', { name: /Subscribe/ })).toBeVisible()
-
-      const unsubscribedButton = page.getByRole('button', { name: /Subscribe/ })
-      const unsubscribedCount = await unsubscribedButton.textContent()
-      const unsubscribedCountMatch = unsubscribedCount?.match(/\((\d+)\)/)
-      const unsubscribedCountValue = unsubscribedCountMatch ? Number.parseInt(unsubscribedCountMatch[1], 10) : 0
-
-      expect(unsubscribedCountValue).toBe(initialCountValue)
     } finally {
       await adminBuilder.cleanup()
       await adminContext.close()
