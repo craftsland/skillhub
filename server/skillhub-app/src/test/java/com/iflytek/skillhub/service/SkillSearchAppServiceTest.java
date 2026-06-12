@@ -24,11 +24,13 @@ import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -98,8 +100,6 @@ class SkillSearchAppServiceTest {
         when(skillRepository.findByIdIn(List.of(11L))).thenReturn(List.of(visibleSkill));
         when(namespaceRepository.findByIdIn(List.of(2L))).thenReturn(List.of(activeNamespace));
         when(skillVersionRepository.findByIdIn(List.of(111L))).thenReturn(List.of());
-        when(skillVersionRepository.findBySkillIdInAndStatus(List.of(11L), com.iflytek.skillhub.domain.skill.SkillVersionStatus.PUBLISHED))
-                .thenReturn(List.of());
 
         SkillSearchAppService.SearchResponse response = service.search("skill", null, "newest", 0, 1, null, null);
 
@@ -147,8 +147,6 @@ class SkillSearchAppServiceTest {
         when(skillRepository.findByIdIn(List.of(10L))).thenReturn(List.of(visibleSkill));
         when(namespaceRepository.findByIdIn(List.of(1L))).thenReturn(List.of(namespace));
         when(skillVersionRepository.findByIdIn(List.of(101L))).thenReturn(List.of());
-        when(skillVersionRepository.findBySkillIdInAndStatus(List.of(10L), com.iflytek.skillhub.domain.skill.SkillVersionStatus.PUBLISHED))
-                .thenReturn(List.of());
 
         SkillSearchAppService.SearchResponse response = service.search("skill", null, "newest", 0, 20, "user-9", Map.of());
 
@@ -166,6 +164,9 @@ class SkillSearchAppServiceTest {
         setField(second, "id", 11L);
         second.setLatestVersionId(102L);
 
+        SkillVersion firstVersion = publishedVersion(10L, 101L, "1.0.0");
+        SkillVersion secondVersion = publishedVersion(11L, 102L, "2.0.0");
+
         Namespace namespace = new Namespace("team-a", "Team A", "owner-1");
         setField(namespace, "id", 1L);
         namespace.setStatus(NamespaceStatus.ACTIVE);
@@ -174,20 +175,80 @@ class SkillSearchAppServiceTest {
                 .thenReturn(new SearchResult(List.of(10L, 11L), 2, 0, 20));
         when(skillRepository.findByIdIn(List.of(10L, 11L))).thenReturn(List.of(first, second));
         when(namespaceRepository.findByIdIn(List.of(1L))).thenReturn(List.of(namespace));
-        when(skillVersionRepository.findByIdIn(List.of(101L, 102L))).thenReturn(List.of());
-        when(skillVersionRepository.findBySkillIdInAndStatus(List.of(10L, 11L), com.iflytek.skillhub.domain.skill.SkillVersionStatus.PUBLISHED))
-                .thenReturn(List.of());
+        when(skillVersionRepository.findByIdIn(List.of(101L, 102L))).thenReturn(List.of(firstVersion, secondVersion));
 
         SkillSearchAppService.SearchResponse response = service.search(null, null, "newest", 0, 20, null, null);
 
         assertEquals(2, response.items().size());
+        assertEquals("1.0.0", response.items().get(0).publishedVersion().version());
+        assertEquals("2.0.0", response.items().get(1).publishedVersion().version());
         verify(skillVersionRepository, times(1)).findByIdIn(List.of(101L, 102L));
-        verify(skillVersionRepository, times(1))
+        verify(skillVersionRepository, times(0))
                 .findBySkillIdInAndStatus(List.of(10L, 11L), com.iflytek.skillhub.domain.skill.SkillVersionStatus.PUBLISHED);
     }
 
     @Test
-    void search_shouldNotExposeDownloadUnavailableVersionAsPublishedSummary() {
+    void search_shouldNotFallbackToOlderPublishedVersionWhenLatestIsMissing() {
+        Skill skill = new Skill(1L, "missing-latest", "owner-1", SkillVisibility.PUBLIC);
+        setField(skill, "id", 10L);
+
+        SkillVersion oldInstallable = publishedVersion(10L, 100L, "0.9.0");
+
+        Namespace namespace = new Namespace("global", "Global", "owner-1");
+        setField(namespace, "id", 1L);
+        namespace.setStatus(NamespaceStatus.ACTIVE);
+
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(10L), 1, 0, 20));
+        when(skillRepository.findByIdIn(List.of(10L))).thenReturn(List.of(skill));
+        when(namespaceRepository.findByIdIn(List.of(1L))).thenReturn(List.of(namespace));
+        org.mockito.Mockito.lenient()
+                .when(skillVersionRepository.findBySkillIdInAndStatus(List.of(10L), SkillVersionStatus.PUBLISHED))
+                .thenReturn(List.of(oldInstallable));
+
+        SkillSearchAppService.SearchResponse response = service.search(null, null, "newest", 0, 20, null, null);
+
+        assertEquals(1, response.items().size());
+        assertEquals("missing-latest", response.items().getFirst().slug());
+        assertNull(response.items().getFirst().publishedVersion());
+        verify(skillVersionRepository, times(0))
+                .findBySkillIdInAndStatus(List.of(10L), SkillVersionStatus.PUBLISHED);
+    }
+
+    @Test
+    void search_shouldNotFallbackToOlderPublishedVersionWhenLatestIsYanked() {
+        Skill skill = new Skill(1L, "yanked-latest", "owner-1", SkillVisibility.PUBLIC);
+        setField(skill, "id", 10L);
+        skill.setLatestVersionId(101L);
+
+        SkillVersion latest = publishedVersion(10L, 101L, "1.0.0");
+        latest.setYankedAt(Instant.parse("2026-06-12T00:00:00Z"));
+        SkillVersion oldInstallable = publishedVersion(10L, 100L, "0.9.0");
+
+        Namespace namespace = new Namespace("global", "Global", "owner-1");
+        setField(namespace, "id", 1L);
+        namespace.setStatus(NamespaceStatus.ACTIVE);
+
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(10L), 1, 0, 20));
+        when(skillRepository.findByIdIn(List.of(10L))).thenReturn(List.of(skill));
+        when(namespaceRepository.findByIdIn(List.of(1L))).thenReturn(List.of(namespace));
+        when(skillVersionRepository.findByIdIn(List.of(101L))).thenReturn(List.of(latest));
+        org.mockito.Mockito.lenient()
+                .when(skillVersionRepository.findBySkillIdInAndStatus(List.of(10L), SkillVersionStatus.PUBLISHED))
+                .thenReturn(List.of(oldInstallable));
+
+        SkillSearchAppService.SearchResponse response = service.search(null, null, "newest", 0, 20, null, null);
+
+        assertEquals(1, response.items().size());
+        assertEquals("yanked-latest", response.items().getFirst().slug());
+        assertNull(response.items().getFirst().publishedVersion());
+        verify(skillVersionRepository, times(0))
+                .findBySkillIdInAndStatus(List.of(10L), SkillVersionStatus.PUBLISHED);
+    }
+
+    @Test
+    void search_shouldNotFallbackToOlderPublishedVersionWhenLatestDownloadUnavailable() {
         Skill skill = new Skill(1L, "not-ready", "owner-1", SkillVisibility.PUBLIC);
         setField(skill, "id", 10L);
         skill.setLatestVersionId(101L);
@@ -196,6 +257,7 @@ class SkillSearchAppServiceTest {
         setField(version, "id", 101L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
         version.setDownloadReady(false);
+        SkillVersion oldInstallable = publishedVersion(10L, 100L, "0.9.0");
 
         Namespace namespace = new Namespace("global", "Global", "owner-1");
         setField(namespace, "id", 1L);
@@ -206,14 +268,17 @@ class SkillSearchAppServiceTest {
         when(skillRepository.findByIdIn(List.of(10L))).thenReturn(List.of(skill));
         when(namespaceRepository.findByIdIn(List.of(1L))).thenReturn(List.of(namespace));
         when(skillVersionRepository.findByIdIn(List.of(101L))).thenReturn(List.of(version));
-        when(skillVersionRepository.findBySkillIdInAndStatus(List.of(10L), SkillVersionStatus.PUBLISHED))
-                .thenReturn(List.of(version));
+        org.mockito.Mockito.lenient()
+                .when(skillVersionRepository.findBySkillIdInAndStatus(List.of(10L), SkillVersionStatus.PUBLISHED))
+                .thenReturn(List.of(oldInstallable));
 
         SkillSearchAppService.SearchResponse response = service.search(null, null, "newest", 0, 20, null, null);
 
         assertEquals(1, response.items().size());
         assertEquals("not-ready", response.items().getFirst().slug());
-        assertEquals(null, response.items().getFirst().publishedVersion());
+        assertNull(response.items().getFirst().publishedVersion());
+        verify(skillVersionRepository, times(0))
+                .findBySkillIdInAndStatus(List.of(10L), SkillVersionStatus.PUBLISHED);
     }
 
     @Test
@@ -271,5 +336,13 @@ class SkillSearchAppServiceTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private SkillVersion publishedVersion(Long skillId, Long versionId, String versionNumber) {
+        SkillVersion version = new SkillVersion(skillId, versionNumber, "owner-1");
+        setField(version, "id", versionId);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
+        return version;
     }
 }

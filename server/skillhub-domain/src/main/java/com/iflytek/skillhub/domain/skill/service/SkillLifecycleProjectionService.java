@@ -89,21 +89,10 @@ public class SkillLifecycleProjectionService {
                 .collect(Collectors.toMap(SkillVersion::getId, Function.identity()));
 
         Map<Long, SkillVersion> publishedBySkillId = new java.util.HashMap<>();
-        List<Long> unresolvedSkillIds = new java.util.ArrayList<>();
         for (Skill skill : skills) {
             SkillVersion latestVersion = latestVersionsById.get(skill.getLatestVersionId());
             if (SkillInstallability.isInstallableVersion(latestVersion)) {
                 publishedBySkillId.put(skill.getId(), latestVersion);
-            } else {
-                unresolvedSkillIds.add(skill.getId());
-            }
-        }
-
-        if (!unresolvedSkillIds.isEmpty()) {
-            for (SkillVersion version : skillVersionRepository.findBySkillIdInAndStatus(unresolvedSkillIds, SkillVersionStatus.PUBLISHED)) {
-                if (SkillInstallability.isInstallableVersion(version)) {
-                    publishedBySkillId.merge(version.getSkillId(), version, this::newerVersion);
-                }
             }
         }
 
@@ -158,10 +147,6 @@ public class SkillLifecycleProjectionService {
                 .comparing(SkillVersion::getPublishedAt, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(SkillVersion::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(SkillVersion::getId, Comparator.nullsLast(Comparator.naturalOrder()));
-    }
-
-    private SkillVersion newerVersion(SkillVersion left, SkillVersion right) {
-        return versionComparator().compare(left, right) >= 0 ? left : right;
     }
 
     private VersionProjection toProjection(SkillVersion version) {
