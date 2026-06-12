@@ -27,6 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -440,6 +441,17 @@ class SkillQueryServiceTest {
     }
 
     @Test
+    void testIsDownloadAvailable_ShouldReturnFalseWhenVersionIsYanked() throws Exception {
+        SkillVersion version = new SkillVersion(1L, "1.0.0", "user-100");
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
+        version.setYankedAt(Instant.parse("2026-06-12T00:00:00Z"));
+
+        assertFalse(service.isDownloadAvailable(version));
+    }
+
+    @Test
     void testIsDownloadAvailable_ShouldNotHitObjectStorageForListSignals() throws Exception {
         SkillVersion version = new SkillVersion(1L, "1.0.0", "user-100");
         setId(version, 10L);
@@ -565,9 +577,11 @@ class SkillQueryServiceTest {
         SkillVersion version100 = new SkillVersion(1L, "1.0.0", "user-100");
         setId(version100, 9L);
         version100.setStatus(SkillVersionStatus.PUBLISHED);
+        version100.setDownloadReady(true);
         SkillVersion version110 = new SkillVersion(1L, "1.1.0", "user-100");
         setId(version110, 10L);
         version110.setStatus(SkillVersionStatus.PUBLISHED);
+        version110.setDownloadReady(true);
 
         SkillFile version100File = new SkillFile(9L, "SKILL.md", 10L, "text/markdown", "hash100", "key100");
         SkillFile version110File = new SkillFile(10L, "SKILL.md", 10L, "text/markdown", "hash110", "key110");
@@ -611,6 +625,7 @@ class SkillQueryServiceTest {
         SkillVersion version = new SkillVersion(3L, "1.0.0 beta", "user-100");
         setId(version, 11L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
         SkillFile file = new SkillFile(11L, "SKILL.md", 10L, "text/markdown", "hash", "key");
 
         when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
@@ -630,6 +645,35 @@ class SkillQueryServiceTest {
         );
 
         assertEquals("/api/v1/skills/global/smoke-skill-two/versions/1.0.0%20beta/download", result.downloadUrl());
+    }
+
+    @Test
+    void testResolveVersion_ShouldRejectDownloadUnavailableLatestVersion() throws Exception {
+        String namespaceSlug = "global";
+        String skillSlug = "not-ready";
+
+        Namespace namespace = new Namespace(namespaceSlug, "Global", "owner-1");
+        setId(namespace, 1L);
+        Skill skill = new Skill(1L, skillSlug, "owner-1", SkillVisibility.PUBLIC);
+        setId(skill, 3L);
+        skill.setStatus(SkillStatus.ACTIVE);
+        skill.setLatestVersionId(11L);
+
+        SkillVersion version = new SkillVersion(3L, "1.0.0", "owner-1");
+        setId(version, 11L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(false);
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
+        when(skillVersionRepository.findBySkillIdAndStatus(3L, SkillVersionStatus.PUBLISHED)).thenReturn(List.of(version));
+        when(skillVersionRepository.findById(11L)).thenReturn(Optional.of(version));
+
+        DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () ->
+                service.resolveVersion(namespaceSlug, skillSlug, null, null, null, null, Map.of()));
+
+        assertEquals("error.skill.version.notDownloadable", ex.messageCode());
+        assertArrayEquals(new Object[]{"1.0.0"}, ex.messageArgs());
     }
 
     @Test

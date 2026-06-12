@@ -77,6 +77,37 @@ class CliSkillAppServiceTest {
     }
 
     @Test
+    void search_filtersResultsWithoutInstallablePublishedVersion() {
+        var searchResponse = new SkillSearchAppService.SearchResponse(
+                List.of(
+                        new SkillSummaryResponse(
+                                1L, "draft-only", "Draft Only", "No installable version",
+                                "PUBLIC", "ACTIVE", 0L, 0, BigDecimal.ZERO, 0,
+                                "global", Instant.now(), false,
+                                null, null, null, "NONE"
+                        ),
+                        new SkillSummaryResponse(
+                                2L, "ready", "Ready", "Installable",
+                                "PUBLIC", "ACTIVE", 0L, 0, BigDecimal.ZERO, 0,
+                                "global", Instant.now(), false,
+                                new SkillLifecycleVersionResponse(2L, "1.0.0", "PUBLISHED"),
+                                new SkillLifecycleVersionResponse(2L, "1.0.0", "PUBLISHED"),
+                                null, "PUBLISHED"
+                        )
+                ),
+                2L, 0, 20
+        );
+        given(skillSearchAppService.search("demo", null, "newest", 0, 20, null, null))
+                .willReturn(searchResponse);
+
+        var result = service.search("demo", 20, null, null);
+
+        assertEquals(1, result.items().size());
+        assertEquals("ready", result.items().getFirst().slug());
+        assertEquals(1L, result.total());
+    }
+
+    @Test
     void resolve_delegatesToQueryService() {
         given(skillQueryService.resolveVersion("global", "demo", "2.0.0", null, null, "user-1", Map.of()))
                 .willReturn(new SkillQueryService.ResolvedVersionDTO(

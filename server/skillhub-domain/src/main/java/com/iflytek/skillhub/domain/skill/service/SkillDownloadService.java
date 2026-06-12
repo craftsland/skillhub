@@ -163,7 +163,7 @@ public class SkillDownloadService {
 
     private DownloadResult downloadVersion(Skill skill, SkillVersion version) {
         assertPublishedAccessible(skill);
-        assertDownloadableVersion(skill, version);
+        assertDownloadableVersion(version);
         DownloadResult result = buildDownloadResult(skill, version);
 
         // Only increment download count for PUBLISHED versions
@@ -301,21 +301,9 @@ public class SkillDownloadService {
         }
     }
 
-    /**
-     * Asserts that the version can be downloaded.
-     * - PUBLISHED: anyone with skill access can download
-     * - UPLOADED/PENDING_REVIEW: only skill owner can download
-     */
-    private void assertDownloadableVersion(Skill skill, SkillVersion version) {
-        switch (version.getStatus()) {
-            case PUBLISHED -> {
-                // Anyone with skill access can download published versions
-            }
-            case UPLOADED, PENDING_REVIEW -> {
-                // Only owner can download UPLOADED/PENDING_REVIEW versions
-                // Note: This check is already done in assertCanDownload via visibilityChecker
-            }
-            default -> throw new DomainBadRequestException("error.skill.version.notDownloadable", version.getVersion());
+    private void assertDownloadableVersion(SkillVersion version) {
+        if (!SkillInstallability.isInstallableVersion(version)) {
+            throw new DomainBadRequestException("error.skill.version.notDownloadable", version.getVersion());
         }
     }
 }

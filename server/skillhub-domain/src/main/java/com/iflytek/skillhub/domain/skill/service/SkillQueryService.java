@@ -487,13 +487,7 @@ public class SkillQueryService {
     }
 
     public boolean isDownloadAvailable(SkillVersion version) {
-        if (version == null) {
-            return false;
-        }
-        if (version.getStatus() != SkillVersionStatus.PUBLISHED) {
-            return false;
-        }
-        return version.isDownloadReady();
+        return SkillInstallability.isInstallableVersion(version);
     }
 
     public ReviewSkillSnapshotDTO getReviewSkillSnapshot(Long skillVersionId) {
@@ -565,6 +559,7 @@ public class SkillQueryService {
         Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
         assertPublishedAccessible(namespace, skill, currentUserId, userNsRoles);
         SkillVersion resolved = resolveVersionEntity(skill, version, tag, hash);
+        assertInstallableVersion(resolved, resolved.getVersion());
         String fingerprint = computeFingerprint(resolved);
         Boolean matched = hash == null || hash.isBlank() ? null : Objects.equals(hash, fingerprint);
 
@@ -913,6 +908,12 @@ public class SkillQueryService {
     private void assertPublishedVersion(SkillVersion version, String versionStr) {
         if (version.getStatus() != SkillVersionStatus.PUBLISHED) {
             throw new DomainBadRequestException("error.skill.version.notPublished", versionStr);
+        }
+    }
+
+    private void assertInstallableVersion(SkillVersion version, String versionStr) {
+        if (!SkillInstallability.isInstallableVersion(version)) {
+            throw new DomainBadRequestException("error.skill.version.notDownloadable", versionStr);
         }
     }
 

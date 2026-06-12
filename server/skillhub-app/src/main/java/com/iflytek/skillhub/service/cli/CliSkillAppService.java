@@ -56,15 +56,16 @@ public class CliSkillAppService {
         );
 
         List<CliSearchItem> items = response.items().stream()
+                .filter(item -> item.publishedVersion() != null)
                 .map(item -> new CliSearchItem(
                         item.namespace(),
                         item.slug(),
-                        item.publishedVersion() != null ? item.publishedVersion().version() : null,
+                        item.publishedVersion().version(),
                         item.summary()
                 ))
                 .toList();
 
-        return new CliSearchResult(items, response.total(), limit);
+        return new CliSearchResult(items, items.size(), limit);
     }
 
     public CliResolveResponse resolve(String namespace, String slug, String version, String userId, Map<Long, NamespaceRole> userNsRoles) {

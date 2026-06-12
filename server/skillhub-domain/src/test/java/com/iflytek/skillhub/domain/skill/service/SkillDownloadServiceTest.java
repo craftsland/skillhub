@@ -91,6 +91,7 @@ class SkillDownloadServiceTest {
         SkillVersion version = new SkillVersion(1L, "1.0.0", userId);
         setId(version, 10L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
         String storageKey = "packages/1/10/bundle.zip";
         InputStream content = new ByteArrayInputStream("test".getBytes());
         ObjectMetadata metadata = new ObjectMetadata(1000L, "application/zip", Instant.now());
@@ -136,6 +137,7 @@ class SkillDownloadServiceTest {
         SkillVersion version = new SkillVersion(1L, "1.0.0", userId);
         setId(version, 10L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
         String storageKey = "packages/1/10/bundle.zip";
         InputStream content = new ByteArrayInputStream("test".getBytes());
         ObjectMetadata metadata = new ObjectMetadata(1000L, "application/zip", Instant.now());
@@ -179,6 +181,7 @@ class SkillDownloadServiceTest {
         SkillVersion version = new SkillVersion(1L, versionStr, userId);
         setId(version, 10L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
         String storageKey = "packages/1/10/bundle.zip";
         InputStream content = new ByteArrayInputStream("test".getBytes());
         ObjectMetadata metadata = new ObjectMetadata(1000L, "application/zip", Instant.now());
@@ -232,6 +235,73 @@ class SkillDownloadServiceTest {
     }
 
     @Test
+    void testDownloadVersion_ShouldRejectDownloadUnavailablePublishedVersion() throws Exception {
+        String namespaceSlug = "test-ns";
+        String skillSlug = "test-skill";
+        String versionStr = "1.0.0";
+        String userId = "user-100";
+        Map<Long, NamespaceRole> userNsRoles = Map.of(1L, NamespaceRole.MEMBER);
+
+        Namespace namespace = new Namespace(namespaceSlug, "Test NS", "user-1");
+        setId(namespace, 1L);
+        Skill skill = new Skill(1L, skillSlug, userId, SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+        skill.setStatus(SkillStatus.ACTIVE);
+        SkillVersion version = new SkillVersion(1L, versionStr, userId);
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(false);
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
+        when(visibilityChecker.canAccess(skill, userId, userNsRoles)).thenReturn(true);
+        when(skillVersionRepository.findBySkillIdAndVersion(1L, versionStr)).thenReturn(Optional.of(version));
+
+        DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () ->
+                service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles));
+
+        assertEquals("error.skill.version.notDownloadable", ex.messageCode());
+        assertArrayEquals(new Object[]{versionStr}, ex.messageArgs());
+        verify(skillRepository, never()).incrementDownloadCount(anyLong());
+        verify(skillVersionStatsRepository, never()).incrementDownloadCount(anyLong(), anyLong());
+        verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));
+    }
+
+    @Test
+    void testDownloadVersion_ShouldRejectYankedPublishedVersion() throws Exception {
+        String namespaceSlug = "test-ns";
+        String skillSlug = "test-skill";
+        String versionStr = "1.0.0";
+        String userId = "user-100";
+        Map<Long, NamespaceRole> userNsRoles = Map.of(1L, NamespaceRole.MEMBER);
+
+        Namespace namespace = new Namespace(namespaceSlug, "Test NS", "user-1");
+        setId(namespace, 1L);
+        Skill skill = new Skill(1L, skillSlug, userId, SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+        skill.setStatus(SkillStatus.ACTIVE);
+        SkillVersion version = new SkillVersion(1L, versionStr, userId);
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
+        version.setYankedAt(Instant.parse("2026-06-12T00:00:00Z"));
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
+        when(visibilityChecker.canAccess(skill, userId, userNsRoles)).thenReturn(true);
+        when(skillVersionRepository.findBySkillIdAndVersion(1L, versionStr)).thenReturn(Optional.of(version));
+
+        DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () ->
+                service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles));
+
+        assertEquals("error.skill.version.notDownloadable", ex.messageCode());
+        assertArrayEquals(new Object[]{versionStr}, ex.messageArgs());
+        verify(skillRepository, never()).incrementDownloadCount(anyLong());
+        verify(skillVersionStatsRepository, never()).incrementDownloadCount(anyLong(), anyLong());
+        verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));
+    }
+
+    @Test
     void testDownloadVersion_ShouldFallbackToBundledFilesWhenBundleIsMissing() throws Exception {
         String namespaceSlug = "test-ns";
         String skillSlug = "test-skill";
@@ -248,6 +318,7 @@ class SkillDownloadServiceTest {
         SkillVersion version = new SkillVersion(1L, versionStr, userId);
         setId(version, 10L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
         SkillFile file = new SkillFile(10L, "SKILL.md", 4L, "text/markdown", "hash", "skills/1/10/SKILL.md");
 
         when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
@@ -296,6 +367,7 @@ class SkillDownloadServiceTest {
         SkillVersion version = new SkillVersion(1L, "1.0.0", "owner-1");
         setId(version, 10L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
 
         when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(namespace));
         when(skillRepository.findByNamespaceIdAndSlug(1L, "demo-skill")).thenReturn(List.of(skill));
@@ -331,6 +403,7 @@ class SkillDownloadServiceTest {
         SkillVersion version = new SkillVersion(1L, "1.0.0", "owner-1");
         setId(version, 10L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
 
         when(namespaceRepository.findBySlug("team-ai")).thenReturn(Optional.of(namespace));
         when(skillRepository.findByNamespaceIdAndSlug(2L, "demo-skill")).thenReturn(List.of(skill));

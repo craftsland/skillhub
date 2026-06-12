@@ -8,7 +8,9 @@ import com.iflytek.skillhub.domain.namespace.NamespaceStatus;
 import com.iflytek.skillhub.domain.namespace.NamespaceService;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
 import com.iflytek.skillhub.search.SearchQuery;
@@ -182,6 +184,36 @@ class SkillSearchAppServiceTest {
         verify(skillVersionRepository, times(1)).findByIdIn(List.of(101L, 102L));
         verify(skillVersionRepository, times(1))
                 .findBySkillIdInAndStatus(List.of(10L, 11L), com.iflytek.skillhub.domain.skill.SkillVersionStatus.PUBLISHED);
+    }
+
+    @Test
+    void search_shouldNotExposeDownloadUnavailableVersionAsPublishedSummary() {
+        Skill skill = new Skill(1L, "not-ready", "owner-1", SkillVisibility.PUBLIC);
+        setField(skill, "id", 10L);
+        skill.setLatestVersionId(101L);
+
+        SkillVersion version = new SkillVersion(10L, "1.0.0", "owner-1");
+        setField(version, "id", 101L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(false);
+
+        Namespace namespace = new Namespace("global", "Global", "owner-1");
+        setField(namespace, "id", 1L);
+        namespace.setStatus(NamespaceStatus.ACTIVE);
+
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(10L), 1, 0, 20));
+        when(skillRepository.findByIdIn(List.of(10L))).thenReturn(List.of(skill));
+        when(namespaceRepository.findByIdIn(List.of(1L))).thenReturn(List.of(namespace));
+        when(skillVersionRepository.findByIdIn(List.of(101L))).thenReturn(List.of(version));
+        when(skillVersionRepository.findBySkillIdInAndStatus(List.of(10L), SkillVersionStatus.PUBLISHED))
+                .thenReturn(List.of(version));
+
+        SkillSearchAppService.SearchResponse response = service.search(null, null, "newest", 0, 20, null, null);
+
+        assertEquals(1, response.items().size());
+        assertEquals("not-ready", response.items().getFirst().slug());
+        assertEquals(null, response.items().getFirst().publishedVersion());
     }
 
     @Test
