@@ -10,9 +10,12 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -37,49 +40,74 @@ public class ApiTokenAuthenticationFilter extends OncePerRequestFilter {
     private final UserAccountRepository userRepo;
     private final UserRoleBindingRepository roleBindingRepo;
     private final ApiTokenScopeService apiTokenScopeService;
+    private final AuthenticationEntryPoint authenticationEntryPoint;
 
+    @Autowired
     public ApiTokenAuthenticationFilter(ApiTokenService apiTokenService,
                                         UserAccountRepository userRepo,
                                         UserRoleBindingRepository roleBindingRepo,
-                                        ApiTokenScopeService apiTokenScopeService) {
+                                        ApiTokenScopeService apiTokenScopeService,
+                                        AuthenticationEntryPoint authenticationEntryPoint) {
         this.apiTokenService = apiTokenService;
         this.userRepo = userRepo;
         this.roleBindingRepo = roleBindingRepo;
         this.apiTokenScopeService = apiTokenScopeService;
+        this.authenticationEntryPoint = authenticationEntryPoint;
+    }
+
+    ApiTokenAuthenticationFilter(ApiTokenService apiTokenService,
+                                 UserAccountRepository userRepo,
+                                 UserRoleBindingRepository roleBindingRepo,
+                                 ApiTokenScopeService apiTokenScopeService) {
+        this(apiTokenService, userRepo, roleBindingRepo, apiTokenScopeService,
+            (request, response, authException) ->
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, authException.getMessage()));
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String authHeader = request.getHeader(AUTH_HEADER);
-        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-            String rawToken = authHeader.substring(BEARER_PREFIX.length());
-            apiTokenService.validateToken(rawToken).ifPresent(token -> {
-                userRepo.findById(token.getUserId()).ifPresent(user -> {
-                    if (!user.isActive()) {
-                        return;
-                    }
-                    Set<String> roles = roleBindingRepo.findByUserId(user.getId()).stream()
-                        .map(rb -> rb.getRole().getCode())
-                        .collect(Collectors.toSet());
-                    roles = PlatformRoleDefaults.withDefaultUserRole(roles);
-                    Set<String> scopes = apiTokenScopeService.parseScopes(token.getScopeJson());
-                    PlatformPrincipal principal = new PlatformPrincipal(
-                        user.getId(), user.getDisplayName(), user.getEmail(),
-                        user.getAvatarUrl(), "api_token", roles
-                    );
-                    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-                    authorities.addAll(roles.stream()
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                        .toList());
-                    authorities.addAll(scopes.stream()
-                        .map(scope -> new SimpleGrantedAuthority("SCOPE_" + scope))
-                        .toList());
-                    var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                    apiTokenService.touchLastUsed(token);
-                });
-            });
+        if (authHeader != null && isBearerAuthorization(authHeader)) {
+            String rawToken = extractBearerToken(authHeader);
+            if (rawToken == null) {
+                rejectBearer(request, response);
+                return;
+            }
+
+            var token = apiTokenService.validateToken(rawToken);
+            if (token.isEmpty()) {
+                rejectBearer(request, response);
+                return;
+            }
+
+            ApiToken apiToken = token.get();
+            var user = userRepo.findById(apiToken.getUserId());
+            if (user.isEmpty() || !user.get().isActive()) {
+                rejectBearer(request, response);
+                return;
+            }
+
+            UserAccount userAccount = user.get();
+            Set<String> roles = roleBindingRepo.findByUserId(userAccount.getId()).stream()
+                .map(rb -> rb.getRole().getCode())
+                .collect(Collectors.toSet());
+            roles = PlatformRoleDefaults.withDefaultUserRole(roles);
+            Set<String> scopes = apiTokenScopeService.parseScopes(apiToken.getScopeJson());
+            PlatformPrincipal principal = new PlatformPrincipal(
+                userAccount.getId(), userAccount.getDisplayName(), userAccount.getEmail(),
+                userAccount.getAvatarUrl(), "api_token", roles
+            );
+            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+            authorities.addAll(roles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .toList());
+            authorities.addAll(scopes.stream()
+                .map(scope -> new SimpleGrantedAuthority("SCOPE_" + scope))
+                .toList());
+            var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+            SecurityContextHolder.getContext().setAuthentication(auth);
+            apiTokenService.touchLastUsed(apiToken);
         }
         filterChain.doFilter(request, response);
     }
@@ -90,5 +118,31 @@ public class ApiTokenAuthenticationFilter extends OncePerRequestFilter {
         return !(path.startsWith("/api/v1/")
             || path.startsWith("/api/web/")
             || path.startsWith("/api/cli/"));
+    }
+
+    private boolean isBearerAuthorization(String authHeader) {
+        if (!authHeader.regionMatches(true, 0, "Bearer", 0, "Bearer".length())) {
+            return false;
+        }
+        return authHeader.length() == "Bearer".length()
+            || Character.isWhitespace(authHeader.charAt("Bearer".length()));
+    }
+
+    private String extractBearerToken(String authHeader) {
+        if (authHeader.length() <= BEARER_PREFIX.length() - 1
+            || authHeader.charAt(BEARER_PREFIX.length() - 1) != ' ') {
+            return null;
+        }
+        String rawToken = authHeader.substring(BEARER_PREFIX.length()).trim();
+        return rawToken.isEmpty() ? null : rawToken;
+    }
+
+    private void rejectBearer(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+        SecurityContextHolder.clearContext();
+        authenticationEntryPoint.commence(
+            request,
+            response,
+            new BadCredentialsException("Invalid bearer token")
+        );
     }
 }

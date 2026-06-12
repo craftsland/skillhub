@@ -10,9 +10,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HexFormat;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -123,5 +128,40 @@ class ApiTokenServiceTest {
         assertThatThrownBy(() -> service.createToken("user-1", "CLI", "[]"))
                 .isInstanceOf(DomainBadRequestException.class)
                 .hasMessageContaining("error.token.name.duplicate");
+    }
+
+    @Test
+    void validateToken_returnsEmptyForUnknownToken() {
+        when(tokenRepo.findByTokenHash(sha256("missing-token"))).thenReturn(Optional.empty());
+
+        assertThat(service.validateToken("missing-token")).isEmpty();
+    }
+
+    @Test
+    void validateToken_returnsEmptyForExpiredToken() {
+        ApiToken token = new ApiToken("user-1", "CLI", "sk_test", sha256("expired-token"), "[]");
+        token.setExpiresAt(Instant.parse("2026-03-17T23:59:59Z"));
+        when(tokenRepo.findByTokenHash(sha256("expired-token"))).thenReturn(Optional.of(token));
+
+        assertThat(service.validateToken("expired-token")).isEmpty();
+    }
+
+    @Test
+    void validateToken_returnsEmptyForRevokedToken() {
+        ApiToken token = new ApiToken("user-1", "CLI", "sk_test", sha256("revoked-token"), "[]");
+        token.setRevokedAt(Instant.parse("2026-03-17T23:59:59Z"));
+        when(tokenRepo.findByTokenHash(sha256("revoked-token"))).thenReturn(Optional.of(token));
+
+        assertThat(service.validateToken("revoked-token")).isEmpty();
+    }
+
+    private static String sha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 }

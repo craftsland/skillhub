@@ -17,11 +17,13 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -89,10 +91,115 @@ class ApiTokenAuthenticationFilterTest {
         request.setRequestURI("/api/v1/publish");
         request.addHeader("Authorization", "Bearer raw-token");
 
-        filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertEquals(MockHttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        assertNull(chain.getRequest());
         verify(apiTokenService, never()).touchLastUsed(token);
+    }
+
+    @Test
+    void shouldRejectUnknownBearerTokenOnCliReadRoutes() throws Exception {
+        when(apiTokenService.validateToken("unknown-token")).thenReturn(Optional.empty());
+
+        for (String route : cliReadRoutes()) {
+            SecurityContextHolder.clearContext();
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", route);
+            request.addHeader("Authorization", "Bearer unknown-token");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+
+            filter.doFilter(request, response, chain);
+
+            assertEquals(MockHttpServletResponse.SC_UNAUTHORIZED, response.getStatus(), route);
+            assertNull(SecurityContextHolder.getContext().getAuthentication(), route);
+            assertNull(chain.getRequest(), route);
+        }
+    }
+
+    @Test
+    void shouldRejectBearerTokenWhenUserIsMissing() throws Exception {
+        ApiToken token = new ApiToken("missing-user", "cli", "sk_test", "hash", "[]");
+
+        when(apiTokenService.validateToken("raw-token")).thenReturn(Optional.of(token));
+        when(userAccountRepository.findById("missing-user")).thenReturn(Optional.empty());
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/cli/v1/skills/search");
+        request.addHeader("Authorization", "Bearer raw-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(MockHttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertNull(chain.getRequest());
+        verify(apiTokenService, never()).touchLastUsed(token);
+    }
+
+    @Test
+    void shouldRejectEmptyBearerTokenWithoutValidatingIt() throws Exception {
+        when(apiTokenService.validateToken("")).thenReturn(Optional.empty());
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/cli/v1/skills/search");
+        request.addHeader("Authorization", "Bearer ");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(MockHttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertNull(chain.getRequest());
+        verify(apiTokenService, never()).validateToken(any());
+    }
+
+    @Test
+    void shouldRejectMalformedBearerHeaderWithoutValidatingIt() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/cli/v1/skills/search");
+        request.addHeader("Authorization", "Bearer");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(MockHttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertNull(chain.getRequest());
+        verify(apiTokenService, never()).validateToken(any());
+    }
+
+    @Test
+    void shouldAllowAnonymousCliReadsWhenAuthorizationHeaderIsAbsent() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/cli/v1/skills/search");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(MockHttpServletResponse.SC_OK, response.getStatus());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertNotNull(chain.getRequest());
+        verify(apiTokenService, never()).validateToken(any());
+    }
+
+    @Test
+    void shouldIgnoreNonBearerAuthorizationHeader() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/cli/v1/skills/search");
+        request.addHeader("Authorization", "Basic abc123");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(MockHttpServletResponse.SC_OK, response.getStatus());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertNotNull(chain.getRequest());
+        verify(apiTokenService, never()).validateToken(any());
     }
 
     @Test
@@ -112,5 +219,14 @@ class ApiTokenAuthenticationFilterTest {
 
         assertNotNull(SecurityContextHolder.getContext().getAuthentication());
         verify(apiTokenService).touchLastUsed(token);
+    }
+
+    private static List<String> cliReadRoutes() {
+        return Stream.of(
+                "/api/cli/v1/skills/search",
+                "/api/cli/v1/skills/global/demo/resolve",
+                "/api/cli/v1/skills/global/demo/download",
+                "/api/cli/v1/skills/global/demo/versions/1.0.0/download"
+        ).toList();
     }
 }

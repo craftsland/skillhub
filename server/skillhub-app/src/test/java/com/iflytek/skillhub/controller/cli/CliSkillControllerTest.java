@@ -1,15 +1,27 @@
 package com.iflytek.skillhub.controller.cli;
 
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
+import com.iflytek.skillhub.auth.entity.ApiToken;
+import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
+import com.iflytek.skillhub.auth.token.ApiTokenService;
+import com.iflytek.skillhub.domain.namespace.NamespaceMember;
+import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
+import com.iflytek.skillhub.domain.namespace.NamespaceRole;
+import com.iflytek.skillhub.domain.user.UserAccount;
+import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.ratelimit.RateLimit;
 import com.iflytek.skillhub.service.cli.CliSkillAppService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.ByteArrayInputStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
@@ -19,11 +31,17 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -35,7 +53,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class CliSkillControllerTest {
     @Autowired MockMvc mockMvc;
+    @Autowired NamespaceMemberRepository namespaceMemberRepository;
     @MockBean CliSkillAppService cliSkillAppService;
+    @MockBean ApiTokenService apiTokenService;
+    @MockBean UserAccountRepository userAccountRepository;
+    @MockBean UserRoleBindingRepository userRoleBindingRepository;
 
     @Test
     void downloadRoutesUseDownloadRateLimit() throws Exception {
@@ -74,6 +96,47 @@ class CliSkillControllerTest {
     }
 
     @Test
+    void searchRejectsInvalidBearerBeforeAnonymousAccess() throws Exception {
+        givenInvalidBearerToken();
+        given(cliSkillAppService.search("pdf", 20, null, null)).willReturn(
+                new CliSkillAppService.CliSearchResult(List.of(), 0, 20)
+        );
+
+        mockMvc.perform(get("/api/cli/v1/skills/search")
+                        .param("q", "pdf")
+                        .param("limit", "20")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer unknown-token"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(cliSkillAppService);
+    }
+
+    @Test
+    void searchWithValidBearerProjectsIdentityAndNamespaceRoles() throws Exception {
+        ApiToken token = new ApiToken("user-cli-token", "cli", "sk_test", "hash", "[]");
+        UserAccount user = new UserAccount("user-cli-token", "CLI User", "cli@example.com", "");
+        Map<Long, NamespaceRole> nsRoles = Map.of(9L, NamespaceRole.MEMBER);
+
+        given(apiTokenService.validateToken("raw-token")).willReturn(Optional.of(token));
+        given(userAccountRepository.findById("user-cli-token")).willReturn(Optional.of(user));
+        given(userRoleBindingRepository.findByUserId("user-cli-token")).willReturn(List.of());
+        namespaceMemberRepository.save(new NamespaceMember(9L, "user-cli-token", NamespaceRole.MEMBER));
+        given(cliSkillAppService.search("private", 20, "user-cli-token", nsRoles)).willReturn(
+                new CliSkillAppService.CliSearchResult(List.of(), 0, 20)
+        );
+
+        mockMvc.perform(get("/api/cli/v1/skills/search")
+                        .param("q", "private")
+                        .param("limit", "20")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer raw-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray());
+
+        verify(cliSkillAppService).search("private", 20, "user-cli-token", nsRoles);
+        verify(apiTokenService).touchLastUsed(token);
+    }
+
+    @Test
     void resolveReturnsCliResolveResponse() throws Exception {
         given(cliSkillAppService.resolve("global", "demo", null, null, null)).willReturn(
                 new com.iflytek.skillhub.dto.cli.CliResolveResponse(
@@ -89,6 +152,47 @@ class CliSkillControllerTest {
                 .andExpect(jsonPath("$.data.version").value("2.0.0"))
                 .andExpect(jsonPath("$.data.versionId").value(42))
                 .andExpect(jsonPath("$.data.fingerprint").value("abc123"));
+    }
+
+    @Test
+    void resolveRejectsInvalidBearerBeforeAnonymousAccess() throws Exception {
+        givenInvalidBearerToken();
+        given(cliSkillAppService.resolve("global", "demo", null, null, null)).willReturn(
+                new com.iflytek.skillhub.dto.cli.CliResolveResponse(
+                        "global", "demo", "2.0.0", 42L, "abc123",
+                        "/api/v1/skills/global/demo/versions/2.0.0/download"
+                )
+        );
+
+        mockMvc.perform(get("/api/cli/v1/skills/global/demo/resolve")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer unknown-token"))
+                .andExpect(status().isUnauthorized());
+
+        verify(cliSkillAppService, never()).resolve(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void downloadLatestRejectsInvalidBearerBeforeAnonymousAccess() throws Exception {
+        givenInvalidBearerToken();
+        given(cliSkillAppService.downloadLatest(any(), any(), any())).willReturn(downloadResponse());
+
+        mockMvc.perform(get("/api/cli/v1/skills/global/demo/download")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer unknown-token"))
+                .andExpect(status().isUnauthorized());
+
+        verify(cliSkillAppService, never()).downloadLatest(any(), any(), any());
+    }
+
+    @Test
+    void downloadVersionRejectsInvalidBearerBeforeAnonymousAccess() throws Exception {
+        givenInvalidBearerToken();
+        given(cliSkillAppService.downloadVersion(any(), any(), any(), any())).willReturn(downloadResponse());
+
+        mockMvc.perform(get("/api/cli/v1/skills/global/demo/versions/1.0.0/download")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer unknown-token"))
+                .andExpect(status().isUnauthorized());
+
+        verify(cliSkillAppService, never()).downloadVersion(any(), any(), any(), any());
     }
 
     @Test
@@ -130,5 +234,13 @@ class CliSkillControllerTest {
         assertEquals("download", rateLimit.category());
         assertEquals(120, rateLimit.authenticated());
         assertEquals(30, rateLimit.anonymous());
+    }
+
+    private static ResponseEntity<InputStreamResource> downloadResponse() {
+        return ResponseEntity.ok(new InputStreamResource(new ByteArrayInputStream("zip".getBytes())));
+    }
+
+    private void givenInvalidBearerToken() {
+        given(apiTokenService.validateToken("unknown-token")).willReturn(Optional.empty());
     }
 }
