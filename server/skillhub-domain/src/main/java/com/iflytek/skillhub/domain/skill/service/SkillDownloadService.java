@@ -45,6 +45,7 @@ public class SkillDownloadService {
     private final VisibilityChecker visibilityChecker;
     private final ApplicationEventPublisher eventPublisher;
     private final SkillSlugResolutionService skillSlugResolutionService;
+    private final AnonymousSkillInstallabilityPolicy anonymousSkillInstallabilityPolicy;
 
     public SkillDownloadService(
             NamespaceRepository namespaceRepository,
@@ -56,7 +57,8 @@ public class SkillDownloadService {
             ObjectStorageService objectStorageService,
             VisibilityChecker visibilityChecker,
             ApplicationEventPublisher eventPublisher,
-            SkillSlugResolutionService skillSlugResolutionService) {
+            SkillSlugResolutionService skillSlugResolutionService,
+            AnonymousSkillInstallabilityPolicy anonymousSkillInstallabilityPolicy) {
         this.namespaceRepository = namespaceRepository;
         this.skillRepository = skillRepository;
         this.skillVersionRepository = skillVersionRepository;
@@ -67,6 +69,7 @@ public class SkillDownloadService {
         this.visibilityChecker = visibilityChecker;
         this.eventPublisher = eventPublisher;
         this.skillSlugResolutionService = skillSlugResolutionService;
+        this.anonymousSkillInstallabilityPolicy = anonymousSkillInstallabilityPolicy;
     }
 
     public record DownloadResult(
@@ -102,6 +105,7 @@ public class SkillDownloadService {
         SkillVersion version = skillVersionRepository.findById(skill.getLatestVersionId())
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.version.latest.notFound"));
 
+        assertAnonymousInstallable(namespace, skill, version, currentUserId);
         return downloadVersion(skill, version);
     }
 
@@ -123,6 +127,7 @@ public class SkillDownloadService {
         SkillVersion version = skillVersionRepository.findBySkillIdAndVersion(skill.getId(), versionStr)
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.version.notFound", versionStr));
 
+        assertAnonymousInstallable(namespace, skill, version, currentUserId);
         return downloadVersion(skill, version);
     }
 
@@ -150,6 +155,7 @@ public class SkillDownloadService {
         SkillVersion version = skillVersionRepository.findById(tag.getVersionId())
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.tag.version.notFound", tagName));
 
+        assertAnonymousInstallable(namespace, skill, version, currentUserId);
         return downloadVersion(skill, version);
     }
 
@@ -177,6 +183,12 @@ public class SkillDownloadService {
         skillRepository.incrementDownloadCount(skill.getId());
         skillVersionStatsRepository.incrementDownloadCount(version.getId(), skill.getId());
         eventPublisher.publishEvent(new SkillDownloadedEvent(skill.getId(), version.getId()));
+    }
+
+    private void assertAnonymousInstallable(Namespace namespace, Skill skill, SkillVersion version, String currentUserId) {
+        if (currentUserId == null) {
+            anonymousSkillInstallabilityPolicy.assertAnonymousInstallable(namespace, skill, version);
+        }
     }
 
     private DownloadResult buildDownloadResult(Skill skill, SkillVersion version) {

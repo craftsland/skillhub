@@ -131,6 +131,7 @@ public class ClawHubCompatAppService {
 
     public String downloadLocationByPath(String canonicalSlug, String version) {
         SkillCoordinate coord = mapper.fromCanonical(canonicalSlug);
+        assertResolvableDownloadTarget(coord, version, null, Map.of());
         return "latest".equals(version)
                 ? "/api/v1/skills/" + coord.namespace() + "/" + coord.slug() + "/download"
                 : "/api/v1/skills/" + coord.namespace() + "/" + coord.slug() + "/versions/" + version + "/download";
@@ -141,9 +142,26 @@ public class ClawHubCompatAppService {
                                           String userId,
                                           Map<Long, NamespaceRole> userNsRoles) {
         SkillCoordinate coord = resolveQueryCoordinate(slug, userId, userNsRoles);
+        assertResolvableDownloadTarget(coord, version, userId, userNsRoles);
         return "latest".equals(version)
                 ? "/api/v1/skills/" + coord.namespace() + "/" + coord.slug() + "/download"
                 : "/api/v1/skills/" + coord.namespace() + "/" + coord.slug() + "/versions/" + version + "/download";
+    }
+
+    private void assertResolvableDownloadTarget(SkillCoordinate coord,
+                                                String version,
+                                                String userId,
+                                                Map<Long, NamespaceRole> userNsRoles) {
+        boolean latest = version == null || "latest".equals(version);
+        skillQueryService.resolveVersion(
+                coord.namespace(),
+                coord.slug(),
+                latest ? null : version,
+                latest ? "latest" : null,
+                null,
+                userId,
+                normalizeRoles(userNsRoles)
+        );
     }
 
     private SkillCoordinate resolveQueryCoordinate(String slug,

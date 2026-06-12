@@ -8,8 +8,11 @@ import com.iflytek.skillhub.domain.namespace.NamespaceStatus;
 import com.iflytek.skillhub.domain.namespace.NamespaceService;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
+import com.iflytek.skillhub.domain.skill.service.AnonymousSkillInstallabilityPolicy;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
 import com.iflytek.skillhub.search.SearchQuery;
 import com.iflytek.skillhub.search.SearchQueryService;
@@ -64,7 +67,9 @@ class SkillSearchAppServiceTest {
                 skillRepository,
                 namespaceRepository,
                 namespaceService,
+                skillVersionRepository,
                 new SkillLifecycleProjectionService(skillVersionRepository),
+                new AnonymousSkillInstallabilityPolicy(),
                 rbacService
         );
     }
@@ -87,6 +92,11 @@ class SkillSearchAppServiceTest {
         setField(visibleSkill, "id", 11L);
         visibleSkill.setLatestVersionId(111L);
 
+        SkillVersion latestVersion = new SkillVersion(11L, "1.0.0", "owner-1");
+        setField(latestVersion, "id", 111L);
+        latestVersion.setStatus(SkillVersionStatus.PUBLISHED);
+        latestVersion.setDownloadReady(true);
+
         Namespace activeNamespace = new Namespace("team-a", "Team A", "owner-1");
         setField(activeNamespace, "id", 2L);
         activeNamespace.setStatus(NamespaceStatus.ACTIVE);
@@ -95,9 +105,7 @@ class SkillSearchAppServiceTest {
                 .thenReturn(new SearchResult(List.of(11L), 1, 0, 20));
         when(skillRepository.findByIdIn(List.of(11L))).thenReturn(List.of(visibleSkill));
         when(namespaceRepository.findByIdIn(List.of(2L))).thenReturn(List.of(activeNamespace));
-        when(skillVersionRepository.findByIdIn(List.of(111L))).thenReturn(List.of());
-        when(skillVersionRepository.findBySkillIdInAndStatus(List.of(11L), com.iflytek.skillhub.domain.skill.SkillVersionStatus.PUBLISHED))
-                .thenReturn(List.of());
+        when(skillVersionRepository.findByIdIn(List.of(111L))).thenReturn(List.of(latestVersion));
 
         SkillSearchAppService.SearchResponse response = service.search("skill", null, "newest", 0, 1, null, null);
 
@@ -164,6 +172,15 @@ class SkillSearchAppServiceTest {
         setField(second, "id", 11L);
         second.setLatestVersionId(102L);
 
+        SkillVersion firstVersion = new SkillVersion(10L, "1.0.0", "owner-1");
+        setField(firstVersion, "id", 101L);
+        firstVersion.setStatus(SkillVersionStatus.PUBLISHED);
+        firstVersion.setDownloadReady(true);
+        SkillVersion secondVersion = new SkillVersion(11L, "2.0.0", "owner-1");
+        setField(secondVersion, "id", 102L);
+        secondVersion.setStatus(SkillVersionStatus.PUBLISHED);
+        secondVersion.setDownloadReady(true);
+
         Namespace namespace = new Namespace("team-a", "Team A", "owner-1");
         setField(namespace, "id", 1L);
         namespace.setStatus(NamespaceStatus.ACTIVE);
@@ -172,16 +189,38 @@ class SkillSearchAppServiceTest {
                 .thenReturn(new SearchResult(List.of(10L, 11L), 2, 0, 20));
         when(skillRepository.findByIdIn(List.of(10L, 11L))).thenReturn(List.of(first, second));
         when(namespaceRepository.findByIdIn(List.of(1L))).thenReturn(List.of(namespace));
-        when(skillVersionRepository.findByIdIn(List.of(101L, 102L))).thenReturn(List.of());
-        when(skillVersionRepository.findBySkillIdInAndStatus(List.of(10L, 11L), com.iflytek.skillhub.domain.skill.SkillVersionStatus.PUBLISHED))
-                .thenReturn(List.of());
+        when(skillVersionRepository.findByIdIn(List.of(101L, 102L))).thenReturn(List.of(firstVersion, secondVersion));
 
         SkillSearchAppService.SearchResponse response = service.search(null, null, "newest", 0, 20, null, null);
 
         assertEquals(2, response.items().size());
-        verify(skillVersionRepository, times(1)).findByIdIn(List.of(101L, 102L));
-        verify(skillVersionRepository, times(1))
-                .findBySkillIdInAndStatus(List.of(10L, 11L), com.iflytek.skillhub.domain.skill.SkillVersionStatus.PUBLISHED);
+        verify(skillVersionRepository, times(2)).findByIdIn(List.of(101L, 102L));
+    }
+
+    @Test
+    void search_shouldExcludeAnonymousPublicSkillWhenLatestVersionIsNotDownloadReady() {
+        Skill skill = new Skill(1L, "skill-a", "owner-1", SkillVisibility.PUBLIC);
+        setField(skill, "id", 10L);
+        skill.setLatestVersionId(101L);
+
+        SkillVersion latestVersion = new SkillVersion(10L, "1.0.0", "owner-1");
+        setField(latestVersion, "id", 101L);
+        latestVersion.setStatus(SkillVersionStatus.PUBLISHED);
+        latestVersion.setDownloadReady(false);
+
+        Namespace namespace = new Namespace("team-a", "Team A", "owner-1");
+        setField(namespace, "id", 1L);
+        namespace.setStatus(NamespaceStatus.ACTIVE);
+
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(10L), 1, 0, 20));
+        when(skillRepository.findByIdIn(List.of(10L))).thenReturn(List.of(skill));
+        when(namespaceRepository.findByIdIn(List.of(1L))).thenReturn(List.of(namespace));
+        when(skillVersionRepository.findByIdIn(List.of(101L))).thenReturn(List.of(latestVersion));
+
+        SkillSearchAppService.SearchResponse response = service.search(null, null, "newest", 0, 20, null, null);
+
+        assertEquals(0, response.items().size());
     }
 
     @Test

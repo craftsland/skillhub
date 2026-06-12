@@ -7,6 +7,9 @@ import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.namespace.NamespaceService;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersion;
+import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
+import com.iflytek.skillhub.domain.skill.service.AnonymousSkillInstallabilityPolicy;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
 import com.iflytek.skillhub.dto.SkillSummaryResponse;
 import com.iflytek.skillhub.search.SearchQuery;
@@ -35,7 +38,9 @@ public class SkillSearchAppService {
     private final SkillRepository skillRepository;
     private final NamespaceRepository namespaceRepository;
     private final NamespaceService namespaceService;
+    private final SkillVersionRepository skillVersionRepository;
     private final SkillLifecycleProjectionService skillLifecycleProjectionService;
+    private final AnonymousSkillInstallabilityPolicy anonymousSkillInstallabilityPolicy;
     private final RbacService rbacService;
 
     public SkillSearchAppService(
@@ -43,13 +48,17 @@ public class SkillSearchAppService {
             SkillRepository skillRepository,
             NamespaceRepository namespaceRepository,
             NamespaceService namespaceService,
+            SkillVersionRepository skillVersionRepository,
             SkillLifecycleProjectionService skillLifecycleProjectionService,
+            AnonymousSkillInstallabilityPolicy anonymousSkillInstallabilityPolicy,
             RbacService rbacService) {
         this.searchQueryService = searchQueryService;
         this.skillRepository = skillRepository;
         this.namespaceRepository = namespaceRepository;
         this.namespaceService = namespaceService;
+        this.skillVersionRepository = skillVersionRepository;
         this.skillLifecycleProjectionService = skillLifecycleProjectionService;
+        this.anonymousSkillInstallabilityPolicy = anonymousSkillInstallabilityPolicy;
         this.rbacService = rbacService;
     }
 
@@ -143,7 +152,7 @@ public class SkillSearchAppService {
                 size,
                 normalizeLabelSlugs(labelSlugs)
         ));
-        List<SkillSummaryResponse> pageItems = mapVisibleSkillSummaries(result.skillIds());
+        List<SkillSummaryResponse> pageItems = mapVisibleSkillSummaries(result.skillIds(), scope);
         return new SearchResponse(pageItems, result.total(), page, size);
     }
 
@@ -158,7 +167,7 @@ public class SkillSearchAppService {
                 .toList();
     }
 
-    private List<SkillSummaryResponse> mapVisibleSkillSummaries(List<Long> skillIds) {
+    private List<SkillSummaryResponse> mapVisibleSkillSummaries(List<Long> skillIds, SearchVisibilityScope scope) {
         if (skillIds.isEmpty()) {
             return List.of();
         }
@@ -177,14 +186,34 @@ public class SkillSearchAppService {
                 .collect(Collectors.toMap(Namespace::getId, Function.identity()));
         Map<Long, String> namespaceSlugsById = namespacesById.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getSlug()));
+        Map<Long, SkillVersion> latestVersionsById = scope.userId() == null
+                ? loadLatestVersions(matchedSkills)
+                : Map.of();
         Map<Long, SkillLifecycleProjectionService.Projection> projectionsBySkillId =
                 skillLifecycleProjectionService.projectPublishedSummaries(matchedSkills);
 
         return skillIds.stream()
                 .map(skillsById::get)
                 .filter(java.util.Objects::nonNull)
+                .filter(skill -> scope.userId() != null || anonymousSkillInstallabilityPolicy.isAnonymousInstallable(
+                        namespacesById.get(skill.getNamespaceId()),
+                        skill,
+                        latestVersionsById.get(skill.getLatestVersionId())))
                 .map(skill -> toSummaryResponse(skill, namespaceSlugsById, projectionsBySkillId.get(skill.getId())))
                 .toList();
+    }
+
+    private Map<Long, SkillVersion> loadLatestVersions(List<Skill> skills) {
+        List<Long> latestVersionIds = skills.stream()
+                .map(Skill::getLatestVersionId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (latestVersionIds.isEmpty()) {
+            return Map.of();
+        }
+        return skillVersionRepository.findByIdIn(latestVersionIds).stream()
+                .collect(Collectors.toMap(SkillVersion::getId, Function.identity()));
     }
 
     private SkillSummaryResponse toSummaryResponse(

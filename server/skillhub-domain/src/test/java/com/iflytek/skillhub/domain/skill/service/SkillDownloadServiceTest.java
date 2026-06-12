@@ -68,7 +68,8 @@ class SkillDownloadServiceTest {
                 objectStorageService,
                 visibilityChecker,
                 eventPublisher,
-                skillSlugResolutionService
+                skillSlugResolutionService,
+                new AnonymousSkillInstallabilityPolicy()
         );
     }
 
@@ -282,6 +283,38 @@ class SkillDownloadServiceTest {
     }
 
     @Test
+    void testDownloadLatest_ShouldRejectAnonymousWhenLatestVersionIsNotDownloadReadyBeforeStorageLookup() throws Exception {
+        Namespace namespace = new Namespace("global", "Global", "system");
+        setId(namespace, 1L);
+        namespace.setType(NamespaceType.GLOBAL);
+
+        Skill skill = new Skill(1L, "demo-skill", "owner-1", SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+        skill.setDisplayName("Demo Skill");
+        skill.setStatus(SkillStatus.ACTIVE);
+        skill.setLatestVersionId(10L);
+
+        SkillVersion version = new SkillVersion(1L, "1.0.0", "owner-1");
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(false);
+
+        when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, "demo-skill")).thenReturn(List.of(skill));
+        when(visibilityChecker.canAccess(skill, null, Map.of())).thenReturn(true);
+        when(skillVersionRepository.findById(10L)).thenReturn(Optional.of(version));
+
+        DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () ->
+                service.downloadLatest("global", "demo-skill", null, Map.of()));
+
+        assertEquals("error.skill.version.notDownloadable", ex.messageCode());
+        verifyNoInteractions(objectStorageService, skillFileRepository);
+        verify(skillRepository, never()).incrementDownloadCount(anyLong());
+        verify(skillVersionStatsRepository, never()).incrementDownloadCount(anyLong(), anyLong());
+        verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));
+    }
+
+    @Test
     void testDownloadVersion_AllowsAnonymousForGlobalPublicSkill() throws Exception {
         Namespace namespace = new Namespace("global", "Global", "system");
         setId(namespace, 1L);
@@ -296,6 +329,7 @@ class SkillDownloadServiceTest {
         SkillVersion version = new SkillVersion(1L, "1.0.0", "owner-1");
         setId(version, 10L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
 
         when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(namespace));
         when(skillRepository.findByNamespaceIdAndSlug(1L, "demo-skill")).thenReturn(List.of(skill));
@@ -331,6 +365,7 @@ class SkillDownloadServiceTest {
         SkillVersion version = new SkillVersion(1L, "1.0.0", "owner-1");
         setId(version, 10L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
 
         when(namespaceRepository.findBySlug("team-ai")).thenReturn(Optional.of(namespace));
         when(skillRepository.findByNamespaceIdAndSlug(2L, "demo-skill")).thenReturn(List.of(skill));

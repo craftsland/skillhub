@@ -60,6 +60,7 @@ public class SkillQueryService {
     private final ReviewTaskRepository reviewTaskRepository;
     private final SkillSlugResolutionService skillSlugResolutionService;
     private final SkillLifecycleProjectionService skillLifecycleProjectionService;
+    private final AnonymousSkillInstallabilityPolicy anonymousSkillInstallabilityPolicy;
     private final UserAccountRepository userAccountRepository;
 
     public SkillQueryService(
@@ -74,6 +75,7 @@ public class SkillQueryService {
             ReviewTaskRepository reviewTaskRepository,
             SkillSlugResolutionService skillSlugResolutionService,
             SkillLifecycleProjectionService skillLifecycleProjectionService,
+            AnonymousSkillInstallabilityPolicy anonymousSkillInstallabilityPolicy,
             UserAccountRepository userAccountRepository) {
         this.namespaceRepository = namespaceRepository;
         this.skillRepository = skillRepository;
@@ -86,6 +88,7 @@ public class SkillQueryService {
         this.reviewTaskRepository = reviewTaskRepository;
         this.skillSlugResolutionService = skillSlugResolutionService;
         this.skillLifecycleProjectionService = skillLifecycleProjectionService;
+        this.anonymousSkillInstallabilityPolicy = anonymousSkillInstallabilityPolicy;
         this.userAccountRepository = userAccountRepository;
     }
 
@@ -487,13 +490,7 @@ public class SkillQueryService {
     }
 
     public boolean isDownloadAvailable(SkillVersion version) {
-        if (version == null) {
-            return false;
-        }
-        if (version.getStatus() != SkillVersionStatus.PUBLISHED) {
-            return false;
-        }
-        return version.isDownloadReady();
+        return anonymousSkillInstallabilityPolicy.isInstallableVersion(version);
     }
 
     public ReviewSkillSnapshotDTO getReviewSkillSnapshot(Long skillVersionId) {
@@ -565,6 +562,9 @@ public class SkillQueryService {
         Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
         assertPublishedAccessible(namespace, skill, currentUserId, userNsRoles);
         SkillVersion resolved = resolveVersionEntity(skill, version, tag, hash);
+        if (currentUserId == null) {
+            anonymousSkillInstallabilityPolicy.assertAnonymousInstallable(namespace, skill, resolved);
+        }
         String fingerprint = computeFingerprint(resolved);
         Boolean matched = hash == null || hash.isBlank() ? null : Objects.equals(hash, fingerprint);
 

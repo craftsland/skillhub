@@ -80,6 +80,7 @@ class SkillQueryServiceTest {
                 reviewTaskRepository,
                 skillSlugResolutionService,
                 skillLifecycleProjectionService,
+                new AnonymousSkillInstallabilityPolicy(),
                 userAccountRepository
         );
     }
@@ -596,6 +597,42 @@ class SkillQueryServiceTest {
     }
 
     @Test
+    void testResolveVersion_ShouldRejectAnonymousLatestWhenDownloadIsNotReadyBeforeFingerprinting() throws Exception {
+        String namespaceSlug = "global";
+        String skillSlug = "test-skill";
+
+        Namespace namespace = new Namespace(namespaceSlug, "Global", "system");
+        setId(namespace, 1L);
+        Skill skill = new Skill(1L, skillSlug, "user-100", SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+        skill.setStatus(SkillStatus.ACTIVE);
+        skill.setLatestVersionId(10L);
+
+        SkillVersion version = new SkillVersion(1L, "1.0.0", "user-100");
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(false);
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
+        when(skillVersionRepository.findById(10L)).thenReturn(Optional.of(version));
+
+        DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () -> service.resolveVersion(
+                namespaceSlug,
+                skillSlug,
+                null,
+                "latest",
+                null,
+                null,
+                Map.of()
+        ));
+
+        assertEquals("error.skill.version.notDownloadable", ex.messageCode());
+        verify(skillFileRepository, never()).findByVersionId(anyLong());
+        verifyNoInteractions(objectStorageService);
+    }
+
+    @Test
     void testResolveVersion_ShouldEncodeDownloadUrlPathSegments() throws Exception {
         String namespaceSlug = "global";
         String skillSlug = "smoke-skill-two";
@@ -611,6 +648,7 @@ class SkillQueryServiceTest {
         SkillVersion version = new SkillVersion(3L, "1.0.0 beta", "user-100");
         setId(version, 11L);
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
         SkillFile file = new SkillFile(11L, "SKILL.md", 10L, "text/markdown", "hash", "key");
 
         when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
