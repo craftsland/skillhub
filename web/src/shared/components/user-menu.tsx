@@ -21,6 +21,10 @@ interface UserMenuProps {
   triggerClassName?: string
 }
 
+export function canShowSecuritySettings(user: Pick<User, 'oauthProvider'>) {
+  return !user.oauthProvider || user.oauthProvider === 'local'
+}
+
 export function UserMenu({ user, triggerClassName }: UserMenuProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -37,7 +41,7 @@ export function UserMenu({ user, triggerClassName }: UserMenuProps) {
   const isAuditor = hasRole('AUDITOR') || hasRole('SUPER_ADMIN')
   const isSuperAdmin = hasRole('SUPER_ADMIN')
   const reviewCenterVisible = canAccessReviewCenter(user.platformRoles, myNamespaces)
-  const isLocalAccount = !user.oauthProvider
+  const isLocalAccount = canShowSecuritySettings(user)
   const open = isHovered || isClickOpen
 
   const clearCloseTimer = () => {
