@@ -9,6 +9,8 @@ import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceAuditDetailFactory;
 import com.iflytek.skillhub.domain.skill.service.SkillGovernanceService;
 import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.service.SkillReviewSubmitService;
@@ -16,6 +18,7 @@ import com.iflytek.skillhub.domain.skill.service.SkillSlugResolutionService;
 import com.iflytek.skillhub.dto.AdminSkillActionRequest;
 import com.iflytek.skillhub.dto.SkillLifecycleMutationResponse;
 import com.iflytek.skillhub.dto.SkillVersionRereleaseRequest;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,8 @@ public class SkillLifecycleAppService {
     private final SkillReviewSubmitService skillReviewSubmitService;
     private final AuditLogService auditLogService;
     private final SkillSlugResolutionService skillSlugResolutionService;
+    private final SkillComplianceAuditDetailFactory complianceAuditDetailFactory =
+            new SkillComplianceAuditDetailFactory();
 
     public SkillLifecycleAppService(NamespaceRepository namespaceRepository,
                                     SkillVersionRepository skillVersionRepository,
@@ -165,8 +170,7 @@ public class SkillLifecycleAppService {
                 null,
                 auditContext.clientIp(),
                 auditContext.userAgent(),
-                "{\"sourceVersion\":\"" + version.replace("\"", "\\\"")
-                        + "\",\"targetVersion\":\"" + targetVersion.replace("\"", "\\\"") + "\"}"
+                rereleaseAuditDetail(version, targetVersion, result.version())
         );
         return new SkillLifecycleMutationResponse(
                 result.skillId(),
@@ -234,7 +238,7 @@ public class SkillLifecycleAppService {
                 null,
                 auditContext.clientIp(),
                 auditContext.userAgent(),
-                "{\"version\":\"" + version.replace("\"", "\\\"") + "\"}"
+                complianceAuditDetailFactory.latestPublishedEntered(skillVersion)
         );
         return new SkillLifecycleMutationResponse(
                 skill.getId(),
@@ -263,5 +267,16 @@ public class SkillLifecycleAppService {
 
     private Map<Long, NamespaceRole> normalizeRoles(Map<Long, NamespaceRole> userNamespaceRoles) {
         return userNamespaceRoles != null ? userNamespaceRoles : Map.of();
+    }
+
+    private String rereleaseAuditDetail(String sourceVersion, String targetVersion, SkillVersion publishedVersion) {
+        if (publishedVersion.getStatus() == SkillVersionStatus.PUBLISHED) {
+            LinkedHashMap<String, Object> extras = new LinkedHashMap<>();
+            extras.put("sourceVersion", sourceVersion);
+            extras.put("targetVersion", targetVersion);
+            return complianceAuditDetailFactory.latestPublishedEntered(publishedVersion, extras);
+        }
+        return "{\"sourceVersion\":\"" + sourceVersion.replace("\"", "\\\"")
+                + "\",\"targetVersion\":\"" + targetVersion.replace("\"", "\\\"") + "\"}";
     }
 }

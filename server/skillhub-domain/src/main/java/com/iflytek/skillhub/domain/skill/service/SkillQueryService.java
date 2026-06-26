@@ -11,6 +11,8 @@ import com.iflytek.skillhub.domain.review.ReviewTaskStatus;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.skill.*;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceMapping;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceMetadataService;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.storage.ObjectStorageService;
@@ -61,6 +63,7 @@ public class SkillQueryService {
     private final SkillSlugResolutionService skillSlugResolutionService;
     private final SkillLifecycleProjectionService skillLifecycleProjectionService;
     private final UserAccountRepository userAccountRepository;
+    private final SkillComplianceMetadataService complianceMetadataService = new SkillComplianceMetadataService();
 
     public SkillQueryService(
             NamespaceRepository namespaceRepository,
@@ -127,7 +130,8 @@ public class SkillQueryService {
             Long totalSize,
             java.time.Instant publishedAt,
             String parsedMetadataJson,
-            String manifestJson
+            String manifestJson,
+            List<SkillComplianceMapping> complianceMappings
     ) {}
 
     public record SkillVersionCompareDTO(
@@ -311,7 +315,8 @@ public class SkillQueryService {
                 skillVersion.getTotalSize(),
                 skillVersion.getPublishedAt(),
                 skillVersion.getParsedMetadataJson(),
-                skillVersion.getManifestJson()
+                skillVersion.getManifestJson(),
+                complianceMetadataService.readFromParsedMetadataJson(skillVersion.getParsedMetadataJson())
         );
     }
 

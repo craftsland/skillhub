@@ -296,6 +296,42 @@ class PostgresFullTextQueryServiceTest {
     }
 
     @Test
+    void complianceStandardFilterShouldBeAppliedToSearchAndCountQueries() {
+        EntityManager entityManager = mock(EntityManager.class);
+        Query nativeQuery = mock(Query.class);
+        Query countQuery = mock(Query.class);
+        when(entityManager.createNativeQuery(anyString()))
+                .thenReturn(nativeQuery)
+                .thenReturn(countQuery);
+        when(nativeQuery.setParameter(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(nativeQuery);
+        when(countQuery.setParameter(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(countQuery);
+        when(nativeQuery.getResultList()).thenReturn(List.of());
+        when(countQuery.getSingleResult()).thenReturn(0L);
+
+        PostgresFullTextQueryService service = new PostgresFullTextQueryService(entityManager);
+
+        service.search(new SearchQuery(
+                "review",
+                null,
+                SearchVisibilityScope.anonymous(),
+                "relevance",
+                0,
+                20,
+                List.of("official"),
+                "gdpr",
+                false
+        ));
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(entityManager, org.mockito.Mockito.times(2)).createNativeQuery(sqlCaptor.capture());
+        assertThat(sqlCaptor.getAllValues().getFirst()).contains(
+                "(latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance') @> CAST(:complianceFilter AS jsonb)"
+        );
+        verify(nativeQuery).setParameter("complianceFilter", "[{\"standard\":\"gdpr\"}]");
+        verify(countQuery).setParameter("complianceFilter", "[{\"standard\":\"gdpr\"}]");
+    }
+
+    @Test
     void downloadsSortShouldNotBindRelevanceOnlyParameters() {
         EntityManager entityManager = mock(EntityManager.class);
         Query nativeQuery = mock(Query.class);

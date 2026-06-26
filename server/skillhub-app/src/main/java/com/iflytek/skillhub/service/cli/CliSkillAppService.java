@@ -1,7 +1,10 @@
 package com.iflytek.skillhub.service.cli;
 
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
+import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceAuditDetailFactory;
 import com.iflytek.skillhub.domain.skill.service.SkillDownloadService;
 import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.service.SkillQueryService;
@@ -21,6 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,18 +37,23 @@ public class CliSkillAppService {
     private final SkillDownloadService skillDownloadService;
     private final SkillDeleteAppService skillDeleteAppService;
     private final SkillPublishService skillPublishService;
+    private final AuditLogService auditLogService;
+    private final SkillComplianceAuditDetailFactory complianceAuditDetailFactory =
+            new SkillComplianceAuditDetailFactory();
 
     public CliSkillAppService(
             SkillSearchAppService skillSearchAppService,
             SkillQueryService skillQueryService,
             SkillDownloadService skillDownloadService,
             SkillDeleteAppService skillDeleteAppService,
-            SkillPublishService skillPublishService) {
+            SkillPublishService skillPublishService,
+            AuditLogService auditLogService) {
         this.skillSearchAppService = skillSearchAppService;
         this.skillQueryService = skillQueryService;
         this.skillDownloadService = skillDownloadService;
         this.skillDeleteAppService = skillDeleteAppService;
         this.skillPublishService = skillPublishService;
+        this.auditLogService = auditLogService;
     }
 
     public record CliSearchItem(String namespace, String slug, String latestVersion, String summary) {}
@@ -132,16 +141,45 @@ public class CliSkillAppService {
         );
     }
 
-    public CliPublishResponse publish(String namespace, List<PackageEntry> entries, String publisherId, SkillVisibility visibility, Set<String> platformRoles) {
+    public CliPublishResponse publish(String namespace,
+                                      List<PackageEntry> entries,
+                                      String publisherId,
+                                      SkillVisibility visibility,
+                                      Set<String> platformRoles,
+                                      AuditRequestContext auditContext) {
         SkillPublishService.PublishResult result = skillPublishService.publishFromEntries(
                 namespace, entries, publisherId, visibility, platformRoles, false
         );
+        recordPublishAuditIfLatestPublished(publisherId, namespace, result, auditContext);
 
         return new CliPublishResponse(
                 namespace,
                 result.slug(),
                 result.version().getVersion(),
                 visibility.name()
+        );
+    }
+
+    private void recordPublishAuditIfLatestPublished(String publisherId,
+                                                     String namespace,
+                                                     SkillPublishService.PublishResult result,
+                                                     AuditRequestContext auditContext) {
+        if (result.version().getStatus() != SkillVersionStatus.PUBLISHED) {
+            return;
+        }
+
+        LinkedHashMap<String, Object> extras = new LinkedHashMap<>();
+        extras.put("namespace", namespace);
+        extras.put("slug", result.slug());
+        auditLogService.record(
+                publisherId,
+                "CLI_PUBLISH",
+                "SKILL_VERSION",
+                result.version().getId(),
+                null,
+                auditContext != null ? auditContext.clientIp() : null,
+                auditContext != null ? auditContext.userAgent() : null,
+                complianceAuditDetailFactory.latestPublishedEntered(result.version(), extras)
         );
     }
 

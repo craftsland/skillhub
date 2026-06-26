@@ -5,6 +5,8 @@ import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.skill.SkillFile;
+import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceMapping;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.service.SkillDownloadService;
 import com.iflytek.skillhub.domain.skill.service.SkillQueryService;
@@ -67,7 +69,14 @@ class SkillControllerTest {
                         128L,
                         Instant.parse("2026-03-12T12:00:00Z"),
                         "{\"name\":\"demo\"}",
-                        "[{\"path\":\"SKILL.md\"}]"
+                        "[{\"path\":\"SKILL.md\"}]",
+                        List.of(new SkillComplianceMapping(
+                                ComplianceStandard.GDPR,
+                                "2024",
+                                "Article-17",
+                                "Right to erasure",
+                                "https://example.com/gdpr"
+                        ))
                 ));
 
         mockMvc.perform(get("/api/v1/skills/team/demo/versions/1.0.0"))
@@ -76,6 +85,9 @@ class SkillControllerTest {
                 .andExpect(jsonPath("$.data.version").value("1.0.0"))
                 .andExpect(jsonPath("$.data.parsedMetadataJson").value("{\"name\":\"demo\"}"))
                 .andExpect(jsonPath("$.data.manifestJson").value("[{\"path\":\"SKILL.md\"}]"))
+                .andExpect(jsonPath("$.data.complianceMappings[0].standard").value("gdpr"))
+                .andExpect(jsonPath("$.data.complianceMappings[0].standardVersion").value("2024"))
+                .andExpect(jsonPath("$.data.complianceMappings[0].controlId").value("Article-17"))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty())
                 .andExpect(jsonPath("$.requestId").isNotEmpty());
     }
@@ -97,7 +109,8 @@ class SkillControllerTest {
                         128L,
                         Instant.parse("2026-03-12T12:00:00Z"),
                         "{\"name\":\"demo\"}",
-                        "[{\"path\":\"SKILL.md\"}]"
+                        "[{\"path\":\"SKILL.md\"}]",
+                        List.of()
                 ));
 
         TimeZone original = TimeZone.getDefault();
@@ -106,7 +119,8 @@ class SkillControllerTest {
                 TimeZone.setDefault(TimeZone.getTimeZone(zoneId));
                 mockMvc.perform(get("/api/v1/skills/team/demo/versions/1.0.0"))
                         .andExpect(status().isOk())
-                        .andExpect(jsonPath("$.data.publishedAt").value("2026-03-12T12:00:00Z"));
+                        .andExpect(jsonPath("$.data.publishedAt").value("2026-03-12T12:00:00Z"))
+                        .andExpect(jsonPath("$.data.complianceMappings").isArray());
             }
         } finally {
             TimeZone.setDefault(original);

@@ -15,10 +15,12 @@ import com.iflytek.skillhub.domain.skill.SkillStatus;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceAuditDetailFactory;
 import com.iflytek.skillhub.storage.ObjectStorageService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -47,6 +49,8 @@ public class SkillGovernanceService {
     private final SecurityScanService securityScanService;
     private final SkillStorageDeletionCompensationService compensationService;
     private final Clock clock;
+    private final SkillComplianceAuditDetailFactory complianceAuditDetailFactory =
+            new SkillComplianceAuditDetailFactory();
 
     public SkillGovernanceService(SkillRepository skillRepository,
                                   SkillVersionRepository skillVersionRepository,
@@ -273,7 +277,20 @@ public class SkillGovernanceService {
                 skillRepository.save(skill);
             }
         });
-        auditLogService.record(actorUserId, "YANK_SKILL_VERSION", "SKILL_VERSION", versionId, null, clientIp, userAgent, jsonReason(reason));
+        LinkedHashMap<String, Object> auditExtras = new LinkedHashMap<>();
+        if (reason != null && !reason.isBlank()) {
+            auditExtras.put("reason", reason);
+        }
+        auditLogService.record(
+                actorUserId,
+                "YANK_SKILL_VERSION",
+                "SKILL_VERSION",
+                versionId,
+                null,
+                clientIp,
+                userAgent,
+                complianceAuditDetailFactory.latestPublishedRemoved(version, auditExtras)
+        );
         eventPublisher.publishEvent(new com.iflytek.skillhub.domain.event.SkillVersionYankedEvent(
                 version.getSkillId(), versionId, actorUserId));
         return saved;

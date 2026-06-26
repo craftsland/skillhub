@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.service.cli;
 
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.namespace.Namespace;
 import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
@@ -40,8 +41,11 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class CliSkillAppServiceTest {
@@ -56,6 +60,7 @@ class CliSkillAppServiceTest {
     @Mock SkillVersionRepository skillVersionRepository;
     @Mock NamespaceService namespaceService;
     @Mock RbacService rbacService;
+    @Mock AuditLogService auditLogService;
 
     private CliSkillAppService service;
 
@@ -63,7 +68,7 @@ class CliSkillAppServiceTest {
     void setUp() {
         service = new CliSkillAppService(
                 skillSearchAppService, skillQueryService,
-                skillDownloadService, skillDeleteAppService, skillPublishService);
+                skillDownloadService, skillDeleteAppService, skillPublishService, auditLogService);
     }
 
     @Test
@@ -166,7 +171,8 @@ class CliSkillAppServiceTest {
                 skillQueryService,
                 skillDownloadService,
                 skillDeleteAppService,
-                skillPublishService
+                skillPublishService,
+                auditLogService
         );
 
         Skill installableSecondMatch = new Skill(1L, "ready-second", "owner-1", SkillVisibility.PUBLIC);
@@ -247,12 +253,73 @@ class CliSkillAppServiceTest {
         given(skillPublishService.publishFromEntries("global", entries, "user-1", SkillVisibility.PUBLIC, Set.of("USER"), false))
                 .willReturn(new SkillPublishService.PublishResult(1L, "test-skill", mockVersion));
 
-        CliPublishResponse response = service.publish("global", entries, "user-1", SkillVisibility.PUBLIC, Set.of("USER"));
+        CliPublishResponse response = service.publish(
+                "global",
+                entries,
+                "user-1",
+                SkillVisibility.PUBLIC,
+                Set.of("USER"),
+                new AuditRequestContext("127.0.0.1", "CLI/1.0")
+        );
 
         assertEquals("global", response.namespace());
         assertEquals("test-skill", response.slug());
         assertEquals("1.0.0", response.version());
         assertEquals("PUBLIC", response.visibility());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void publish_recordsComplianceSnapshotWhenLatestPublished() {
+        List<PackageEntry> entries = List.of(
+                new PackageEntry("SKILL.md", "name: test".getBytes(), 10, "text/markdown")
+        );
+        SkillVersion version = publishedVersion(1L, 42L, "1.0.0");
+        version.setParsedMetadataJson("""
+                {
+                  "frontmatter": {
+                    "x-astron-compliance": [
+                      {
+                        "standard": "soc2",
+                        "standardVersion": "2017",
+                        "controlId": "CC6.1"
+                      }
+                    ]
+                  }
+                }
+                """);
+        given(skillPublishService.publishFromEntries("global", entries, "user-1", SkillVisibility.PUBLIC, Set.of("SUPER_ADMIN"), false))
+                .willReturn(new SkillPublishService.PublishResult(1L, "test-skill", version));
+
+        service.publish(
+                "global",
+                entries,
+                "user-1",
+                SkillVisibility.PUBLIC,
+                Set.of("SUPER_ADMIN"),
+                new AuditRequestContext("127.0.0.1", "CLI/1.0")
+        );
+
+        verify(auditLogService).record(
+                eq("user-1"),
+                eq("CLI_PUBLISH"),
+                eq("SKILL_VERSION"),
+                eq(42L),
+                isNull(),
+                eq("127.0.0.1"),
+                eq("CLI/1.0"),
+                contains("\"snapshotKind\":\"latest_published_entered\"")
+        );
+        verify(auditLogService).record(
+                eq("user-1"),
+                eq("CLI_PUBLISH"),
+                eq("SKILL_VERSION"),
+                eq(42L),
+                isNull(),
+                eq("127.0.0.1"),
+                eq("CLI/1.0"),
+                contains("\"controlId\":\"CC6.1\"")
+        );
     }
 
     private boolean requiresInstallableLatest(SearchQuery query) {

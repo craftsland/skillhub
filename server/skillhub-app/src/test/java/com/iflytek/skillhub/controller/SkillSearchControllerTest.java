@@ -43,6 +43,7 @@ class SkillSearchControllerTest {
                 eq(0),
                 eq(20),
                 eq(null),
+                eq(null),
                 any(),
                 any()))
                 .thenReturn(new SkillSearchAppService.SearchResponse(List.of(), 0, 0, 20));
@@ -67,6 +68,7 @@ class SkillSearchControllerTest {
                 eq(0),
                 eq(12),
                 eq(null),
+                eq(null),
                 any(),
                 any()))
                 .thenReturn(new SkillSearchAppService.SearchResponse(List.of(), 0, 0, 12));
@@ -89,6 +91,7 @@ class SkillSearchControllerTest {
                 eq(0),
                 eq(20),
                 eq(List.of("code-generation", "official")),
+                eq(null),
                 any(),
                 any()))
                 .thenReturn(new SkillSearchAppService.SearchResponse(List.of(), 0, 0, 20));
@@ -109,6 +112,7 @@ class SkillSearchControllerTest {
                 eq("newest"),
                 eq(0),
                 eq(20),
+                eq(null),
                 eq(null),
                 any(),
                 any()))
@@ -132,6 +136,7 @@ class SkillSearchControllerTest {
                 eq(0),
                 eq(20),
                 eq(null),
+                eq(null),
                 any(),
                 any()))
                 .thenReturn(new SkillSearchAppService.SearchResponse(List.of(), 0, 0, 20));
@@ -142,5 +147,27 @@ class SkillSearchControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.page").value(0))
                 .andExpect(jsonPath("$.data.size").value(20));
+    }
+
+    @Test
+    void searchShouldPassComplianceStandardFilter() throws Exception {
+        when(skillSearchAppService.search(
+                eq("review"),
+                eq(null),
+                eq("newest"),
+                eq(0),
+                eq(20),
+                eq(List.of("official")),
+                eq("gdpr"),
+                any(),
+                any()))
+                .thenReturn(new SkillSearchAppService.SearchResponse(List.of(), 0, 0, 20));
+
+        mockMvc.perform(get("/api/web/skills")
+                        .param("q", "review")
+                        .param("label", "official")
+                        .param("complianceStandard", "gdpr"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray());
     }
 }

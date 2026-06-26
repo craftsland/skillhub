@@ -7,10 +7,11 @@ describe('buildSkillSearchUrl', () => {
       q: '  hello world  ',
       namespace: '@team-ai',
       label: 'code-generation',
+      complianceStandard: 'gdpr',
       sort: 'relevance',
       page: 2,
       size: 12,
-    })).toBe('/api/web/skills?q=hello+world&namespace=team-ai&label=code-generation&sort=relevance&page=2&size=12')
+    })).toBe('/api/web/skills?q=hello+world&namespace=team-ai&label=code-generation&complianceStandard=gdpr&sort=relevance&page=2&size=12')
   })
 
   it('returns the base skills endpoint when no search params are provided', () => {

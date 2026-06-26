@@ -11,10 +11,14 @@ import com.iflytek.skillhub.domain.review.ReviewTaskRepository;
 import com.iflytek.skillhub.domain.review.ReviewTaskStatus;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
+import com.iflytek.skillhub.domain.skill.SkillVersion;
+import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceAuditDetailFactory;
 import com.iflytek.skillhub.dto.PageResponse;
 import com.iflytek.skillhub.dto.ReviewTaskResponse;
 import com.iflytek.skillhub.repository.GovernanceQueryRepository;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.MDC;
@@ -34,19 +38,24 @@ public class ReviewPortalAppService {
     private final GovernanceQueryRepository governanceQueryRepository;
     private final RbacService rbacService;
     private final AuditLogService auditLogService;
+    private final SkillVersionRepository skillVersionRepository;
+    private final SkillComplianceAuditDetailFactory complianceAuditDetailFactory =
+            new SkillComplianceAuditDetailFactory();
 
     public ReviewPortalAppService(ReviewService reviewService,
                                   ReviewTaskRepository reviewTaskRepository,
                                   NamespaceRepository namespaceRepository,
                                   GovernanceQueryRepository governanceQueryRepository,
                                   RbacService rbacService,
-                                  AuditLogService auditLogService) {
+                                  AuditLogService auditLogService,
+                                  SkillVersionRepository skillVersionRepository) {
         this.reviewService = reviewService;
         this.reviewTaskRepository = reviewTaskRepository;
         this.namespaceRepository = namespaceRepository;
         this.governanceQueryRepository = governanceQueryRepository;
         this.rbacService = rbacService;
         this.auditLogService = auditLogService;
+        this.skillVersionRepository = skillVersionRepository;
     }
 
     public ReviewTaskResponse submitReview(Long skillVersionId,
@@ -75,7 +84,13 @@ public class ReviewPortalAppService {
                 normalizeRoles(userNsRoles),
                 platformRoles(userId)
         );
-        recordAudit("REVIEW_APPROVE", userId, task.getId(), auditContext, detailWithComment(comment));
+        recordAudit(
+                "REVIEW_APPROVE",
+                userId,
+                task.getId(),
+                auditContext,
+                detailWithCommentAndSnapshot(comment, task.getSkillVersionId())
+        );
         return governanceQueryRepository.getReviewTaskResponse(task);
     }
 
@@ -268,5 +283,18 @@ public class ReviewPortalAppService {
             return null;
         }
         return "{\"comment\":\"" + comment.replace("\"", "\\\"") + "\"}";
+    }
+
+    private String detailWithCommentAndSnapshot(String comment, Long skillVersionId) {
+        SkillVersion version = skillVersionRepository.findById(skillVersionId).orElse(null);
+        if (version == null) {
+            return detailWithComment(comment);
+        }
+
+        LinkedHashMap<String, Object> extras = new LinkedHashMap<>();
+        if (comment != null && !comment.isBlank()) {
+            extras.put("comment", comment);
+        }
+        return complianceAuditDetailFactory.latestPublishedEntered(version, extras);
     }
 }

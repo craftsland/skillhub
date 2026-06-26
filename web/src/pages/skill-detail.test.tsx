@@ -16,9 +16,11 @@ const hasRoleMock = vi.fn<(role: string) => boolean>((role: string) => role === 
 const useSkillDetailMock = vi.fn()
 const useSkillLabelsMock = vi.fn()
 const useSkillVersionsMock = vi.fn()
+const useSkillVersionDetailMock = vi.fn()
 const useSkillFilesMock = vi.fn()
 const useSkillReadmeMock = vi.fn()
 const useSkillFileMock = vi.fn()
+let detailSearchState: { returnTo?: string; version?: string } = { returnTo: '/dashboard/skills' }
 let authState: {
   user: { userId: string; platformRoles: string[] } | null
   hasRole: (role: string) => boolean
@@ -31,7 +33,7 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
   useParams: () => ({ namespace: 'global', slug: 'demo-skill' }),
   useRouterState: () => ({ pathname: '/space/global/demo-skill', searchStr: '', hash: '' }),
-  useSearch: () => ({ returnTo: '/dashboard/skills' }),
+  useSearch: () => detailSearchState,
 }))
 
 vi.mock('react-i18next', async () => {
@@ -159,7 +161,7 @@ vi.mock('@/shared/hooks/use-skill-queries', () => ({
   useAttachSkillLabel: () => ({ mutate: vi.fn(), isPending: false }),
   useDetachSkillLabel: () => ({ mutate: vi.fn(), isPending: false }),
   useSkillVersions: (...args: unknown[]) => useSkillVersionsMock(...args),
-  useSkillVersionDetail: () => ({ data: undefined }),
+  useSkillVersionDetail: (...args: unknown[]) => useSkillVersionDetailMock(...args),
   useSkillFiles: (...args: unknown[]) => useSkillFilesMock(...args),
   useSkillReadme: (...args: unknown[]) => useSkillReadmeMock(...args),
   useSkillFile: (...args: unknown[]) => useSkillFileMock(...args),
@@ -236,8 +238,10 @@ describe('SkillDetailPage', () => {
     useSkillFilesMock.mockReset()
     useSkillReadmeMock.mockReset()
     useSkillFileMock.mockReset()
+    useSkillVersionDetailMock.mockReset()
     toastMocks.success.mockReset()
     toastMocks.error.mockReset()
+    detailSearchState = { returnTo: '/dashboard/skills' }
     hasRoleMock.mockImplementation((role: string) => role === 'USER')
     authState = {
       user: { userId: 'owner-1', platformRoles: ['USER'] },
@@ -269,6 +273,20 @@ describe('SkillDetailPage', () => {
     useSkillFilesMock.mockReturnValue({ data: [] })
     useSkillReadmeMock.mockReturnValue({ data: '# Demo', error: null })
     useSkillFileMock.mockReturnValue({ data: null, isLoading: false, error: null })
+    useSkillVersionDetailMock.mockReturnValue({
+      data: {
+        id: 10,
+        version: '1.0.0',
+        status: 'PUBLISHED',
+        changelog: '',
+        fileCount: 1,
+        totalSize: 12,
+        publishedAt: '2026-03-20T00:00:00Z',
+        parsedMetadataJson: '{}',
+        manifestJson: '[]',
+        complianceMappings: [],
+      },
+    })
   })
 
   it('shows hard delete action for the skill owner', () => {
@@ -312,6 +330,65 @@ describe('SkillDetailPage', () => {
     expect(html).toContain('install')
     expect(html).not.toContain('skillDetail.loginRequired')
     expect(html).not.toContain('skillDetail.deleteSkill')
+  })
+
+  it('renders version-scoped compliance mappings for the selected version from route search', () => {
+    detailSearchState = { returnTo: '/dashboard/skills', version: '0.9.0' }
+    useSkillVersionsMock.mockReturnValue({
+      data: [
+        {
+          id: 10,
+          version: '1.0.0',
+          status: 'PUBLISHED',
+          changelog: '',
+          fileCount: 1,
+          totalSize: 12,
+          publishedAt: '2026-03-20T00:00:00Z',
+          downloadAvailable: true,
+        },
+        {
+          id: 9,
+          version: '0.9.0',
+          status: 'PUBLISHED',
+          changelog: '',
+          fileCount: 1,
+          totalSize: 12,
+          publishedAt: '2026-03-19T00:00:00Z',
+          downloadAvailable: true,
+        },
+      ],
+    })
+    useSkillVersionDetailMock.mockImplementation((_namespace: string, _slug: string, version?: string) => ({
+      data: version === '0.9.0'
+        ? {
+            id: 9,
+            version: '0.9.0',
+            status: 'PUBLISHED',
+            changelog: '',
+            fileCount: 1,
+            totalSize: 12,
+            publishedAt: '2026-03-19T00:00:00Z',
+            parsedMetadataJson: '{}',
+            manifestJson: '[]',
+            complianceMappings: [
+              {
+                standard: 'gdpr',
+                standardVersion: '2024',
+                controlId: 'Article-17',
+                controlTitle: 'Right to erasure',
+                evidenceUrl: 'https://example.com/evidence',
+              },
+            ],
+          }
+        : undefined,
+    }))
+
+    const html = renderToStaticMarkup(<SkillDetailPage />)
+
+    expect(useSkillVersionDetailMock).toHaveBeenCalledWith('global', 'demo-skill', '0.9.0', true)
+    expect(html).toContain('skillDetail.complianceSectionTitle')
+    expect(html).toContain('Right to erasure')
+    expect(html).toContain('Article-17')
   })
 
   it('shows the label management panel for a user who can manage the skill lifecycle', () => {

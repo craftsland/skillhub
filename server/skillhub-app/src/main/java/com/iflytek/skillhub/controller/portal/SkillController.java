@@ -11,6 +11,7 @@ import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.dto.PageResponse;
 import com.iflytek.skillhub.dto.ResolveVersionResponse;
+import com.iflytek.skillhub.dto.SkillComplianceMappingResponse;
 import com.iflytek.skillhub.dto.SkillDetailResponse;
 import com.iflytek.skillhub.dto.SkillFileResponse;
 import com.iflytek.skillhub.dto.SkillLifecycleVersionResponse;
@@ -173,7 +174,16 @@ public class SkillController extends BaseApiController {
                 detail.totalSize(),
                 detail.publishedAt(),
                 detail.parsedMetadataJson(),
-                detail.manifestJson()
+                detail.manifestJson(),
+                detail.complianceMappings().stream()
+                        .map(mapping -> new SkillComplianceMappingResponse(
+                                mapping.standard().value(),
+                                mapping.standardVersion(),
+                                mapping.controlId(),
+                                mapping.controlTitle(),
+                                mapping.evidenceUrl()
+                        ))
+                        .toList()
         );
         return ok("response.success.read", response);
     }

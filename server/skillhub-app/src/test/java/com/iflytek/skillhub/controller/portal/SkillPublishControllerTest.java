@@ -1,12 +1,15 @@
 package com.iflytek.skillhub.controller.portal;
 
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import org.mockito.ArgumentMatchers;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -63,6 +66,9 @@ class SkillPublishControllerTest {
     @MockBean
     private SkillHubMetrics skillHubMetrics;
 
+    @MockBean
+    private AuditLogService auditLogService;
+
     @Test
     void publish_recordsMetricsAfterSuccess() throws Exception {
         SkillVersion version = new SkillVersion(12L, "1.0.0", "usr_1");
@@ -112,6 +118,88 @@ class SkillPublishControllerTest {
             .andExpect(jsonPath("$.data.slug").value("demo-skill"));
 
         verify(skillHubMetrics).incrementSkillPublish("global", "PENDING_REVIEW");
+    }
+
+    @Test
+    void publish_recordsComplianceSnapshotWhenLatestPublished() throws Exception {
+        SkillVersion version = new SkillVersion(12L, "1.0.0", "usr_1");
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setFileCount(1);
+        version.setTotalSize(128L);
+        version.setParsedMetadataJson("""
+                {
+                  "frontmatter": {
+                    "x-astron-compliance": [
+                      {
+                        "standard": "soc2",
+                        "standardVersion": "2017",
+                        "controlId": "CC6.1"
+                      }
+                    ]
+                  }
+                }
+                """);
+        ReflectionTestUtils.setField(version, "id", 34L);
+
+        given(skillPublishService.publishFromEntries(
+                eq("global"),
+                ArgumentMatchers.<List<PackageEntry>>any(),
+                eq("usr_1"),
+                eq(SkillVisibility.PUBLIC),
+                eq(Set.of("SUPER_ADMIN")),
+                eq(false)))
+                .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version));
+
+        PlatformPrincipal principal = new PlatformPrincipal(
+                "usr_1",
+                "publisher",
+                "publisher@example.com",
+                "",
+                "local",
+                Set.of("SUPER_ADMIN")
+        );
+        var auth = new UsernamePasswordAuthenticationToken(
+                principal,
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "skill.zip",
+                "application/zip",
+                buildZipBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/skills/global/publish")
+                        .file(file)
+                        .param("visibility", "PUBLIC")
+                        .header("User-Agent", "JUnit")
+                        .with(authentication(auth))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0));
+
+        verify(auditLogService).record(
+                eq("usr_1"),
+                eq("PUBLISH"),
+                eq("SKILL_VERSION"),
+                eq(34L),
+                isNull(),
+                eq("127.0.0.1"),
+                eq("JUnit"),
+                contains("\"snapshotKind\":\"latest_published_entered\"")
+        );
+        verify(auditLogService).record(
+                eq("usr_1"),
+                eq("PUBLISH"),
+                eq("SKILL_VERSION"),
+                eq(34L),
+                isNull(),
+                eq("127.0.0.1"),
+                eq("JUnit"),
+                contains("\"controlId\":\"CC6.1\"")
+        );
     }
 
     @Test

@@ -16,7 +16,9 @@ import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
+import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceAuditDetailFactory;
 import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.service.SkillQueryService;
 import com.iflytek.skillhub.domain.social.SkillStarService;
@@ -24,6 +26,7 @@ import com.iflytek.skillhub.dto.SkillSummaryResponse;
 import com.iflytek.skillhub.service.SkillSearchAppService;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.MDC;
@@ -49,6 +52,8 @@ public class ClawHubCompatAppService {
     private final AuditLogService auditLogService;
     private final CompatSkillLookupService compatSkillLookupService;
     private final SkillStarService skillStarService;
+    private final SkillComplianceAuditDetailFactory complianceAuditDetailFactory =
+            new SkillComplianceAuditDetailFactory();
 
     public ClawHubCompatAppService(CanonicalSlugMapper mapper,
                                    SkillSearchAppService skillSearchAppService,
@@ -302,8 +307,14 @@ public class ClawHubCompatAppService {
                 principal.platformRoles(),
                 confirmWarnings
         );
-        recordCompatPublishAudit(principal.userId(), result.version().getId(), clientIp, userAgent,
-                "{\"namespace\":\"" + namespace + "\",\"slug\":\"" + extracted.payload().slug() + "\"}");
+        recordCompatPublishAudit(
+                principal.userId(),
+                result.version(),
+                namespace,
+                result.slug(),
+                clientIp,
+                userAgent
+        );
         return new ClawHubPublishResponse(result.skillId().toString(), result.version().getId().toString());
     }
 
@@ -321,8 +332,14 @@ public class ClawHubCompatAppService {
                 principal.platformRoles(),
                 confirmWarnings
         );
-        recordCompatPublishAudit(principal.userId(), result.version().getId(), clientIp, userAgent,
-                "{\"namespace\":\"" + namespace + "\"}");
+        recordCompatPublishAudit(
+                principal.userId(),
+                result.version(),
+                namespace,
+                result.slug(),
+                clientIp,
+                userAgent
+        );
         return new ClawHubPublishResponse(result.skillId().toString(), result.version().getId().toString());
     }
 
@@ -421,20 +438,31 @@ public class ClawHubCompatAppService {
     }
 
     private void recordCompatPublishAudit(String userId,
-                                          Long versionId,
+                                          SkillVersion version,
+                                          String namespace,
+                                          String slug,
                                           String clientIp,
-                                          String userAgent,
-                                          String detailJson) {
+                                          String userAgent) {
         auditLogService.record(
                 userId,
                 "COMPAT_PUBLISH",
                 "SKILL_VERSION",
-                versionId,
+                version.getId(),
                 MDC.get("requestId"),
                 clientIp,
                 userAgent,
-                detailJson
+                compatPublishAuditDetail(version, namespace, slug)
         );
+    }
+
+    private String compatPublishAuditDetail(SkillVersion version, String namespace, String slug) {
+        if (version.getStatus() == SkillVersionStatus.PUBLISHED) {
+            LinkedHashMap<String, Object> extras = new LinkedHashMap<>();
+            extras.put("namespace", namespace);
+            extras.put("slug", slug);
+            return complianceAuditDetailFactory.latestPublishedEntered(version, extras);
+        }
+        return "{\"namespace\":\"" + namespace + "\",\"slug\":\"" + slug + "\"}";
     }
 
 }

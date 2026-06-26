@@ -14,6 +14,7 @@ import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.review.ReviewService;
 import com.iflytek.skillhub.domain.skill.Skill;
+import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.service.SkillGovernanceService;
@@ -26,6 +27,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 import java.util.Optional;
+
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.isNull;
 
 class SkillLifecycleAppServiceTest {
 
@@ -75,5 +79,66 @@ class SkillLifecycleAppServiceTest {
         assertThat(response.action()).isEqualTo("ARCHIVE");
         assertThat(response.status()).isEqualTo("ARCHIVED");
         verify(skillGovernanceService).archiveSkill(11L, "owner-1", Map.of(7L, NamespaceRole.OWNER), "127.0.0.1", "JUnit", "cleanup");
+    }
+
+    @Test
+    void confirmPublish_recordsComplianceSnapshot() {
+        Namespace namespace = new Namespace("global", "Global", "owner-1");
+        ReflectionTestUtils.setField(namespace, "id", 7L);
+        Skill skill = new Skill(7L, "demo-skill", "owner-1", SkillVisibility.PRIVATE);
+        ReflectionTestUtils.setField(skill, "id", 11L);
+        SkillVersion version = new SkillVersion(11L, "1.0.0", "owner-1");
+        ReflectionTestUtils.setField(version, "id", 22L);
+        version.setParsedMetadataJson("""
+                {
+                  "frontmatter": {
+                    "x-astron-compliance": [
+                      {
+                        "standard": "soc2",
+                        "standardVersion": "2017",
+                        "controlId": "CC6.1"
+                      }
+                    ]
+                  }
+                }
+                """);
+
+        when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(namespace));
+        when(skillSlugResolutionService.resolve(7L, "demo-skill", "owner-1", SkillSlugResolutionService.Preference.CURRENT_USER))
+                .thenReturn(skill);
+        when(skillVersionRepository.findBySkillIdAndVersion(11L, "1.0.0")).thenReturn(Optional.of(version));
+
+        var response = service.confirmPublish(
+                "global",
+                "demo-skill",
+                "1.0.0",
+                "owner-1",
+                Map.of(7L, NamespaceRole.OWNER),
+                new AuditRequestContext("127.0.0.1", "JUnit")
+        );
+
+        assertThat(response.versionId()).isEqualTo(22L);
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        verify(skillReviewSubmitService).confirmPublish(11L, 22L, "owner-1", Map.of(7L, NamespaceRole.OWNER));
+        verify(auditLogService).record(
+                eq("owner-1"),
+                eq("CONFIRM_PUBLISH"),
+                eq("SKILL_VERSION"),
+                eq(22L),
+                isNull(),
+                eq("127.0.0.1"),
+                eq("JUnit"),
+                contains("\"snapshotKind\":\"latest_published_entered\"")
+        );
+        verify(auditLogService).record(
+                eq("owner-1"),
+                eq("CONFIRM_PUBLISH"),
+                eq("SKILL_VERSION"),
+                eq(22L),
+                isNull(),
+                eq("127.0.0.1"),
+                eq("JUnit"),
+                contains("\"controlId\":\"CC6.1\"")
+        );
     }
 }

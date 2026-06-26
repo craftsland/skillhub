@@ -255,6 +255,14 @@ export interface SkillVersion {
   downloadAvailable: boolean
 }
 
+export interface SkillComplianceMapping {
+  standard: string
+  standardVersion: string
+  controlId: string
+  controlTitle?: string
+  evidenceUrl?: string
+}
+
 export interface SkillVersionDetail {
   id: number
   version: string
@@ -265,6 +273,7 @@ export interface SkillVersionDetail {
   publishedAt: string
   parsedMetadataJson?: string
   manifestJson?: string
+  complianceMappings: SkillComplianceMapping[]
 }
 
 export interface SkillFile {
@@ -328,6 +337,7 @@ export interface SearchParams {
   q?: string
   namespace?: string
   label?: string
+  complianceStandard?: string
   sort?: string
   page?: number
   size?: number

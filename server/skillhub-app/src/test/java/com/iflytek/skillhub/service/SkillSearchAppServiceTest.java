@@ -295,6 +295,28 @@ class SkillSearchAppServiceTest {
     }
 
     @Test
+    void search_shouldNormalizeAndPassComplianceStandard() {
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(), 0, 0, 20));
+
+        service.search(
+                "skill",
+                null,
+                "newest",
+                0,
+                20,
+                List.of("official"),
+                " GDPR ",
+                "user-9",
+                Map.of(7L, NamespaceRole.MEMBER)
+        );
+
+        ArgumentCaptor<SearchQuery> captor = ArgumentCaptor.forClass(SearchQuery.class);
+        verify(searchQueryService).search(captor.capture());
+        assertEquals("gdpr", captor.getValue().complianceStandard());
+    }
+
+    @Test
     void search_shouldIncludeMemberNamespacesInVisibilityScope() {
         when(searchQueryService.search(any()))
                 .thenReturn(new SearchResult(List.of(), 0, 0, 20));

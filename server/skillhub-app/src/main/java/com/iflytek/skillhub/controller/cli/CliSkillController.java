@@ -125,7 +125,8 @@ public class CliSkillController extends BaseApiController {
             @PathVariable String namespace,
             @RequestPart("file") MultipartFile file,
             @RequestPart(value = "visibility", required = false) String visibility,
-            @AuthenticationPrincipal PlatformPrincipal principal) throws IOException {
+            @AuthenticationPrincipal PlatformPrincipal principal,
+            HttpServletRequest request) throws IOException {
         List<PackageEntry> entries;
         try {
             entries = archiveExtractor.extract(file);
@@ -135,7 +136,8 @@ public class CliSkillController extends BaseApiController {
         var result = cliSkillAppService.publish(
                 namespace, entries, principal.userId(),
                 SkillVisibility.valueOf((visibility != null ? visibility : "PUBLIC").toUpperCase()),
-                principal.platformRoles());
+                principal.platformRoles(),
+                AuditRequestContext.from(request));
         return ok("response.success.published", result);
     }
 }

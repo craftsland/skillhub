@@ -4161,6 +4161,14 @@ export interface components {
             publishedAt?: string;
             parsedMetadataJson?: string;
             manifestJson?: string;
+            complianceMappings?: components["schemas"]["SkillComplianceMappingResponse"][];
+        };
+        SkillComplianceMappingResponse: {
+            standard?: string;
+            standardVersion?: string;
+            controlId?: string;
+            controlTitle?: string;
+            evidenceUrl?: string;
         };
         ApiResponseSkillVersionCompareResponse: {
             /** Format: int32 */
@@ -8508,6 +8516,7 @@ export interface operations {
                 q?: string;
                 namespace?: string;
                 label?: string[];
+                complianceStandard?: string;
                 sort?: string;
                 page?: number;
                 size?: number;

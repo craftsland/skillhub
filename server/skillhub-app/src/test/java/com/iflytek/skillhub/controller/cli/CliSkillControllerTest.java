@@ -69,7 +69,7 @@ class CliSkillControllerTest {
     @Test
     void publishConsumesMultipartFormData() throws Exception {
         Method publish = CliSkillController.class.getMethod(
-                "publish", String.class, MultipartFile.class, String.class, PlatformPrincipal.class);
+                "publish", String.class, MultipartFile.class, String.class, PlatformPrincipal.class, HttpServletRequest.class);
 
         PostMapping mapping = publish.getAnnotation(PostMapping.class);
         assertNotNull(mapping);

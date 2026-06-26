@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
@@ -143,6 +144,19 @@ class SkillGovernanceServiceTest {
     void yankVersion_setsYankedStatus() {
         SkillVersion version = new SkillVersion(2L, "1.0.0", "owner");
         version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setParsedMetadataJson("""
+                {
+                  "frontmatter": {
+                    "x-astron-compliance": [
+                      {
+                        "standard": "gdpr",
+                        "standardVersion": "2024",
+                        "controlId": "Article-17"
+                      }
+                    ]
+                  }
+                }
+                """);
         given(skillVersionRepository.findById(22L)).willReturn(Optional.of(version));
         given(skillVersionRepository.save(version)).willReturn(version);
         given(skillRepository.findById(2L)).willReturn(Optional.empty());
@@ -152,7 +166,26 @@ class SkillGovernanceServiceTest {
         assertThat(result.getStatus()).isEqualTo(SkillVersionStatus.YANKED);
         assertThat(result.getYankedBy()).isEqualTo("admin");
         assertThat(result.getYankedAt()).isEqualTo(Instant.now(CLOCK));
-        verify(auditLogService).record("admin", "YANK_SKILL_VERSION", "SKILL_VERSION", 22L, null, "127.0.0.1", "JUnit", "{\"reason\":\"broken\"}");
+        verify(auditLogService).record(
+                org.mockito.ArgumentMatchers.eq("admin"),
+                org.mockito.ArgumentMatchers.eq("YANK_SKILL_VERSION"),
+                org.mockito.ArgumentMatchers.eq("SKILL_VERSION"),
+                org.mockito.ArgumentMatchers.eq(22L),
+                org.mockito.ArgumentMatchers.eq(null),
+                org.mockito.ArgumentMatchers.eq("127.0.0.1"),
+                org.mockito.ArgumentMatchers.eq("JUnit"),
+                contains("\"reason\":\"broken\"")
+        );
+        verify(auditLogService).record(
+                org.mockito.ArgumentMatchers.eq("admin"),
+                org.mockito.ArgumentMatchers.eq("YANK_SKILL_VERSION"),
+                org.mockito.ArgumentMatchers.eq("SKILL_VERSION"),
+                org.mockito.ArgumentMatchers.eq(22L),
+                org.mockito.ArgumentMatchers.eq(null),
+                org.mockito.ArgumentMatchers.eq("127.0.0.1"),
+                org.mockito.ArgumentMatchers.eq("JUnit"),
+                contains("\"snapshotKind\":\"latest_published_removed\"")
+        );
     }
 
     @Test

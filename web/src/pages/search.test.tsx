@@ -134,6 +134,7 @@ describe('SearchPage', () => {
       q: 'agent',
       namespace: 'team-ai',
       label: 'code-generation',
+      complianceStandard: 'gdpr',
       sort: 'downloads',
       page: 1,
       starredOnly: false,
@@ -156,6 +157,7 @@ describe('SearchPage', () => {
     expect(html).toContain('Code Generation')
     expect(findButton('Code Generation').variant).toBe('default')
     expect(findButton('Official').variant).toBe('outline')
+    expect(findButton('search.compliance.options.gdpr').variant).toBe('default')
   })
 
   it('toggles the selected label off and resets paging', () => {
@@ -169,6 +171,7 @@ describe('SearchPage', () => {
         q: 'agent',
         namespace: 'team-ai',
         label: '',
+        complianceStandard: 'gdpr',
         sort: 'downloads',
         page: 0,
         starredOnly: false,
@@ -187,6 +190,7 @@ describe('SearchPage', () => {
         q: 'agent',
         namespace: 'team-ai',
         label: 'code-generation',
+        complianceStandard: 'gdpr',
         sort: 'newest',
         page: 0,
         starredOnly: false,
@@ -206,6 +210,7 @@ describe('SearchPage', () => {
         q: 'agent',
         namespace: 'team-ai',
         label: 'code-generation',
+        complianceStandard: 'gdpr',
         sort: 'downloads',
         page: 2,
         starredOnly: false,
@@ -217,6 +222,7 @@ describe('SearchPage', () => {
         q: 'agent',
         namespace: 'team-ai',
         label: 'code-generation',
+        complianceStandard: 'gdpr',
         sort: 'downloads',
         page: 0,
         starredOnly: true,
@@ -231,6 +237,7 @@ describe('SearchPage', () => {
       q: 'agent',
       namespace: 'team-ai',
       label: 'code-generation',
+      complianceStandard: 'gdpr',
       sort: 'downloads',
       page: 1,
       size: 12,
@@ -248,11 +255,31 @@ describe('SearchPage', () => {
         q: 'onboarding',
         namespace: 'product-team',
         label: 'code-generation',
+        complianceStandard: 'gdpr',
         sort: 'downloads',
         page: 0,
         starredOnly: false,
       },
       replace: true,
+    })
+  })
+
+  it('toggles the compliance filter and resets paging', () => {
+    renderToStaticMarkup(<SearchPage />)
+
+    findButton('search.compliance.options.soc2').onClick?.()
+
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/search',
+      search: {
+        q: 'agent',
+        namespace: 'team-ai',
+        label: 'code-generation',
+        complianceStandard: 'soc2',
+        sort: 'downloads',
+        page: 0,
+        starredOnly: false,
+      },
     })
   })
 

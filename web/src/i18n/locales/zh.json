@@ -176,6 +176,16 @@
     "filters": {
       "label": "筛选:"
     },
+    "compliance": {
+      "label": "合规标准:",
+      "options": {
+        "mitre_attack": "MITRE ATT&CK",
+        "nist_csf": "NIST CSF",
+        "gdpr": "GDPR",
+        "hipaa": "HIPAA",
+        "soc2": "SOC 2"
+      }
+    },
     "sort": {
       "label": "排序:",
       "relevance": "相关性",
@@ -822,6 +832,13 @@
     "noVersions": "暂无版本",
     "fileCount": "{{count}} 个文件",
     "version": "版本",
+    "complianceSectionTitle": "声明的对齐关系",
+    "complianceSectionDescription": "版本 {{version}} 声明了以下控制项映射。",
+    "complianceEmptyTitle": "暂无声明映射",
+    "complianceEmptyDescription": "这个版本暂未声明任何合规标准映射。",
+    "complianceStandardVersion": "标准版本：{{version}}",
+    "complianceControlId": "控制项 ID：{{controlId}}",
+    "complianceEvidenceLink": "查看证据链接",
     "downloads": "下载量",
     "rating": "评分",
     "ratingNone": "暂无",

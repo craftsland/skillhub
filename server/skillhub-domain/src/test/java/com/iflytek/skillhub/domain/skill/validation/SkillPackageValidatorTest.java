@@ -190,6 +190,30 @@ class SkillPackageValidatorTest {
     }
 
     @Test
+    void testInvalidComplianceMetadataRejected() {
+        String skillMdContent = """
+            ---
+            name: compliance-skill
+            description: Skill with malformed compliance metadata
+            version: 1.0.0
+            x-astron-compliance: gdpr
+            ---
+            Body
+            """;
+
+        List<PackageEntry> entries = List.of(
+                new PackageEntry("SKILL.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown")
+        );
+
+        ValidationResult result = validator.validate(entries);
+
+        assertFalse(result.passed());
+        assertTrue(result.errors().stream().anyMatch(error ->
+                error.contains("Invalid SKILL.md frontmatter")
+                        && error.contains("x-astron-compliance must be a non-empty array")));
+    }
+
+    @Test
     void testPackageTooLarge() {
         // Use a custom validator with 2KB total limit to test the logic
         SkillPackageValidator smallValidator = new SkillPackageValidator(

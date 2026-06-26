@@ -8,7 +8,7 @@ import { resolvePackageRelativeLink } from '@/features/skill/package-relative-li
 import { FileTree } from '@/features/skill/file-tree'
 import { FilePreviewDialog } from '@/features/skill/file-preview-dialog'
 import type { FileTreeNode } from '@/features/skill/file-tree-builder'
-import type { SkillFile } from '@/api/types'
+import type { SkillComplianceMapping, SkillFile } from '@/api/types'
 import { InstallCommand } from '@/features/skill/install-command'
 import { ShareButton } from '@/features/skill/share-button'
 import { SkillLabelPanel } from '@/features/skill/skill-label-panel'
@@ -103,6 +103,10 @@ function createPackageFilePreviewNode(file: SkillFile): FileTreeNode {
   }
 }
 
+function renderComplianceMappingTitle(mapping: SkillComplianceMapping) {
+  return mapping.controlTitle || mapping.controlId
+}
+
 function getPromotionConflictKey(error: ApiError): 'promotion.duplicate_pending' | 'promotion.already_promoted' | null {
   if (error.serverMessageKey === 'promotion.duplicate_pending') {
     return 'promotion.duplicate_pending'
@@ -160,8 +164,16 @@ export function SkillDetailPage() {
   const headlineVersion = skill ? getHeadlineVersion(skill) : null
   const publishedVersion = skill ? getPublishedVersion(skill) : null
   const ownerPreviewVersion = skill ? getOwnerPreviewVersion(skill) : null
-  const selectedVersion = headlineVersion?.version ?? versions?.[0]?.version
-  const selectedVersionEntry = versions?.find((version) => version.version === selectedVersion) ?? versions?.[0]
+  const requestedVersion = search.version
+  const requestedVersionEntry = requestedVersion
+    ? versions?.find((version) => version.version === requestedVersion)
+    : undefined
+  const headlineVersionEntry = headlineVersion
+    ? versions?.find((version) => version.version === headlineVersion.version)
+    : undefined
+  const selectedVersionEntry = requestedVersionEntry ?? headlineVersionEntry ?? versions?.[0]
+  const selectedVersion = selectedVersionEntry?.version ?? requestedVersion ?? headlineVersion?.version ?? versions?.[0]?.version
+  const { data: selectedVersionDetail } = useSkillVersionDetail(qns, qslug, selectedVersion, skillReady)
   const { data: files } = useSkillFiles(qns, qslug, selectedVersion, skillReady)
   const documentationPath = resolveDocumentationFilePath(files)
   const { data: readme, error: readmeError } = useSkillReadme(qns, qslug, selectedVersion, documentationPath, skillReady)
@@ -194,6 +206,7 @@ export function SkillDetailPage() {
   const canHardDeleteSkill = Boolean(skill && user && (skill.ownerId === user.userId || hasRole('SUPER_ADMIN')))
   const canManageLabels = Boolean(skill && user && (skill.canManageLifecycle || hasRole('SUPER_ADMIN')))
   const isVersionDownloadable = selectedVersionEntry?.status === 'PUBLISHED' && (selectedVersionEntry?.downloadAvailable ?? false)
+  const selectedVersionComplianceMappings = selectedVersionDetail?.complianceMappings ?? []
 
   useEffect(() => {
     // Recompute collapse rules whenever rendered documentation height changes so the page can keep
@@ -259,6 +272,14 @@ export function SkillDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['skills', namespace, slug] })
     queryClient.invalidateQueries({ queryKey: ['skills', namespace, slug, 'versions'] })
     queryClient.invalidateQueries({ queryKey: ['skills'] })
+  }
+
+  const handleVersionSelect = (version: string) => {
+    navigate({
+      to: '/space/$namespace/$slug',
+      params: { namespace, slug },
+      search: { returnTo: search.returnTo, version },
+    })
   }
 
   const hideMutation = useMutation({
@@ -945,9 +966,18 @@ export function SkillDetailPage() {
                     <div key={version.id} className="py-5 first:pt-0 last:pb-0">
                       <div className="flex items-start justify-between gap-4 mb-2">
                         <span className="font-semibold font-heading text-foreground flex items-center gap-2 flex-wrap min-w-0">
-                          <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-sm font-mono">
+                          <button
+                            type="button"
+                            className={cn(
+                              'rounded-full px-2.5 py-0.5 text-sm font-mono transition-colors',
+                              selectedVersionEntry?.version === version.version
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-primary/10 text-primary hover:bg-primary/20',
+                            )}
+                            onClick={() => handleVersionSelect(version.version)}
+                          >
                             v{version.version}
-                          </span>
+                          </button>
                           {version.status && (
                             <span className="rounded-full border border-border/60 bg-secondary/40 px-2.5 py-0.5 text-xs text-muted-foreground">
                               {resolveVersionStatusLabel(version.status)}
@@ -1077,7 +1107,7 @@ export function SkillDetailPage() {
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">{t('skillDetail.version')}</div>
             <div className="max-w-[11rem] break-all text-right font-mono font-semibold leading-snug text-foreground">
-              {headlineVersion ? `v${headlineVersion.version}` : '—'}
+              {selectedVersionEntry ? `v${selectedVersionEntry.version}` : '—'}
             </div>
           </div>
 
@@ -1216,6 +1246,55 @@ export function SkillDetailPage() {
 
         {skill.canManageLifecycle && selectedVersionEntry && (
           <SecurityAuditSummary skillId={skill.id} versionId={selectedVersionEntry.id} versionStatus={selectedVersionEntry.status} />
+        )}
+
+        {selectedVersionEntry && (
+          <Card className="p-5 space-y-4">
+            <div className="space-y-1">
+              <div className="text-sm font-semibold font-heading text-foreground">
+                {t('skillDetail.complianceSectionTitle')}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {t('skillDetail.complianceSectionDescription', { version: selectedVersionEntry.version })}
+              </p>
+            </div>
+            {selectedVersionComplianceMappings.length > 0 ? (
+              <div className="space-y-3">
+                {selectedVersionComplianceMappings.map((mapping) => (
+                  <div
+                    key={`${mapping.standard}:${mapping.standardVersion}:${mapping.controlId}`}
+                    className="rounded-xl border border-border/60 bg-secondary/20 p-3"
+                  >
+                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                      {t(`search.compliance.options.${mapping.standard}`)}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-foreground">
+                      {renderComplianceMappingTitle(mapping)}
+                    </div>
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      <div>{t('skillDetail.complianceStandardVersion', { version: mapping.standardVersion })}</div>
+                      <div>{t('skillDetail.complianceControlId', { controlId: mapping.controlId })}</div>
+                      {mapping.evidenceUrl ? (
+                        <a
+                          className="inline-flex text-primary underline-offset-4 hover:underline"
+                          href={mapping.evidenceUrl}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {t('skillDetail.complianceEvidenceLink')}
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4 text-sm text-muted-foreground">
+                <div className="font-medium text-foreground">{t('skillDetail.complianceEmptyTitle')}</div>
+                <p className="mt-1">{t('skillDetail.complianceEmptyDescription')}</p>
+              </div>
+            )}
+          </Card>
         )}
 
         <SkillLabelPanel

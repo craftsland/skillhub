@@ -80,8 +80,10 @@ public class PostgresFullTextQueryService implements SearchQueryService {
     public SearchResult search(SearchQuery query) {
         String normalizedKeyword = normalizeKeyword(query.keyword());
         String tsQuery = buildPrefixTsQuery(normalizedKeyword);
+        String complianceStandard = normalizeComplianceStandard(query.complianceStandard());
         boolean hasKeyword = normalizedKeyword != null;
         boolean hasTsQuery = tsQuery != null;
+        boolean hasComplianceStandard = complianceStandard != null;
         boolean useRelevanceOrdering = "relevance".equals(query.sortBy()) && hasKeyword;
         boolean useShortPrefixTitleSearch = hasTsQuery && isShortAsciiPrefixSearch(normalizedKeyword);
         boolean useSemanticRerank = semanticEnabled
@@ -107,7 +109,7 @@ public class PostgresFullTextQueryService implements SearchQueryService {
         sql.append("FROM skill_search_document d ");
         sql.append("JOIN skill s ON s.id = d.skill_id ");
         sql.append("JOIN namespace n ON n.id = d.namespace_id ");
-        if (query.requireInstallableLatest()) {
+        if (query.requireInstallableLatest() || hasComplianceStandard) {
             sql.append("JOIN skill_version latest ON latest.id = s.latest_version_id ");
         }
         sql.append("WHERE 1=1 ");
@@ -127,6 +129,9 @@ public class PostgresFullTextQueryService implements SearchQueryService {
             sql.append("AND latest.status = 'PUBLISHED' ");
             sql.append("AND latest.download_ready = TRUE ");
             sql.append("AND latest.yanked_at IS NULL ");
+        }
+        if (hasComplianceStandard) {
+            sql.append("AND (latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance') @> CAST(:complianceFilter AS jsonb) ");
         }
         sql.append("AND (n.status <> 'ARCHIVED' ");
         if (query.visibilityScope().userId() != null) {
@@ -203,6 +208,9 @@ public class PostgresFullTextQueryService implements SearchQueryService {
         if (query.labelSlugs() != null && !query.labelSlugs().isEmpty()) {
             nativeQuery.setParameter("labelSlugs", query.labelSlugs());
         }
+        if (hasComplianceStandard) {
+            nativeQuery.setParameter("complianceFilter", "[{\"standard\":\"" + complianceStandard + "\"}]");
+        }
 
         if (hasKeyword) {
             if (hasTsQuery) {
@@ -247,6 +255,9 @@ public class PostgresFullTextQueryService implements SearchQueryService {
         if (query.labelSlugs() != null && !query.labelSlugs().isEmpty()) {
             countQuery.setParameter("labelSlugs", query.labelSlugs());
         }
+        if (hasComplianceStandard) {
+            countQuery.setParameter("complianceFilter", "[{\"standard\":\"" + complianceStandard + "\"}]");
+        }
 
         if (hasKeyword) {
             if (hasTsQuery) {
@@ -262,6 +273,13 @@ public class PostgresFullTextQueryService implements SearchQueryService {
         }
 
         return new SearchResult(skillIds, total, query.page(), query.size());
+    }
+
+    private String normalizeComplianceStandard(String complianceStandard) {
+        if (complianceStandard == null || complianceStandard.isBlank()) {
+            return null;
+        }
+        return complianceStandard.trim().toLowerCase(Locale.ROOT);
     }
 
     private List<Long> rerankBySemanticSimilarity(List<Long> candidateSkillIds,

@@ -176,6 +176,16 @@
     "filters": {
       "label": "Filter:"
     },
+    "compliance": {
+      "label": "Compliance:",
+      "options": {
+        "mitre_attack": "MITRE ATT&CK",
+        "nist_csf": "NIST CSF",
+        "gdpr": "GDPR",
+        "hipaa": "HIPAA",
+        "soc2": "SOC 2"
+      }
+    },
     "sort": {
       "label": "Sort:",
       "relevance": "Relevance",
@@ -822,6 +832,13 @@
     "noVersions": "No versions",
     "fileCount": "{{count}} files",
     "version": "Version",
+    "complianceSectionTitle": "Declared Alignment",
+    "complianceSectionDescription": "Version {{version}} declares the following control mappings.",
+    "complianceEmptyTitle": "No declared mappings",
+    "complianceEmptyDescription": "This version does not declare alignment to a compliance standard yet.",
+    "complianceStandardVersion": "Standard version: {{version}}",
+    "complianceControlId": "Control ID: {{controlId}}",
+    "complianceEvidenceLink": "Open evidence",
     "downloads": "Downloads",
     "rating": "Rating",
     "ratingNone": "None",

@@ -17,6 +17,7 @@ import { Button } from '@/shared/ui/button'
 import { APP_SHELL_PAGE_CLASS_NAME } from '@/app/page-shell-style'
 
 const PAGE_SIZE = 12
+const COMPLIANCE_STANDARD_OPTIONS = ['mitre_attack', 'nist_csf', 'gdpr', 'hipaa', 'soc2'] as const
 
 function blurActiveElement() {
   if (typeof document === 'undefined' || typeof HTMLElement === 'undefined') {
@@ -93,11 +94,31 @@ export function SearchPage() {
   const q = normalizeSearchQuery(searchParams.q || '')
   const namespace = (searchParams.namespace || '').replace(/^@/, '')
   const selectedLabel = searchParams.label || ''
+  const complianceStandard = searchParams.complianceStandard || ''
   const sort = searchParams.sort || 'newest'
   const page = searchParams.page ?? 0
   const starredOnly = searchParams.starredOnly ?? false
   const [queryInput, setQueryInput] = useState(formatNamespaceSearchInput(namespace, q))
   const previousPageRef = useRef(page)
+
+  const buildSearchState = (overrides: Partial<{
+    q: string
+    namespace: string
+    label: string
+    complianceStandard: string
+    sort: string
+    page: number
+    starredOnly: boolean
+  }> = {}) => ({
+    q,
+    namespace,
+    label: selectedLabel,
+    complianceStandard,
+    sort,
+    page,
+    starredOnly,
+    ...overrides,
+  })
 
   useEffect(() => {
     setQueryInput(formatNamespaceSearchInput(namespace, q))
@@ -121,6 +142,7 @@ export function SearchPage() {
     q,
     namespace: namespace || undefined,
     label: selectedLabel || undefined,
+    complianceStandard: complianceStandard || undefined,
     sort,
     page,
     size: PAGE_SIZE,
@@ -142,44 +164,77 @@ export function SearchPage() {
 
     if (!parsedInput.query && !parsedInput.namespace) {
       startTransition(() => {
-        navigate({ to: '/search', search: { q: '', namespace: '', label: selectedLabel, sort, page: 0, starredOnly }, replace: page === 0 })
+        navigate({
+          to: '/search',
+          search: {
+            q: '',
+            namespace: '',
+            label: selectedLabel,
+            complianceStandard,
+            sort,
+            page: 0,
+            starredOnly,
+          },
+          replace: page === 0,
+        })
       })
       return
     }
 
     const timeoutId = window.setTimeout(() => {
       startTransition(() => {
-        navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly }, replace: true })
+        navigate({
+          to: '/search',
+          search: {
+            q: parsedInput.query,
+            namespace: parsedInput.namespace,
+            label: selectedLabel,
+            complianceStandard,
+            sort,
+            page: 0,
+            starredOnly,
+          },
+          replace: true,
+        })
       })
     }, 250)
 
     return () => window.clearTimeout(timeoutId)
-  }, [navigate, namespace, page, q, queryInput, selectedLabel, sort, starredOnly])
+  }, [complianceStandard, navigate, namespace, page, q, queryInput, selectedLabel, sort, starredOnly])
 
   const handleSearch = (query: string) => {
     const parsedInput = parseNamespaceSearchInput(query)
     setQueryInput(query)
     startTransition(() => {
-      navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly }, replace: true })
+      navigate({
+        to: '/search',
+        search: buildSearchState({ q: parsedInput.query, namespace: parsedInput.namespace, page: 0 }),
+        replace: true,
+      })
     })
   }
 
   const handleSortChange = (newSort: string) => {
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort: newSort, page: 0, starredOnly } })
+    navigate({ to: '/search', search: buildSearchState({ sort: newSort, page: 0 }) })
   }
 
   const handlePageChange = (newPage: number) => {
     blurActiveElement()
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort, page: newPage, starredOnly } })
+    navigate({ to: '/search', search: buildSearchState({ page: newPage }) })
   }
 
   const handleLabelToggle = (label: string) => {
     const nextLabel = selectedLabel === label ? '' : label
-    navigate({ to: '/search', search: { q, namespace, label: nextLabel, sort, page: 0, starredOnly } })
+    navigate({ to: '/search', search: buildSearchState({ label: nextLabel, page: 0 }) })
+  }
+
+  const handleComplianceToggle = (standard: string) => {
+    const nextStandard = complianceStandard === standard ? '' : standard
+    navigate({ to: '/search', search: buildSearchState({ complianceStandard: nextStandard, page: 0 }) })
   }
 
   const handleNamespaceClear = () => {
-    navigate({ to: '/search', search: { q, namespace: '', label: selectedLabel, sort, page: 0, starredOnly } })
+    navigate({ to: '/search', search: buildSearchState({ namespace: '', page: 0 }) })
   }
 
   const handleStarredToggle = () => {
@@ -193,7 +248,7 @@ export function SearchPage() {
       return
     }
 
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort, page: 0, starredOnly: !starredOnly } })
+    navigate({ to: '/search', search: buildSearchState({ page: 0, starredOnly: !starredOnly }) })
   }
 
   const handleSkillClick = (namespace: string, slug: string) => {
@@ -301,6 +356,21 @@ export function SearchPage() {
             </Button>
           ) : null}
         </div>
+        {!starredOnly && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium text-muted-foreground">{t('search.compliance.label')}</span>
+            {COMPLIANCE_STANDARD_OPTIONS.map((standard) => (
+              <Button
+                key={standard}
+                variant={complianceStandard === standard ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleComplianceToggle(standard)}
+              >
+                {t(`search.compliance.options.${standard}`)}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Results */}
