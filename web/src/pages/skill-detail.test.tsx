@@ -388,7 +388,7 @@ describe('SkillDetailPage', () => {
     expect(useSkillVersionDetailMock).toHaveBeenCalledWith('global', 'demo-skill', '0.9.0', true)
     expect(html).toContain('skillDetail.complianceSectionTitle')
     expect(html).toContain('Right to erasure')
-    expect(html).toContain('Article-17')
+    expect(html).toContain('skillDetail.complianceControlId')
   })
 
   it('shows the label management panel for a user who can manage the skill lifecycle', () => {
