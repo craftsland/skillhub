@@ -3,7 +3,9 @@ package com.iflytek.skillhub.bootstrap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.iflytek.skillhub.bootstrap.BuiltinSkillManifestLoader.ManifestItem;
 import com.iflytek.skillhub.controller.support.SkillPackageArchiveExtractor;
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.namespace.Namespace;
 import com.iflytek.skillhub.domain.namespace.NamespaceMember;
 import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
@@ -74,6 +77,7 @@ class BuiltinSkillInitializerTest {
     @Mock private SkillVersionRepository skillVersionRepository;
     @Mock private SkillFileRepository skillFileRepository;
     @Mock private SkillPublishService skillPublishService;
+    @Mock private AuditLogService auditLogService;
 
     private BuiltinSkillProperties properties;
     private BuiltinSkillInitializer initializer;
@@ -94,7 +98,8 @@ class BuiltinSkillInitializerTest {
                 skillRepository,
                 skillVersionRepository,
                 skillFileRepository,
-                skillPublishService
+                skillPublishService,
+                auditLogService
         );
         globalNamespace = new Namespace(GLOBAL, "Global", "system");
         ReflectionTestUtils.setField(globalNamespace, "id", 1L);
@@ -250,6 +255,15 @@ class BuiltinSkillInitializerTest {
         List<PackageEntry> entries = packageEntries("skillhub-hello", "1.0.0", "same");
         givenExtractedPackage(entries);
         when(skillRepository.findByNamespaceIdAndSlug(1L, "skillhub-hello")).thenReturn(List.of());
+        when(skillPublishService.publishFromEntries(
+                eq(GLOBAL),
+                eq(entries),
+                eq(PUBLISHER),
+                eq(SkillVisibility.PUBLIC),
+                eq(Set.of("SUPER_ADMIN")),
+                eq(true)
+        )).thenReturn(new SkillPublishService.PublishResult(100L, "skillhub-hello",
+                version(300L, 100L, "1.0.0", SkillVersionStatus.PUBLISHED)));
 
         runInitializer();
 
@@ -266,12 +280,73 @@ class BuiltinSkillInitializerTest {
     }
 
     @Test
+    void publishesBuiltInSkill_recordsComplianceSnapshotWhenLatestPublished() throws Exception {
+        List<PackageEntry> entries = packageEntriesWithCompliance("skillhub-hello", "1.0.0", "CC6.1");
+        SkillVersion published = version(300L, 100L, "1.0.0", SkillVersionStatus.PUBLISHED);
+        published.setParsedMetadataJson("""
+                {
+                  "frontmatter": {
+                    "x-astron-compliance": [
+                      {
+                        "standard": "soc2",
+                        "standardVersion": "2017",
+                        "controlId": "CC6.1"
+                      }
+                    ]
+                  }
+                }
+                """);
+        givenExtractedPackage(entries);
+        when(skillRepository.findByNamespaceIdAndSlug(1L, "skillhub-hello")).thenReturn(List.of());
+        when(skillPublishService.publishFromEntries(
+                eq(GLOBAL),
+                eq(entries),
+                eq(PUBLISHER),
+                eq(SkillVisibility.PUBLIC),
+                eq(Set.of("SUPER_ADMIN")),
+                eq(true)
+        )).thenReturn(new SkillPublishService.PublishResult(100L, "skillhub-hello", published));
+
+        runInitializer();
+
+        verify(auditLogService).record(
+                eq(PUBLISHER),
+                eq("BUILTIN_PUBLISH"),
+                eq("SKILL_VERSION"),
+                eq(300L),
+                isNull(),
+                isNull(),
+                isNull(),
+                contains("\"snapshotKind\":\"latest_published_entered\"")
+        );
+        verify(auditLogService).record(
+                eq(PUBLISHER),
+                eq("BUILTIN_PUBLISH"),
+                eq("SKILL_VERSION"),
+                eq(300L),
+                isNull(),
+                isNull(),
+                isNull(),
+                contains("\"controlId\":\"CC6.1\"")
+        );
+    }
+
+    @Test
     void createsSystemPublisherAndGlobalMembershipBeforePublishing() throws Exception {
         List<PackageEntry> entries = packageEntries("skillhub-hello", "1.0.0", "same");
         givenExtractedPackage(entries);
         when(userAccountRepository.findById(PUBLISHER)).thenReturn(Optional.empty());
         when(namespaceMemberRepository.findByNamespaceIdAndUserId(1L, PUBLISHER)).thenReturn(Optional.empty());
         when(skillRepository.findByNamespaceIdAndSlug(1L, "skillhub-hello")).thenReturn(List.of());
+        when(skillPublishService.publishFromEntries(
+                eq(GLOBAL),
+                eq(entries),
+                eq(PUBLISHER),
+                eq(SkillVisibility.PUBLIC),
+                eq(Set.of("SUPER_ADMIN")),
+                eq(true)
+        )).thenReturn(new SkillPublishService.PublishResult(100L, "skillhub-hello",
+                version(301L, 100L, "1.0.0", SkillVersionStatus.PUBLISHED)));
 
         runInitializer();
 
@@ -393,6 +468,26 @@ class BuiltinSkillInitializerTest {
                 # %s
                 """).formatted(name, version, name).getBytes(StandardCharsets.UTF_8);
         byte[] readmeBytes = readme.getBytes(StandardCharsets.UTF_8);
+        return List.of(
+                new PackageEntry("SKILL.md", skillMd, skillMd.length, "text/markdown"),
+                new PackageEntry("README.md", readmeBytes, readmeBytes.length, "text/markdown")
+        );
+    }
+
+    private static List<PackageEntry> packageEntriesWithCompliance(String name, String version, String controlId) {
+        byte[] skillMd = ("""
+                ---
+                name: %s
+                description: Built-in guardrails
+                version: %s
+                x-astron-compliance:
+                  - standard: soc2
+                    standardVersion: "2017"
+                    controlId: %s
+                ---
+                # %s
+                """).formatted(name, version, controlId, name).getBytes(StandardCharsets.UTF_8);
+        byte[] readmeBytes = "same".getBytes(StandardCharsets.UTF_8);
         return List.of(
                 new PackageEntry("SKILL.md", skillMd, skillMd.length, "text/markdown"),
                 new PackageEntry("README.md", readmeBytes, readmeBytes.length, "text/markdown")

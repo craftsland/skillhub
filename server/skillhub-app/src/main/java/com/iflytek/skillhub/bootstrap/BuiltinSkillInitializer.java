@@ -2,6 +2,7 @@ package com.iflytek.skillhub.bootstrap;
 
 import com.iflytek.skillhub.bootstrap.BuiltinSkillManifestLoader.ManifestItem;
 import com.iflytek.skillhub.controller.support.SkillPackageArchiveExtractor;
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.namespace.Namespace;
 import com.iflytek.skillhub.domain.namespace.NamespaceMember;
 import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
@@ -16,6 +17,7 @@ import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceAuditDetailFactory;
 import com.iflytek.skillhub.domain.skill.metadata.SkillMetadata;
 import com.iflytek.skillhub.domain.skill.metadata.SkillMetadataParser;
 import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
@@ -35,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -64,6 +67,9 @@ public class BuiltinSkillInitializer {
     private final SkillVersionRepository skillVersionRepository;
     private final SkillFileRepository skillFileRepository;
     private final SkillPublishService skillPublishService;
+    private final AuditLogService auditLogService;
+    private final SkillComplianceAuditDetailFactory complianceAuditDetailFactory =
+            new SkillComplianceAuditDetailFactory();
 
     public BuiltinSkillInitializer(
             BuiltinSkillProperties properties,
@@ -77,7 +83,8 @@ public class BuiltinSkillInitializer {
             SkillRepository skillRepository,
             SkillVersionRepository skillVersionRepository,
             SkillFileRepository skillFileRepository,
-            SkillPublishService skillPublishService) {
+            SkillPublishService skillPublishService,
+            AuditLogService auditLogService) {
         this.properties = properties;
         this.manifestLoader = manifestLoader;
         this.downloader = downloader;
@@ -90,6 +97,7 @@ public class BuiltinSkillInitializer {
         this.skillVersionRepository = skillVersionRepository;
         this.skillFileRepository = skillFileRepository;
         this.skillPublishService = skillPublishService;
+        this.auditLogService = auditLogService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -238,7 +246,7 @@ public class BuiltinSkillInitializer {
         }
 
         try {
-            skillPublishService.publishFromEntries(
+            SkillPublishService.PublishResult publishResult = skillPublishService.publishFromEntries(
                     GLOBAL_NAMESPACE,
                     entries,
                     SYSTEM_PUBLISHER_ID,
@@ -246,6 +254,7 @@ public class BuiltinSkillInitializer {
                     SYSTEM_PUBLISHER_ROLES,
                     CONFIRM_BUILTIN_PUBLISH_WARNINGS
             );
+            recordBuiltInPublishAuditIfLatestPublished(publishResult);
             log.info("Published built-in skill slug={} version={} to @{}",
                     item.slug(), item.version(), GLOBAL_NAMESPACE);
             return SyncOutcome.PUBLISHED;
@@ -269,6 +278,26 @@ public class BuiltinSkillInitializer {
                     item.slug(), item.version(), exception.getMessage());
             return Optional.empty();
         }
+    }
+
+    private void recordBuiltInPublishAuditIfLatestPublished(SkillPublishService.PublishResult publishResult) {
+        if (publishResult.version().getStatus() != SkillVersionStatus.PUBLISHED) {
+            return;
+        }
+
+        LinkedHashMap<String, Object> extras = new LinkedHashMap<>();
+        extras.put("namespace", GLOBAL_NAMESPACE);
+        extras.put("slug", publishResult.slug());
+        auditLogService.record(
+                SYSTEM_PUBLISHER_ID,
+                "BUILTIN_PUBLISH",
+                "SKILL_VERSION",
+                publishResult.version().getId(),
+                null,
+                null,
+                null,
+                complianceAuditDetailFactory.latestPublishedEntered(publishResult.version(), extras)
+        );
     }
 
     private SkillMetadata parseSkillMetadata(List<PackageEntry> entries) {
