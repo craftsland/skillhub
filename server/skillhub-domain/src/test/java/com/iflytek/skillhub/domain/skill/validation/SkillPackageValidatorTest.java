@@ -214,6 +214,34 @@ class SkillPackageValidatorTest {
     }
 
     @Test
+    void testUnsafeComplianceEvidenceUrlRejected() {
+        String skillMdContent = """
+            ---
+            name: compliance-skill
+            description: Skill with unsafe evidence url
+            version: 1.0.0
+            x-astron-compliance:
+              - standard: gdpr
+                standardVersion: "2024"
+                controlId: Article-17
+                evidenceUrl: "javascript:alert(1)"
+            ---
+            Body
+            """;
+
+        List<PackageEntry> entries = List.of(
+                new PackageEntry("SKILL.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown")
+        );
+
+        ValidationResult result = validator.validate(entries);
+
+        assertFalse(result.passed());
+        assertTrue(result.errors().stream().anyMatch(error ->
+                error.contains("Invalid SKILL.md frontmatter")
+                        && error.contains("evidenceUrl must use an http or https URI")));
+    }
+
+    @Test
     void testPackageTooLarge() {
         // Use a custom validator with 2KB total limit to test the logic
         SkillPackageValidator smallValidator = new SkillPackageValidator(

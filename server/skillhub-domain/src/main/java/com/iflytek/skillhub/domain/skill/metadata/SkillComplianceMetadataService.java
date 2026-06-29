@@ -5,12 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.regex.Pattern;
 
 /**
@@ -23,6 +23,8 @@ public class SkillComplianceMetadataService {
     private static final int MAX_STANDARD_VERSION_LENGTH = 32;
     private static final int MAX_CONTROL_TITLE_LENGTH = 200;
     private static final Pattern CONTROL_ID_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$");
+    private static final Set<String> ALLOWED_EVIDENCE_URL_SCHEMES = Set.of("http", "https");
+    private static final String EVIDENCE_URL_ERROR = "evidenceUrl must use an http or https URI";
     private static final Set<String> ALLOWED_KEYS = Set.of(
             "standard",
             "standardVersion",
@@ -221,18 +223,21 @@ public class SkillComplianceMetadataService {
             return null;
         }
         if (!(rawValue instanceof String value) || value.isBlank()) {
-            errors.add("x-astron-compliance[" + index + "].evidenceUrl must be an absolute URI");
+            errors.add("x-astron-compliance[" + index + "]." + EVIDENCE_URL_ERROR);
             return null;
         }
         try {
             URI uri = URI.create(value.trim());
-            if (!uri.isAbsolute()) {
-                errors.add("x-astron-compliance[" + index + "].evidenceUrl must be an absolute URI");
+            String scheme = uri.getScheme();
+            if (!uri.isAbsolute()
+                    || scheme == null
+                    || !ALLOWED_EVIDENCE_URL_SCHEMES.contains(scheme.toLowerCase(Locale.ROOT))) {
+                errors.add("x-astron-compliance[" + index + "]." + EVIDENCE_URL_ERROR);
                 return null;
             }
             return uri.toString();
         } catch (IllegalArgumentException ex) {
-            errors.add("x-astron-compliance[" + index + "].evidenceUrl must be an absolute URI");
+            errors.add("x-astron-compliance[" + index + "]." + EVIDENCE_URL_ERROR);
             return null;
         }
     }

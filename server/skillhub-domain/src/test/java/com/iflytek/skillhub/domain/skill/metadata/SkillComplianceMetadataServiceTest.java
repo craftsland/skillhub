@@ -85,6 +85,35 @@ class SkillComplianceMetadataServiceTest {
     }
 
     @Test
+    void parseFrontmatter_rejectsUnsafeEvidenceUrlSchemes() {
+        Map<String, Object> frontmatter = Map.of(
+                "x-astron-compliance",
+                List.of(
+                        Map.of(
+                                "standard", "gdpr",
+                                "standardVersion", "2024",
+                                "controlId", "Article-17",
+                                "evidenceUrl", "javascript:alert(1)"
+                        ),
+                        Map.of(
+                                "standard", "soc2",
+                                "standardVersion", "2017",
+                                "controlId", "CC6.1",
+                                "evidenceUrl", "data:text/html;base64,SGk="
+                        )
+                )
+        );
+
+        SkillComplianceMetadataService.ParseResult result = service.parseFrontmatter(frontmatter);
+
+        assertThat(result.mappings()).isEmpty();
+        assertThat(result.errors()).containsExactlyInAnyOrder(
+                "x-astron-compliance[0].evidenceUrl must use an http or https URI",
+                "x-astron-compliance[1].evidenceUrl must use an http or https URI"
+        );
+    }
+
+    @Test
     void readFromParsedMetadataJson_extractsMappingsFromStoredSkillMetadata() {
         String parsedMetadataJson = """
                 {
