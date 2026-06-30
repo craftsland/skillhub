@@ -1,6 +1,6 @@
-# Staging environment: hybrid mode
+# Staging environment
 # - Backend: locally built Docker image
-# - Frontend: locally built static files mounted into Nginx
+# - Frontend: locally built Docker image
 # - Dependencies: reuses docker-compose.yml (postgres, redis, minio)
 #
 # Usage: make staging
@@ -61,12 +61,9 @@ services:
       start_period: 60s
 
   web:
-    image: nginx:alpine
+    image: skillhub-web:staging
     ports:
       - "80:80"
-    volumes:
-      - ./web/dist:/usr/share/nginx/html:ro
-      - ./web/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
     environment:
       SKILLHUB_API_UPSTREAM: http://server:8080
       SKILLHUB_WEB_API_BASE_URL: ""
