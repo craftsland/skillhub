@@ -79,7 +79,7 @@ public class SkillSearchAppService {
             int page,
             int size,
             List<String> labelSlugs,
-            String complianceStandard,
+            ComplianceStandard complianceStandard,
             String userId,
             Map<Long, NamespaceRole> userNsRoles) {
 
@@ -94,7 +94,7 @@ public class SkillSearchAppService {
                 page,
                 size,
                 labelSlugs,
-                normalizeComplianceStandard(complianceStandard),
+                complianceStandard,
                 scope,
                 false
         );
@@ -197,13 +197,6 @@ public class SkillSearchAppService {
                 .map(value -> value.trim().toLowerCase(java.util.Locale.ROOT))
                 .distinct()
                 .toList();
-    }
-
-    private ComplianceStandard normalizeComplianceStandard(String complianceStandard) {
-        if (complianceStandard == null || complianceStandard.isBlank()) {
-            return null;
-        }
-        return ComplianceStandard.findByValue(complianceStandard).orElse(null);
     }
 
     private List<SkillSummaryResponse> mapVisibleSkillSummaries(List<Long> skillIds) {

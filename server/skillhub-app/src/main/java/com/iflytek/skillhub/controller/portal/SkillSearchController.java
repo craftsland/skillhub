@@ -2,6 +2,7 @@ package com.iflytek.skillhub.controller.portal;
 
 import com.iflytek.skillhub.controller.BaseApiController;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
+import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
@@ -62,7 +63,7 @@ public class SkillSearchController extends BaseApiController {
                 parseNonNegativeInt(page, DEFAULT_PAGE),
                 parsePositiveInt(size, DEFAULT_SIZE),
                 labels,
-                complianceStandard,
+                parseComplianceStandard(complianceStandard),
                 userId,
                 userNsRoles
         );
@@ -95,5 +96,13 @@ public class SkillSearchController extends BaseApiController {
     private int parsePositiveInt(String rawValue, int defaultValue) {
         int parsed = parseNonNegativeInt(rawValue, defaultValue);
         return parsed > 0 ? parsed : defaultValue;
+    }
+
+    private ComplianceStandard parseComplianceStandard(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        return ComplianceStandard.findByValue(rawValue)
+                .orElseThrow(() -> new DomainBadRequestException("error.search.complianceStandard.invalid", rawValue.trim()));
     }
 }

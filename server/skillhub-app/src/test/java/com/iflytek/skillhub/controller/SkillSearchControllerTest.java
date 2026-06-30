@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.controller;
 
+import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
 import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
 import com.iflytek.skillhub.service.SkillSearchAppService;
 import org.junit.jupiter.api.Test;
@@ -13,8 +14,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -158,7 +161,7 @@ class SkillSearchControllerTest {
                 eq(0),
                 eq(20),
                 eq(List.of("official")),
-                eq("gdpr"),
+                eq(ComplianceStandard.GDPR),
                 any(),
                 any()))
                 .thenReturn(new SkillSearchAppService.SearchResponse(List.of(), 0, 0, 20));
@@ -169,5 +172,16 @@ class SkillSearchControllerTest {
                         .param("complianceStandard", "gdpr"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items").isArray());
+    }
+
+    @Test
+    void searchShouldRejectInvalidComplianceStandard() throws Exception {
+        mockMvc.perform(get("/api/web/skills")
+                        .param("complianceStandard", "not-a-standard"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value(containsString("not-a-standard")));
+
+        verifyNoInteractions(skillSearchAppService);
     }
 }

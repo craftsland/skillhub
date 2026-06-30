@@ -296,7 +296,7 @@ class SkillSearchAppServiceTest {
     }
 
     @Test
-    void search_shouldNormalizeAndPassComplianceStandard() {
+    void search_shouldPassComplianceStandardEnum() {
         when(searchQueryService.search(any()))
                 .thenReturn(new SearchResult(List.of(), 0, 0, 20));
 
@@ -307,7 +307,7 @@ class SkillSearchAppServiceTest {
                 0,
                 20,
                 List.of("official"),
-                " GDPR ",
+                ComplianceStandard.GDPR,
                 "user-9",
                 Map.of(7L, NamespaceRole.MEMBER)
         );
