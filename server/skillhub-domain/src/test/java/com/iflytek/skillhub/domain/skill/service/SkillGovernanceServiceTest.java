@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -212,11 +214,37 @@ class SkillGovernanceServiceTest {
         setField(yanked, "id", 22L);
         yanked.setStatus(SkillVersionStatus.PUBLISHED);
         yanked.setPublishedAt(Instant.parse("2026-03-18T10:00:00Z"));
+        yanked.setParsedMetadataJson("""
+                {
+                  "frontmatter": {
+                    "x-astron-compliance": [
+                      {
+                        "standard": "gdpr",
+                        "standardVersion": "2024",
+                        "controlId": "Article-17"
+                      }
+                    ]
+                  }
+                }
+                """);
 
         SkillVersion fallback = new SkillVersion(2L, "1.0.0", "owner");
         setField(fallback, "id", 11L);
         fallback.setStatus(SkillVersionStatus.PUBLISHED);
         fallback.setPublishedAt(Instant.parse("2026-03-17T10:00:00Z"));
+        fallback.setParsedMetadataJson("""
+                {
+                  "frontmatter": {
+                    "x-astron-compliance": [
+                      {
+                        "standard": "soc2",
+                        "standardVersion": "2017",
+                        "controlId": "CC6.1"
+                      }
+                    ]
+                  }
+                }
+                """);
 
         Skill skill = new Skill(1L, "demo", "owner", com.iflytek.skillhub.domain.skill.SkillVisibility.PUBLIC);
         setField(skill, "id", 2L);
@@ -232,6 +260,33 @@ class SkillGovernanceServiceTest {
 
         assertThat(skill.getLatestVersionId()).isEqualTo(11L);
         verify(skillRepository).save(skill);
+
+        ArgumentCaptor<Long> entityIdCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<String> detailCaptor = ArgumentCaptor.forClass(String.class);
+        verify(auditLogService, times(2)).record(
+                org.mockito.ArgumentMatchers.eq("admin"),
+                org.mockito.ArgumentMatchers.eq("YANK_SKILL_VERSION"),
+                org.mockito.ArgumentMatchers.eq("SKILL_VERSION"),
+                entityIdCaptor.capture(),
+                org.mockito.ArgumentMatchers.eq(null),
+                org.mockito.ArgumentMatchers.eq("127.0.0.1"),
+                org.mockito.ArgumentMatchers.eq("JUnit"),
+                detailCaptor.capture()
+        );
+        assertThat(entityIdCaptor.getAllValues()).containsExactlyInAnyOrder(22L, 11L);
+        assertThat(detailCaptor.getAllValues()).anySatisfy(detail -> {
+            assertThat(detail).contains("\"snapshotKind\":\"latest_published_removed\"");
+            assertThat(detail).contains("\"versionId\":22");
+            assertThat(detail).contains("\"replacementLatestPublished\"");
+            assertThat(detail).contains("\"snapshotKind\":\"latest_published_entered\"");
+            assertThat(detail).contains("\"versionId\":11");
+            assertThat(detail).contains("\"standard\":\"soc2\"");
+        });
+        assertThat(detailCaptor.getAllValues()).anySatisfy(detail -> {
+            assertThat(detail).contains("\"snapshotKind\":\"latest_published_entered\"");
+            assertThat(detail).contains("\"versionId\":11");
+            assertThat(detail).contains("\"standard\":\"soc2\"");
+        });
     }
 
     @Test

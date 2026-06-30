@@ -2,7 +2,7 @@ import { startTransition, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
-import type { SkillSummary } from '@/api/types'
+import { COMPLIANCE_STANDARD_VALUES, type ComplianceStandard, type SkillSummary } from '@/api/types'
 import { useAuth } from '@/features/auth/use-auth'
 import { SearchBar } from '@/features/search/search-bar'
 import { SkillCard } from '@/features/skill/skill-card'
@@ -17,7 +17,6 @@ import { Button } from '@/shared/ui/button'
 import { APP_SHELL_PAGE_CLASS_NAME } from '@/app/page-shell-style'
 
 const PAGE_SIZE = 12
-const COMPLIANCE_STANDARD_OPTIONS = ['mitre_attack', 'nist_csf', 'gdpr', 'hipaa', 'soc2'] as const
 
 function blurActiveElement() {
   if (typeof document === 'undefined' || typeof HTMLElement === 'undefined') {
@@ -94,7 +93,7 @@ export function SearchPage() {
   const q = normalizeSearchQuery(searchParams.q || '')
   const namespace = (searchParams.namespace || '').replace(/^@/, '')
   const selectedLabel = searchParams.label || ''
-  const complianceStandard = searchParams.complianceStandard || ''
+  const complianceStandard = searchParams.complianceStandard
   const sort = searchParams.sort || 'newest'
   const page = searchParams.page ?? 0
   const starredOnly = searchParams.starredOnly ?? false
@@ -105,7 +104,7 @@ export function SearchPage() {
     q: string
     namespace: string
     label: string
-    complianceStandard: string
+    complianceStandard?: ComplianceStandard
     sort: string
     page: number
     starredOnly: boolean
@@ -142,7 +141,7 @@ export function SearchPage() {
     q,
     namespace: namespace || undefined,
     label: selectedLabel || undefined,
-    complianceStandard: complianceStandard || undefined,
+    complianceStandard,
     sort,
     page,
     size: PAGE_SIZE,
@@ -228,8 +227,8 @@ export function SearchPage() {
     navigate({ to: '/search', search: buildSearchState({ label: nextLabel, page: 0 }) })
   }
 
-  const handleComplianceToggle = (standard: string) => {
-    const nextStandard = complianceStandard === standard ? '' : standard
+  const handleComplianceToggle = (standard: ComplianceStandard) => {
+    const nextStandard = complianceStandard === standard ? undefined : standard
     navigate({ to: '/search', search: buildSearchState({ complianceStandard: nextStandard, page: 0 }) })
   }
 
@@ -359,7 +358,7 @@ export function SearchPage() {
         {!starredOnly && (
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm font-medium text-muted-foreground">{t('search.compliance.label')}</span>
-            {COMPLIANCE_STANDARD_OPTIONS.map((standard) => (
+            {COMPLIANCE_STANDARD_VALUES.map((standard) => (
               <Button
                 key={standard}
                 variant={complianceStandard === standard ? 'default' : 'outline'}

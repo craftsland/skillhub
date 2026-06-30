@@ -2,6 +2,7 @@ package com.iflytek.skillhub.search.postgres;
 
 import com.iflytek.skillhub.infra.jpa.SkillSearchDocumentEntity;
 import com.iflytek.skillhub.infra.jpa.SkillSearchDocumentJpaRepository;
+import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
 import com.iflytek.skillhub.search.SearchEmbeddingService;
 import com.iflytek.skillhub.search.SearchQuery;
 import com.iflytek.skillhub.search.SearchQueryService;
@@ -275,11 +276,11 @@ public class PostgresFullTextQueryService implements SearchQueryService {
         return new SearchResult(skillIds, total, query.page(), query.size());
     }
 
-    private String normalizeComplianceStandard(String complianceStandard) {
-        if (complianceStandard == null || complianceStandard.isBlank()) {
+    private String normalizeComplianceStandard(ComplianceStandard complianceStandard) {
+        if (complianceStandard == null) {
             return null;
         }
-        return complianceStandard.trim().toLowerCase(Locale.ROOT);
+        return complianceStandard.value();
     }
 
     private List<Long> rerankBySemanticSimilarity(List<Long> candidateSkillIds,

@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.search;
 
+import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
 import java.util.List;
 
 /**
@@ -13,7 +14,7 @@ public record SearchQuery(
         int page,
         int size,
         List<String> labelSlugs,
-        String complianceStandard,
+        ComplianceStandard complianceStandard,
         boolean requireInstallableLatest
 ) {
     public SearchQuery(

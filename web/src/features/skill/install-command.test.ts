@@ -68,6 +68,12 @@ describe('install-command', () => {
     )
   })
 
+  it('adds an explicit version to the ClawHub install command when a version is selected', () => {
+    expect(buildInstallCommand('team-alpha', 'my-skill', 'https://skill.xfyun.cn', '0.9.0')).toBe(
+      'npx clawhub install team-alpha--my-skill --registry https://skill.xfyun.cn --version 0.9.0',
+    )
+  })
+
   it('builds a one-line SkillHub npx command for the global namespace', () => {
     expect(buildSkillhubInstallCommand('global', 'my-skill', 'https://skill.xfyun.cn')).toBe(
       'npx @astron-team/skillhub@latest install my-skill --registry https://skill.xfyun.cn',
@@ -77,6 +83,12 @@ describe('install-command', () => {
   it('builds a one-line SkillHub npx command with namespace for team skills', () => {
     expect(buildSkillhubInstallCommand('team-alpha', 'my-skill', 'https://skill.xfyun.cn')).toBe(
       'npx @astron-team/skillhub@latest install my-skill --namespace team-alpha --registry https://skill.xfyun.cn',
+    )
+  })
+
+  it('adds an explicit version to the SkillHub install command when a version is selected', () => {
+    expect(buildSkillhubInstallCommand('team-alpha', 'my-skill', 'https://skill.xfyun.cn', '0.9.0')).toBe(
+      'npx @astron-team/skillhub@latest install my-skill --namespace team-alpha --registry https://skill.xfyun.cn --version 0.9.0',
     )
   })
 

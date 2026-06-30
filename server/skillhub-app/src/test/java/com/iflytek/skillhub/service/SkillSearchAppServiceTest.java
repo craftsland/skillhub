@@ -12,6 +12,7 @@ import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
+import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
 import com.iflytek.skillhub.search.SearchQuery;
 import com.iflytek.skillhub.search.SearchQueryService;
@@ -313,7 +314,7 @@ class SkillSearchAppServiceTest {
 
         ArgumentCaptor<SearchQuery> captor = ArgumentCaptor.forClass(SearchQuery.class);
         verify(searchQueryService).search(captor.capture());
-        assertEquals("gdpr", captor.getValue().complianceStandard());
+        assertEquals(ComplianceStandard.GDPR, captor.getValue().complianceStandard());
     }
 
     @Test

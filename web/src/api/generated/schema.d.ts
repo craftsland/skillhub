@@ -4164,7 +4164,7 @@ export interface components {
             complianceMappings?: components["schemas"]["SkillComplianceMappingResponse"][];
         };
         SkillComplianceMappingResponse: {
-            standard?: string;
+            standard?: "mitre_attack" | "nist_csf" | "gdpr" | "hipaa" | "soc2";
             standardVersion?: string;
             controlId?: string;
             controlTitle?: string;
@@ -8516,7 +8516,7 @@ export interface operations {
                 q?: string;
                 namespace?: string;
                 label?: string[];
-                complianceStandard?: string;
+                complianceStandard?: "mitre_attack" | "nist_csf" | "gdpr" | "hipaa" | "soc2";
                 sort?: string;
                 page?: number;
                 size?: number;

@@ -256,7 +256,7 @@ export interface SkillVersion {
 }
 
 export interface SkillComplianceMapping {
-  standard: string
+  standard: ComplianceStandard
   standardVersion: string
   controlId: string
   controlTitle?: string
@@ -332,12 +332,20 @@ export interface SkillTag {
   createdAt: string
 }
 
+export const COMPLIANCE_STANDARD_VALUES = ['mitre_attack', 'nist_csf', 'gdpr', 'hipaa', 'soc2'] as const
+
+export type ComplianceStandard = (typeof COMPLIANCE_STANDARD_VALUES)[number]
+
+export function isComplianceStandard(value: string): value is ComplianceStandard {
+  return COMPLIANCE_STANDARD_VALUES.some((candidate) => candidate === value)
+}
+
 // Search and pagination
 export interface SearchParams {
   q?: string
   namespace?: string
   label?: string
-  complianceStandard?: string
+  complianceStandard?: ComplianceStandard
   sort?: string
   page?: number
   size?: number

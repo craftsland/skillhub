@@ -7,6 +7,7 @@ import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.namespace.NamespaceService;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
+import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
 import com.iflytek.skillhub.dto.SkillSummaryResponse;
 import com.iflytek.skillhub.search.SearchQuery;
@@ -169,7 +170,7 @@ public class SkillSearchAppService {
             int page,
             int size,
             List<String> labelSlugs,
-            String complianceStandard,
+            ComplianceStandard complianceStandard,
             SearchVisibilityScope scope,
             boolean requireInstallableLatest) {
         SearchResult result = searchQueryService.search(new SearchQuery(
@@ -198,11 +199,11 @@ public class SkillSearchAppService {
                 .toList();
     }
 
-    private String normalizeComplianceStandard(String complianceStandard) {
+    private ComplianceStandard normalizeComplianceStandard(String complianceStandard) {
         if (complianceStandard == null || complianceStandard.isBlank()) {
             return null;
         }
-        return complianceStandard.trim().toLowerCase(java.util.Locale.ROOT);
+        return ComplianceStandard.findByValue(complianceStandard).orElse(null);
     }
 
     private List<SkillSummaryResponse> mapVisibleSkillSummaries(List<Long> skillIds) {

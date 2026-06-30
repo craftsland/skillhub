@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.search.postgres;
 
+import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
 import com.iflytek.skillhub.infra.jpa.SkillSearchDocumentEntity;
 import com.iflytek.skillhub.infra.jpa.SkillSearchDocumentJpaRepository;
 import com.iflytek.skillhub.search.HashingSearchEmbeddingService;
@@ -318,7 +319,7 @@ class PostgresFullTextQueryServiceTest {
                 0,
                 20,
                 List.of("official"),
-                "gdpr",
+                ComplianceStandard.GDPR,
                 false
         ));
 

@@ -1,7 +1,9 @@
 package com.iflytek.skillhub.dto;
 
+import com.iflytek.skillhub.domain.skill.metadata.ComplianceStandard;
+
 public record SkillComplianceMappingResponse(
-        String standard,
+        ComplianceStandard standard,
         String standardVersion,
         String controlId,
         String controlTitle,

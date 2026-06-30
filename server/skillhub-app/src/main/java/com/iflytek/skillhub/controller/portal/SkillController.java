@@ -177,7 +177,7 @@ public class SkillController extends BaseApiController {
                 detail.manifestJson(),
                 detail.complianceMappings().stream()
                         .map(mapping -> new SkillComplianceMappingResponse(
-                                mapping.standard().value(),
+                                mapping.standard(),
                                 mapping.standardVersion(),
                                 mapping.controlId(),
                                 mapping.controlTitle(),

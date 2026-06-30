@@ -1,10 +1,12 @@
 import { lazy, Suspense, type ComponentType } from 'react'
 import { createRouter, createRoute, createRootRoute, redirect } from '@tanstack/react-router'
+import type { ComplianceStandard } from '@/api/types'
 import { Layout } from './layout'
 import { getCurrentUser } from '@/api/client'
 import { RoleGuard } from '@/shared/components/role-guard'
 import { createRequireAuth } from '@/shared/lib/auth-route'
 import { normalizeSearchQuery } from '@/shared/lib/search-query'
+import { isComplianceStandard } from '@/api/types'
 
 /**
  * Central route registry for the SkillHub web app.
@@ -199,12 +201,13 @@ const searchRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'search',
   component: SearchPage,
-  validateSearch: (search: Record<string, unknown>): { q: string; namespace?: string; label?: string; complianceStandard?: string; sort: string; page: number; starredOnly: boolean } => {
+  validateSearch: (search: Record<string, unknown>): { q: string; namespace?: string; label?: string; complianceStandard?: ComplianceStandard; sort: string; page: number; starredOnly: boolean } => {
+    const rawComplianceStandard = typeof search.complianceStandard === 'string' ? search.complianceStandard : ''
     return {
       q: normalizeSearchQuery(typeof search.q === 'string' ? search.q : ''),
       namespace: typeof search.namespace === 'string' && search.namespace ? search.namespace.replace(/^@/, '') : undefined,
       label: typeof search.label === 'string' && search.label ? search.label : undefined,
-      complianceStandard: typeof search.complianceStandard === 'string' && search.complianceStandard ? search.complianceStandard : undefined,
+      complianceStandard: isComplianceStandard(rawComplianceStandard) ? rawComplianceStandard : undefined,
       sort: (search.sort as string) || 'newest',
       page: Number(search.page) || 0,
       starredOnly: search.starredOnly === true || search.starredOnly === 'true',

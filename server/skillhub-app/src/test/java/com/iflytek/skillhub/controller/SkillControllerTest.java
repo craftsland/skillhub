@@ -28,7 +28,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -125,6 +127,16 @@ class SkillControllerTest {
         } finally {
             TimeZone.setDefault(original);
         }
+    }
+
+    @Test
+    void openApiShouldExposeClosedComplianceStandardEnums() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("\"SkillComplianceMappingResponse\"")))
+                .andExpect(content().string(containsString("\"standard\"")))
+                .andExpect(content().string(containsString("\"enum\":[\"mitre_attack\",\"nist_csf\",\"gdpr\",\"hipaa\",\"soc2\"]")))
+                .andExpect(content().string(containsString("\"name\":\"complianceStandard\"")));
     }
 
     @Test

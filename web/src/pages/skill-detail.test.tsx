@@ -139,7 +139,7 @@ vi.mock('@/features/skill/file-tree', () => ({
 }))
 
 vi.mock('@/features/skill/install-command', () => ({
-  InstallCommand: () => <div>install</div>,
+  InstallCommand: ({ version }: { version?: string }) => <div>install:{version ?? 'latest'}</div>,
 }))
 
 vi.mock('@/features/social/rating-input', () => ({
@@ -389,6 +389,7 @@ describe('SkillDetailPage', () => {
     expect(html).toContain('skillDetail.complianceSectionTitle')
     expect(html).toContain('Right to erasure')
     expect(html).toContain('skillDetail.complianceControlId')
+    expect(html).toContain('install:0.9.0')
   })
 
   it('shows the label management panel for a user who can manage the skill lifecycle', () => {

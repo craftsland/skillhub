@@ -207,6 +207,9 @@ export function SkillDetailPage() {
   const canManageLabels = Boolean(skill && user && (skill.canManageLifecycle || hasRole('SUPER_ADMIN')))
   const isVersionDownloadable = selectedVersionEntry?.status === 'PUBLISHED' && (selectedVersionEntry?.downloadAvailable ?? false)
   const selectedVersionComplianceMappings = selectedVersionDetail?.complianceMappings ?? []
+  const installCommandVersion = selectedVersionEntry?.status === 'PUBLISHED'
+    ? selectedVersionEntry.version
+    : publishedVersion?.version
 
   useEffect(() => {
     // Recompute collapse rules whenever rendered documentation height changes so the page can keep
@@ -1178,7 +1181,7 @@ export function SkillDetailPage() {
             <InstallCommand
               namespace={namespace}
               slug={slug}
-              version={publishedVersion.version}
+              version={installCommandVersion}
             />
           </Card>
         )}

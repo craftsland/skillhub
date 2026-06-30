@@ -270,13 +270,14 @@ public class SkillGovernanceService {
         version.setYankReason(reason);
         version.setDownloadReady(false);
         SkillVersion saved = skillVersionRepository.save(version);
-        skillRepository.findById(version.getSkillId()).ifPresent(skill -> {
-            if (versionId.equals(skill.getLatestVersionId())) {
-                skill.setLatestVersionId(findLatestPublishedVersionId(skill.getId()));
-                skill.setUpdatedBy(actorUserId);
-                skillRepository.save(skill);
-            }
-        });
+        SkillVersion replacementLatestPublished = null;
+        Skill skill = skillRepository.findById(version.getSkillId()).orElse(null);
+        if (skill != null && versionId.equals(skill.getLatestVersionId())) {
+            replacementLatestPublished = findLatestPublishedVersion(skill.getId());
+            skill.setLatestVersionId(replacementLatestPublished != null ? replacementLatestPublished.getId() : null);
+            skill.setUpdatedBy(actorUserId);
+            skillRepository.save(skill);
+        }
         LinkedHashMap<String, Object> auditExtras = new LinkedHashMap<>();
         if (reason != null && !reason.isBlank()) {
             auditExtras.put("reason", reason);
@@ -289,20 +290,36 @@ public class SkillGovernanceService {
                 null,
                 clientIp,
                 userAgent,
-                complianceAuditDetailFactory.latestPublishedRemoved(version, auditExtras)
+                complianceAuditDetailFactory.latestPublishedRemoved(version, replacementLatestPublished, auditExtras)
         );
+        if (replacementLatestPublished != null) {
+            auditLogService.record(
+                    actorUserId,
+                    "YANK_SKILL_VERSION",
+                    "SKILL_VERSION",
+                    replacementLatestPublished.getId(),
+                    null,
+                    clientIp,
+                    userAgent,
+                    complianceAuditDetailFactory.latestPublishedEntered(replacementLatestPublished, auditExtras)
+            );
+        }
         eventPublisher.publishEvent(new com.iflytek.skillhub.domain.event.SkillVersionYankedEvent(
                 version.getSkillId(), versionId, actorUserId));
         return saved;
     }
 
     private Long findLatestPublishedVersionId(Long skillId) {
+        SkillVersion latestPublishedVersion = findLatestPublishedVersion(skillId);
+        return latestPublishedVersion != null ? latestPublishedVersion.getId() : null;
+    }
+
+    private SkillVersion findLatestPublishedVersion(Long skillId) {
         return skillVersionRepository.findBySkillIdAndStatus(skillId, SkillVersionStatus.PUBLISHED).stream()
                 .max(java.util.Comparator
                         .comparing(SkillVersion::getPublishedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
                         .thenComparing(SkillVersion::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
                         .thenComparing(SkillVersion::getId, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
-                .map(SkillVersion::getId)
                 .orElse(null);
     }
 

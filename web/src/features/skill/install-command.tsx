@@ -29,14 +29,21 @@ export function getBaseUrl(): string {
   return `${window.location.protocol}//${window.location.host}`
 }
 
-export function buildInstallCommand(namespace: string, slug: string, baseUrl: string): string {
-  const installTarget = buildInstallTarget(namespace, slug)
-  return `npx clawhub install ${installTarget} --registry ${baseUrl}`
+function buildVersionedCommand(command: string, version?: string): string {
+  if (!version) {
+    return command
+  }
+  return `${command} --version ${version}`
 }
 
-export function buildSkillhubInstallCommand(namespace: string, slug: string, baseUrl: string): string {
+export function buildInstallCommand(namespace: string, slug: string, baseUrl: string, version?: string): string {
+  const installTarget = buildInstallTarget(namespace, slug)
+  return buildVersionedCommand(`npx clawhub install ${installTarget} --registry ${baseUrl}`, version)
+}
+
+export function buildSkillhubInstallCommand(namespace: string, slug: string, baseUrl: string, version?: string): string {
   const namespaceArg = namespace === 'global' ? '' : ` --namespace ${namespace}`
-  return `npx @astron-team/skillhub@latest install ${slug}${namespaceArg} --registry ${baseUrl}`
+  return buildVersionedCommand(`npx @astron-team/skillhub@latest install ${slug}${namespaceArg} --registry ${baseUrl}`, version)
 }
 
 interface CommandBlockProps {
@@ -80,11 +87,11 @@ function CommandBlock({ command }: CommandBlockProps) {
   )
 }
 
-export function InstallCommand({ namespace, slug }: InstallCommandProps) {
+export function InstallCommand({ namespace, slug, version }: InstallCommandProps) {
   const { t } = useTranslation()
   const baseUrl = useMemo(() => getBaseUrl(), [])
-  const clawhubCommand = useMemo(() => buildInstallCommand(namespace, slug, baseUrl), [baseUrl, namespace, slug])
-  const skillhubCommand = useMemo(() => buildSkillhubInstallCommand(namespace, slug, baseUrl), [baseUrl, namespace, slug])
+  const clawhubCommand = useMemo(() => buildInstallCommand(namespace, slug, baseUrl, version), [baseUrl, namespace, slug, version])
+  const skillhubCommand = useMemo(() => buildSkillhubInstallCommand(namespace, slug, baseUrl, version), [baseUrl, namespace, slug, version])
 
   return (
     <Tabs defaultValue="clawhub" className="space-y-3">

@@ -37,15 +37,21 @@ public class SkillComplianceAuditDetailFactory {
         return build("latest_published_removed", version, extras);
     }
 
-    public String build(String snapshotKind, SkillVersion version, Map<String, Object> extras) {
+    public String latestPublishedRemoved(SkillVersion version,
+                                         SkillVersion replacementLatestPublished,
+                                         Map<String, Object> extras) {
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-        payload.put("snapshotKind", snapshotKind);
-        payload.put("versionId", version.getId());
-        payload.put("version", version.getVersion());
-        payload.put(
-                "compliance",
-                complianceMetadataService.readFromParsedMetadataJson(version.getParsedMetadataJson())
-        );
+        if (extras != null && !extras.isEmpty()) {
+            payload.putAll(extras);
+        }
+        if (replacementLatestPublished != null) {
+            payload.put("replacementLatestPublished", snapshotPayload("latest_published_entered", replacementLatestPublished));
+        }
+        return build("latest_published_removed", version, payload);
+    }
+
+    public String build(String snapshotKind, SkillVersion version, Map<String, Object> extras) {
+        LinkedHashMap<String, Object> payload = snapshotPayload(snapshotKind, version);
         if (extras != null && !extras.isEmpty()) {
             payload.putAll(extras);
         }
@@ -54,5 +60,17 @@ public class SkillComplianceAuditDetailFactory {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Failed to serialize compliance audit detail", ex);
         }
+    }
+
+    private LinkedHashMap<String, Object> snapshotPayload(String snapshotKind, SkillVersion version) {
+        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+        payload.put("snapshotKind", snapshotKind);
+        payload.put("versionId", version.getId());
+        payload.put("version", version.getVersion());
+        payload.put(
+                "compliance",
+                complianceMetadataService.readFromParsedMetadataJson(version.getParsedMetadataJson())
+        );
+        return payload;
     }
 }
