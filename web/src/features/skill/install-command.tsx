@@ -11,6 +11,8 @@ interface InstallCommandProps {
   version?: string
 }
 
+const SAFE_VERSION_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?$/
+
 export function buildInstallTarget(namespace: string, slug: string): string {
   return namespace === 'global' ? slug : `${namespace}--${slug}`
 }
@@ -30,7 +32,7 @@ export function getBaseUrl(): string {
 }
 
 function buildVersionedCommand(command: string, version?: string): string {
-  if (!version) {
+  if (!version || !SAFE_VERSION_PATTERN.test(version)) {
     return command
   }
   return `${command} --version ${version}`

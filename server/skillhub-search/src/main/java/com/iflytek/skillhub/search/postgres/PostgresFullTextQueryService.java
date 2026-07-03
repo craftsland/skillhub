@@ -132,7 +132,12 @@ public class PostgresFullTextQueryService implements SearchQueryService {
             sql.append("AND latest.yanked_at IS NULL ");
         }
         if (hasComplianceStandard) {
-            sql.append("AND (latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance') @> CAST(:complianceFilter AS jsonb) ");
+            sql.append("AND EXISTS (");
+            sql.append("SELECT 1 FROM jsonb_array_elements(");
+            sql.append("COALESCE(latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance', '[]'::jsonb)");
+            sql.append(") AS compliance_item ");
+            sql.append("WHERE LOWER(BTRIM(compliance_item ->> 'standard')) = :complianceStandard");
+            sql.append(") ");
         }
         sql.append("AND (n.status <> 'ARCHIVED' ");
         if (query.visibilityScope().userId() != null) {
@@ -210,7 +215,7 @@ public class PostgresFullTextQueryService implements SearchQueryService {
             nativeQuery.setParameter("labelSlugs", query.labelSlugs());
         }
         if (hasComplianceStandard) {
-            nativeQuery.setParameter("complianceFilter", "[{\"standard\":\"" + complianceStandard + "\"}]");
+            nativeQuery.setParameter("complianceStandard", complianceStandard);
         }
 
         if (hasKeyword) {
@@ -257,7 +262,7 @@ public class PostgresFullTextQueryService implements SearchQueryService {
             countQuery.setParameter("labelSlugs", query.labelSlugs());
         }
         if (hasComplianceStandard) {
-            countQuery.setParameter("complianceFilter", "[{\"standard\":\"" + complianceStandard + "\"}]");
+            countQuery.setParameter("complianceStandard", complianceStandard);
         }
 
         if (hasKeyword) {

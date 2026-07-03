@@ -186,7 +186,7 @@ class SkillGovernanceServiceTest {
                 org.mockito.ArgumentMatchers.eq(null),
                 org.mockito.ArgumentMatchers.eq("127.0.0.1"),
                 org.mockito.ArgumentMatchers.eq("JUnit"),
-                contains("\"snapshotKind\":\"latest_published_removed\"")
+                contains("\"snapshotKind\":\"published_version_yanked\"")
         );
     }
 
@@ -287,6 +287,52 @@ class SkillGovernanceServiceTest {
             assertThat(detail).contains("\"versionId\":11");
             assertThat(detail).contains("\"standard\":\"soc2\"");
         });
+    }
+
+    @Test
+    void yankVersion_onHistoricalPublishedVersionDoesNotEmitLatestPublishedRemoved() {
+        SkillVersion historical = new SkillVersion(2L, "1.0.0", "owner");
+        setField(historical, "id", 11L);
+        historical.setStatus(SkillVersionStatus.PUBLISHED);
+        historical.setPublishedAt(Instant.parse("2026-03-17T10:00:00Z"));
+        historical.setParsedMetadataJson("""
+                {
+                  "frontmatter": {
+                    "x-astron-compliance": [
+                      {
+                        "standard": "gdpr",
+                        "standardVersion": "2024",
+                        "controlId": "Article-17"
+                      }
+                    ]
+                  }
+                }
+                """);
+
+        Skill skill = new Skill(1L, "demo", "owner", com.iflytek.skillhub.domain.skill.SkillVisibility.PUBLIC);
+        setField(skill, "id", 2L);
+        skill.setLatestVersionId(22L);
+
+        given(skillVersionRepository.findById(11L)).willReturn(Optional.of(historical));
+        given(skillVersionRepository.save(historical)).willReturn(historical);
+        given(skillRepository.findById(2L)).willReturn(Optional.of(skill));
+
+        service.yankVersion(11L, "admin", "127.0.0.1", "JUnit", "obsolete");
+
+        assertThat(skill.getLatestVersionId()).isEqualTo(22L);
+        verify(skillRepository, never()).save(skill);
+        verify(auditLogService).record(
+                org.mockito.ArgumentMatchers.eq("admin"),
+                org.mockito.ArgumentMatchers.eq("YANK_SKILL_VERSION"),
+                org.mockito.ArgumentMatchers.eq("SKILL_VERSION"),
+                org.mockito.ArgumentMatchers.eq(11L),
+                org.mockito.ArgumentMatchers.eq(null),
+                org.mockito.ArgumentMatchers.eq("127.0.0.1"),
+                org.mockito.ArgumentMatchers.eq("JUnit"),
+                argThat(detail -> detail.contains("\"snapshotKind\":\"published_version_yanked\"")
+                        && !detail.contains("\"snapshotKind\":\"latest_published_removed\"")
+                        && !detail.contains("\"snapshotKind\":\"latest_published_entered\""))
+        );
     }
 
     @Test

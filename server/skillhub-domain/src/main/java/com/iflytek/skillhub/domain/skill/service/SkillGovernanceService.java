@@ -272,7 +272,8 @@ public class SkillGovernanceService {
         SkillVersion saved = skillVersionRepository.save(version);
         SkillVersion replacementLatestPublished = null;
         Skill skill = skillRepository.findById(version.getSkillId()).orElse(null);
-        if (skill != null && versionId.equals(skill.getLatestVersionId())) {
+        boolean latestPublishedRemoved = skill != null && versionId.equals(skill.getLatestVersionId());
+        if (latestPublishedRemoved) {
             replacementLatestPublished = findLatestPublishedVersion(skill.getId());
             skill.setLatestVersionId(replacementLatestPublished != null ? replacementLatestPublished.getId() : null);
             skill.setUpdatedBy(actorUserId);
@@ -290,9 +291,11 @@ public class SkillGovernanceService {
                 null,
                 clientIp,
                 userAgent,
-                complianceAuditDetailFactory.latestPublishedRemoved(version, replacementLatestPublished, auditExtras)
+                latestPublishedRemoved
+                        ? complianceAuditDetailFactory.latestPublishedRemoved(version, replacementLatestPublished, auditExtras)
+                        : complianceAuditDetailFactory.publishedVersionYanked(version, auditExtras)
         );
-        if (replacementLatestPublished != null) {
+        if (latestPublishedRemoved && replacementLatestPublished != null) {
             auditLogService.record(
                     actorUserId,
                     "YANK_SKILL_VERSION",

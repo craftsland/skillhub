@@ -50,6 +50,10 @@ public class SkillComplianceAuditDetailFactory {
         return build("latest_published_removed", version, payload);
     }
 
+    public String publishedVersionYanked(SkillVersion version, Map<String, Object> extras) {
+        return build("published_version_yanked", version, extras);
+    }
+
     public String build(String snapshotKind, SkillVersion version, Map<String, Object> extras) {
         LinkedHashMap<String, Object> payload = snapshotPayload(snapshotKind, version);
         if (extras != null && !extras.isEmpty()) {

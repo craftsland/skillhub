@@ -214,4 +214,23 @@ class SkillMetadataParserTest {
         );
         assertEquals("error.skill.metadata.frontmatter.missingEnd", exception.messageCode());
     }
+
+    @Test
+    void testRejectsUnsafeVersion() {
+        String content = """
+            ---
+            name: test-skill
+            description: Unsafe version
+            version: "1.0.0 && whoami"
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+                DomainBadRequestException.class,
+                () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.version.invalid", exception.messageCode());
+        assertEquals("1.0.0 && whoami", exception.messageArgs()[0]);
+    }
 }

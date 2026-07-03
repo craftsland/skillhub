@@ -92,6 +92,15 @@ describe('install-command', () => {
     )
   })
 
+  it('omits unsafe versions from install commands', () => {
+    expect(buildInstallCommand('team-alpha', 'my-skill', 'https://skill.xfyun.cn', '0.9.0 && whoami')).toBe(
+      'npx clawhub install team-alpha--my-skill --registry https://skill.xfyun.cn',
+    )
+    expect(buildSkillhubInstallCommand('team-alpha', 'my-skill', 'https://skill.xfyun.cn', '0.9.0 && whoami')).toBe(
+      'npx @astron-team/skillhub@latest install my-skill --namespace team-alpha --registry https://skill.xfyun.cn',
+    )
+  })
+
   it('uses the runtime app base url when available', () => {
     setMockWindow('https://app.example.com')
 

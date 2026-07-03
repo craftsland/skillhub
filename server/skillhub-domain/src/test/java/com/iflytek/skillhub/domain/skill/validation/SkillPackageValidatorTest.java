@@ -242,6 +242,29 @@ class SkillPackageValidatorTest {
     }
 
     @Test
+    void testUnsafeVersionRejected() {
+        String skillMdContent = """
+            ---
+            name: compliance-skill
+            description: Skill with unsafe version
+            version: "1.0.0 && whoami"
+            ---
+            Body
+            """;
+
+        List<PackageEntry> entries = List.of(
+                new PackageEntry("SKILL.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown")
+        );
+
+        ValidationResult result = validator.validate(entries);
+
+        assertFalse(result.passed());
+        assertTrue(result.errors().stream().anyMatch(error ->
+                error.contains("Invalid SKILL.md frontmatter")
+                        && error.contains("error.skill.metadata.version.invalid")));
+    }
+
+    @Test
     void testPackageTooLarge() {
         // Use a custom validator with 2KB total limit to test the logic
         SkillPackageValidator smallValidator = new SkillPackageValidator(

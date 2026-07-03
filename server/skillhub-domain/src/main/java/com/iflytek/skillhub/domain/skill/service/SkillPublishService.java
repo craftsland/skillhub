@@ -16,8 +16,10 @@ import com.iflytek.skillhub.domain.security.SecurityScanService;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.skill.*;
+import com.iflytek.skillhub.domain.skill.metadata.SkillComplianceMetadataService;
 import com.iflytek.skillhub.domain.skill.metadata.SkillMetadata;
 import com.iflytek.skillhub.domain.skill.metadata.SkillMetadataParser;
+import com.iflytek.skillhub.domain.skill.metadata.SkillVersionFormatValidator;
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
 import com.iflytek.skillhub.domain.skill.validation.PrePublishValidator;
 import com.iflytek.skillhub.domain.skill.validation.SkillPackageValidator;
@@ -85,6 +87,7 @@ public class SkillPublishService {
     private final SkillStorageDeletionCompensationService compensationService;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
+    private final SkillComplianceMetadataService complianceMetadataService = new SkillComplianceMetadataService();
 
     public SkillPublishService(
             NamespaceRepository namespaceRepository,
@@ -301,6 +304,7 @@ public class SkillPublishService {
         if (publishedVersion.getStatus() != SkillVersionStatus.PUBLISHED) {
             throw new DomainBadRequestException("error.skill.version.notPublished", sourceVersion);
         }
+        SkillVersionFormatValidator.requireSafe(targetVersion);
         if (skillVersionRepository.findBySkillIdAndVersion(skillId, targetVersion).isPresent()) {
             throw new DomainBadRequestException("error.skill.version.exists", targetVersion);
         }
@@ -458,7 +462,7 @@ public class SkillPublishService {
 
         // Store metadata as JSON
         try {
-            String metadataJson = objectMapper.writeValueAsString(metadata);
+            String metadataJson = objectMapper.writeValueAsString(normalizeMetadataForPersistence(metadata));
             version.setParsedMetadataJson(metadataJson);
             version.setManifestJson(objectMapper.writeValueAsString(buildManifest(entries)));
         } catch (Exception e) {
@@ -709,6 +713,26 @@ public class SkillPublishService {
                 + "\n---\n"
                 + metadata.body();
         return rewritten.getBytes();
+    }
+
+    private SkillMetadata normalizeMetadataForPersistence(SkillMetadata metadata) {
+        if (!metadata.frontmatter().containsKey("x-astron-compliance")) {
+            return metadata;
+        }
+        SkillComplianceMetadataService.ParseResult complianceResult =
+                complianceMetadataService.parseFrontmatter(metadata.frontmatter());
+        if (!complianceResult.errors().isEmpty()) {
+            return metadata;
+        }
+        LinkedHashMap<String, Object> normalizedFrontmatter = new LinkedHashMap<>(metadata.frontmatter());
+        normalizedFrontmatter.put("x-astron-compliance", complianceResult.mappings());
+        return new SkillMetadata(
+                metadata.name(),
+                metadata.description(),
+                metadata.version(),
+                metadata.body(),
+                normalizedFrontmatter
+        );
     }
 
     private List<Map<String, Object>> buildManifest(List<PackageEntry> entries) {

@@ -37,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -904,6 +905,32 @@ class SkillPublishServiceTest {
     }
 
     @Test
+    void testRereleasePublishedVersion_ShouldRejectUnsafeTargetVersion() throws Exception {
+        String publisherId = "user-100";
+        Skill skill = new Skill(1L, "demo-skill", publisherId, SkillVisibility.PUBLIC);
+        setId(skill, 11L);
+        SkillVersion sourceVersion = new SkillVersion(skill.getId(), "1.2.3", publisherId);
+        setId(sourceVersion, 21L);
+        sourceVersion.setStatus(SkillVersionStatus.PUBLISHED);
+
+        when(skillRepository.findById(skill.getId())).thenReturn(Optional.of(skill));
+        when(skillVersionRepository.findBySkillIdAndVersion(skill.getId(), "1.2.3")).thenReturn(Optional.of(sourceVersion));
+
+        DomainBadRequestException exception = assertThrows(DomainBadRequestException.class, () -> service.rereleasePublishedVersion(
+                skill.getId(),
+                "1.2.3",
+                "1.2.4 && whoami",
+                publisherId,
+                Map.of(skill.getNamespaceId(), com.iflytek.skillhub.domain.namespace.NamespaceRole.OWNER),
+                false
+        ));
+
+        assertEquals("error.skill.metadata.version.invalid", exception.messageCode());
+        assertEquals("1.2.4 && whoami", exception.messageArgs()[0]);
+        verify(skillFileRepository, never()).findByVersionId(anyLong());
+    }
+
+    @Test
     void testRereleasePublishedVersion_PrivateSkill_ShouldGoToUploaded() throws Exception {
         String publisherId = "user-100";
         Skill skill = new Skill(1L, "demo-skill", publisherId, SkillVisibility.PRIVATE);
@@ -1099,6 +1126,61 @@ class SkillPublishServiceTest {
         assertThrows(DomainBadRequestException.class, () -> service.publishFromEntries(
                 namespaceSlug, entries, publisherId, SkillVisibility.PUBLIC, Set.of()
         ));
+    }
+
+    @Test
+    void testPublishFromEntries_ShouldCanonicalizeComplianceMetadataJson() throws Exception {
+        String namespaceSlug = "test-ns";
+        String publisherId = "user-100";
+        String skillMdContent = "---\nname: compliance-skill\ndescription: Test\nversion: 1.0.0\n---\nBody";
+
+        PackageEntry skillMd = new PackageEntry("SKILL.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown");
+        List<PackageEntry> entries = List.of(skillMd);
+
+        Namespace namespace = new Namespace(namespaceSlug, "Test NS", "user-1");
+        setId(namespace, 1L);
+        NamespaceMember member = mock(NamespaceMember.class);
+        LinkedHashMap<String, Object> mapping = new LinkedHashMap<>();
+        mapping.put("standard", " GDPR ");
+        mapping.put("standardVersion", "2024");
+        mapping.put("controlId", "Article-17");
+        LinkedHashMap<String, Object> frontmatter = new LinkedHashMap<>();
+        frontmatter.put("name", "compliance-skill");
+        frontmatter.put("description", "Test");
+        frontmatter.put("version", "1.0.0");
+        frontmatter.put("x-astron-compliance", List.of(mapping));
+        SkillMetadata metadata = new SkillMetadata("compliance-skill", "Test", "1.0.0", "Body", frontmatter);
+        Skill skill = new Skill(namespace.getId(), "compliance-skill", publisherId, SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(namespaceMemberRepository.findByNamespaceIdAndUserId(any(), eq(publisherId))).thenReturn(Optional.of(member));
+        when(skillPackageValidator.validate(entries)).thenReturn(ValidationResult.pass());
+        when(skillMetadataParser.parse(skillMdContent)).thenReturn(metadata);
+        when(prePublishValidator.validate(any())).thenReturn(ValidationResult.pass());
+        when(skillRepository.findByNamespaceIdAndSlug(any(), eq("compliance-skill"))).thenReturn(List.of(skill));
+        when(skillRepository.findByNamespaceIdAndSlugAndOwnerId(any(), eq("compliance-skill"), eq(publisherId))).thenReturn(Optional.of(skill));
+        when(skillVersionRepository.findBySkillIdAndVersion(any(), eq("1.0.0"))).thenReturn(Optional.empty());
+        when(skillVersionRepository.save(any(SkillVersion.class))).thenAnswer(invocation -> {
+            SkillVersion saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                setId(saved, 10L);
+            }
+            return saved;
+        });
+        when(skillRepository.save(any())).thenReturn(skill);
+
+        SkillPublishService.PublishResult result = service.publishFromEntries(
+                namespaceSlug,
+                entries,
+                publisherId,
+                SkillVisibility.PUBLIC,
+                Set.of()
+        );
+
+        var metadataJson = objectMapper.readTree(result.version().getParsedMetadataJson());
+        assertEquals("gdpr", metadataJson.at("/frontmatter/x-astron-compliance/0/standard").asText());
+        assertEquals("Article-17", metadataJson.at("/frontmatter/x-astron-compliance/0/controlId").asText());
     }
 
     @Test

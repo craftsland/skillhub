@@ -53,6 +53,7 @@ public class SkillMetadataParser {
         if (version == null) {
             version = extractNestedOptionalField(frontmatter, "metadata", "version");
         }
+        version = SkillVersionFormatValidator.validateOrNull(version);
 
         return new SkillMetadata(name, description, version, body, frontmatter);
     }
