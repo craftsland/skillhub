@@ -134,7 +134,8 @@ public class PostgresFullTextQueryService implements SearchQueryService {
         if (hasComplianceStandard) {
             sql.append("AND EXISTS (");
             sql.append("SELECT 1 FROM jsonb_array_elements(");
-            sql.append("COALESCE(latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance', '[]'::jsonb)");
+            sql.append("CASE WHEN jsonb_typeof(latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance') = 'array' ");
+            sql.append("THEN latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance' ELSE '[]'::jsonb END");
             sql.append(") AS compliance_item ");
             sql.append("WHERE LOWER(BTRIM(compliance_item ->> 'standard')) = :complianceStandard");
             sql.append(") ");

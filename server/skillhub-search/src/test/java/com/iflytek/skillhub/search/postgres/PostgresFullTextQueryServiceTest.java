@@ -326,7 +326,10 @@ class PostgresFullTextQueryServiceTest {
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
         verify(entityManager, org.mockito.Mockito.times(2)).createNativeQuery(sqlCaptor.capture());
         assertThat(sqlCaptor.getAllValues().getFirst()).contains(
-                "jsonb_array_elements(COALESCE(latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance', '[]'::jsonb))"
+                "jsonb_array_elements(CASE WHEN jsonb_typeof(latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance') = 'array'"
+        );
+        assertThat(sqlCaptor.getAllValues().getFirst()).contains(
+                "THEN latest.parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance' ELSE '[]'::jsonb END)"
         );
         assertThat(sqlCaptor.getAllValues().getFirst()).contains("LOWER(BTRIM(compliance_item ->> 'standard')) = :complianceStandard");
         verify(nativeQuery).setParameter("complianceStandard", "gdpr");
