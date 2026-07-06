@@ -294,6 +294,9 @@
     "notice": "After authorization, the device will have access to your account"
   },
   "cliAuth": {
+    "legacyDisabledTitle": "Use device authorization",
+    "legacyDisabledDescription": "This legacy CLI callback no longer creates browser tokens. Continue with the device authorization page to finish CLI sign-in safely.",
+    "openDeviceAuth": "Open Device Authorization",
     "validating": "Validating...",
     "pleaseWait": "Please wait",
     "creatingToken": "Creating token...",

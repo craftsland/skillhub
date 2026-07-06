@@ -294,6 +294,9 @@
     "notice": "授权后,设备将可以访问你的账户"
   },
   "cliAuth": {
+    "legacyDisabledTitle": "请使用设备授权",
+    "legacyDisabledDescription": "旧版 CLI 回调页不再在浏览器中创建令牌。请前往设备授权页，安全完成 CLI 登录。",
+    "openDeviceAuth": "打开设备授权",
     "validating": "验证中...",
     "pleaseWait": "请稍候",
     "creatingToken": "创建令牌中...",

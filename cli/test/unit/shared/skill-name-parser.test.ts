@@ -26,6 +26,14 @@ describe('parseSkillName', () => {
         slug: 'slug--with--dashes'
       })
     })
+
+    test('should preserve namespace when namespaced slug ends with separator characters', () => {
+      const result = parseSkillName('namespace--slug--')
+      expect(result).toEqual({
+        namespace: 'namespace',
+        slug: 'slug--'
+      })
+    })
   })
 
   describe('with slug only format', () => {

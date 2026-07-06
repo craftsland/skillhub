@@ -296,12 +296,12 @@ db-reset: ## 重置数据库
 validate-release-config: ## 校验发布环境变量文件（默认 .env.release）
 	./scripts/validate-release-config.sh .env.release
 
-staging: ## 构建并启动 staging 环境，运行 smoke test（混合模式：后端镜像 + 前端静态文件）
+staging: ## 构建并启动 staging 环境，运行 smoke test（混合模式：后端镜像 + 前端镜像）
 	@echo "=== [1/5] Building backend JAR and Docker image ==="
 	cd server && ./mvnw package -DskipTests -B -q
 	docker build -t $(STAGING_SERVER_IMAGE) -f server/Dockerfile.dev server
-	@echo "=== [2/5] Building frontend static files ==="
-	cd web && pnpm run build
+	@echo "=== [2/5] Building frontend Docker image ==="
+	docker build -t skillhub-web:staging -f web/Dockerfile web
 	@echo "=== [3/5] Starting dependency services ==="
 	$(STAGING_BASE_COMPOSE) up -d --wait
 	@echo "=== [4/5] Starting staging services ==="

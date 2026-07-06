@@ -16,8 +16,20 @@ import java.util.regex.Pattern;
 @Component
 public class BasicPrePublishValidator implements PrePublishValidator {
 
-    private static final Pattern PLACEHOLDER_VALUE = Pattern.compile(
-            "(?i).*(your|example|sample|placeholder|changeme|replace|dummy|mock|test|fake|todo|xxx|redacted).*"
+    private static final List<String> PLACEHOLDER_MARKERS = List.of(
+            "your",
+            "example",
+            "sample",
+            "placeholder",
+            "changeme",
+            "replace",
+            "dummy",
+            "mock",
+            "test",
+            "fake",
+            "todo",
+            "xxx",
+            "redacted"
     );
     private static final List<SecretRule> SECRET_RULES = List.of(
             new SecretRule(Pattern.compile("(AKIA[0-9A-Z]{16})"), 1, "cloud access key"),
@@ -83,7 +95,8 @@ public class BasicPrePublishValidator implements PrePublishValidator {
         if (value == null || value.isBlank()) {
             return false;
         }
-        return PLACEHOLDER_VALUE.matcher(value).matches()
+        String lowerValue = value.toLowerCase(Locale.ROOT);
+        return PLACEHOLDER_MARKERS.stream().anyMatch(lowerValue::contains)
                 || value.chars().allMatch(ch -> ch == 'x' || ch == 'X' || ch == '*' || ch == '-');
     }
 

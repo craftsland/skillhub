@@ -98,4 +98,25 @@ class BasicPrePublishValidatorTest {
 
         assertTrue(result.passed());
     }
+
+    @Test
+    void shouldTreatVeryLongPlaceholderValuesLinearly() {
+        String content = "token=" + "x".repeat(20_000);
+        PackageEntry env = new PackageEntry(
+                ".env",
+                content.getBytes(StandardCharsets.UTF_8),
+                content.length(),
+                "text/plain"
+        );
+
+        ValidationResult result = validator.validate(new PrePublishValidator.SkillPackageContext(
+                List.of(env),
+                new SkillMetadata("Example Skill", "desc", "1.0.0", "body", Map.of()),
+                "user-1",
+                1L
+        ));
+
+        assertTrue(result.passed());
+        assertFalse(result.hasWarnings());
+    }
 }

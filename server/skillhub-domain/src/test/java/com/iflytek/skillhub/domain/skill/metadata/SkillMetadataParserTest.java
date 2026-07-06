@@ -182,6 +182,110 @@ class SkillMetadataParserTest {
     }
 
     @Test
+    void rejectsExplicitYamlTagsInsteadOfFallingBackToLooseParsing() {
+        String content = """
+            ---
+            name: !!java.net.URL ["https://example.test"]
+            description: malicious tag should not be accepted
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+    }
+
+    @Test
+    void rejectsSingleBangYamlTagsInsteadOfFallingBackToLooseParsing() {
+        String content = """
+            ---
+            name: !java.net.URL ["https://example.test"]
+            description: malicious tag should not be accepted
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+    }
+
+    @Test
+    void rejectsUriStyleYamlTagsInsteadOfFallingBackToLooseParsing() {
+        String content = """
+            ---
+            name: !<tag:yaml.org,2002:java.net.URL> ["https://example.test"]
+            description: malicious tag should not be accepted
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+    }
+
+    @Test
+    void rejectsAnchoredExplicitYamlTagsInsteadOfFallingBackToLooseParsing() {
+        String content = """
+            ---
+            name: &x !!java.net.URL ["https://example.test"]
+            description: anchored malicious tag should not be accepted
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+    }
+
+    @Test
+    void allowsPlainScalarExclamationMarks() {
+        String content = """
+            ---
+            name: Excited Skill
+            description: This is important!
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        SkillMetadata metadata = parser.parse(content);
+
+        assertEquals("This is important!", metadata.description());
+    }
+
+    @Test
+    void allowsPlainScalarCommaBeforeExclamationWord() {
+        String content = """
+            ---
+            name: css-guidance
+            description: Avoid CSS, !important when possible
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        SkillMetadata metadata = parser.parse(content);
+
+        assertEquals("Avoid CSS, !important when possible", metadata.description());
+    }
+
+    @Test
     void testAllowsColonInDescriptionWithoutStrictYamlQuoting() {
         String content = """
             ---

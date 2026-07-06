@@ -1,6 +1,6 @@
 # Staging environment: hybrid mode
 # - Backend: locally built Docker image
-# - Frontend: locally built static files mounted into Nginx
+# - Frontend: locally built Docker image
 # - Dependencies: reuses docker-compose.yml (postgres, redis, minio)
 #
 # Usage: make staging
@@ -23,7 +23,7 @@ services:
       REDIS_PORT: 6379
       SESSION_COOKIE_SECURE: "false"
       SKILLHUB_PUBLIC_BASE_URL: "http://localhost"
-      DEVICE_AUTH_VERIFICATION_URI: "http://localhost/cli/auth"
+      DEVICE_AUTH_VERIFICATION_URI: "http://localhost/device"
       SKILLHUB_STORAGE_PROVIDER: s3
       STORAGE_BASE_PATH: /var/lib/skillhub/storage
       SKILLHUB_STORAGE_S3_ENDPOINT: http://minio:9000
@@ -61,12 +61,12 @@ services:
       start_period: 60s
 
   web:
-    image: nginx:alpine
+    image: skillhub-web:staging
+    build:
+      context: ./web
+      dockerfile: Dockerfile
     ports:
       - "80:80"
-    volumes:
-      - ./web/dist:/usr/share/nginx/html:ro
-      - ./web/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
     environment:
       SKILLHUB_API_UPSTREAM: http://server:8080
       SKILLHUB_WEB_API_BASE_URL: ""

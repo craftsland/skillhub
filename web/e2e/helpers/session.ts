@@ -1,4 +1,5 @@
 import { expect, type Page, type TestInfo } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
 import { csrfHeaders } from './csrf'
 
 const password = 'Passw0rd!123'
@@ -38,7 +39,7 @@ function usernameForWorker(testInfo?: TestInfo): string {
 
 function uniqueUsernameForWorker(testInfo?: TestInfo): string {
   const worker = testInfo?.parallelIndex ?? 0
-  const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
+  const suffix = `${Date.now().toString(36)}${randomUUID().replace(/-/g, '').slice(0, 8)}`
   return `e2e_w${worker}_${suffix}`
 }
 

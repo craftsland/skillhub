@@ -5,6 +5,7 @@ export interface ParsedSkillName {
 
 export function parseSkillName(skillName: string, defaultNamespace = 'global'): ParsedSkillName {
   const separatorIndex = skillName.indexOf('--')
+  const trailingSeparatorIndex = skillName.lastIndexOf('--')
 
   if (separatorIndex <= 0) {
     return {
@@ -13,7 +14,7 @@ export function parseSkillName(skillName: string, defaultNamespace = 'global'): 
     }
   }
 
-  if (separatorIndex === skillName.length - 2) {
+  if (trailingSeparatorIndex === separatorIndex && trailingSeparatorIndex + 2 === skillName.length) {
     return {
       namespace: defaultNamespace,
       slug: skillName.slice(0, -2)
