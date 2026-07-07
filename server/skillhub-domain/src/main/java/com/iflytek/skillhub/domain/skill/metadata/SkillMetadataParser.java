@@ -62,6 +62,7 @@ public class SkillMetadataParser {
     }
 
     private Map<String, Object> parseFrontmatter(String yamlContent) {
+        validateFrontmatterCodePointLimit(yamlContent);
         if (containsExplicitYamlTag(yamlContent)) {
             throw new DomainBadRequestException("error.skill.metadata.yaml.invalid", "Explicit YAML tags are not allowed");
         }
@@ -77,6 +78,9 @@ public class SkillMetadataParser {
         } catch (DomainBadRequestException exception) {
             throw exception;
         } catch (Exception exception) {
+            if (isLoaderConstraintException(exception)) {
+                throw new DomainBadRequestException("error.skill.metadata.yaml.invalid", exception.getMessage());
+            }
             Map<String, Object> fallback = parseLooseFrontmatter(yamlContent);
             if (!fallback.isEmpty()) {
                 return fallback;
@@ -91,6 +95,25 @@ public class SkillMetadataParser {
         options.setCodePointLimit(FRONTMATTER_CODE_POINT_LIMIT);
         options.setNestingDepthLimit(FRONTMATTER_NESTING_DEPTH_LIMIT);
         return new Yaml(new SafeConstructor(options));
+    }
+
+    private void validateFrontmatterCodePointLimit(String yamlContent) {
+        if (yamlContent.codePointCount(0, yamlContent.length()) > FRONTMATTER_CODE_POINT_LIMIT) {
+            throw new DomainBadRequestException(
+                    "error.skill.metadata.yaml.invalid",
+                    "Frontmatter exceeds the supported size"
+            );
+        }
+    }
+
+    private boolean isLoaderConstraintException(Exception exception) {
+        String message = exception.getMessage();
+        if (message == null) {
+            return false;
+        }
+        return message.contains("exceeds the limit")
+                || message.contains("Nesting Depth exceeded")
+                || message.contains("found duplicate key");
     }
 
     private boolean containsExplicitYamlTag(String yamlContent) {
@@ -230,6 +253,12 @@ public class SkillMetadataParser {
             String value = line.substring(separatorIndex + 1).trim();
             if (key.isEmpty()) {
                 continue;
+            }
+            if (values.containsKey(key)) {
+                throw new DomainBadRequestException(
+                        "error.skill.metadata.yaml.invalid",
+                        "Duplicate YAML keys are not allowed"
+                );
             }
 
             values.put(key, stripWrappingQuotes(value));

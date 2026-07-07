@@ -182,6 +182,64 @@ class SkillMetadataParserTest {
     }
 
     @Test
+    void rejectsOversizedFrontmatterInsteadOfFallingBackToLooseParsing() {
+        String longDescription = "x".repeat(70_000);
+        String content = """
+            ---
+            name: oversized-skill
+            description: [unclosed bracket %s
+            version: 1.0.0
+            ---
+            Body
+            """.formatted(longDescription);
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+    }
+
+    @Test
+    void rejectsDuplicateKeysInsteadOfFallingBackToLooseParsing() {
+        String content = """
+            ---
+            name: original-skill
+            name: overwritten-skill
+            description: Duplicate keys should not be accepted
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+    }
+
+    @Test
+    void rejectsExcessiveNestingInsteadOfFallingBackToLooseParsing() {
+        String nestedValue = "[".repeat(25) + "value" + "]".repeat(25);
+        String content = """
+            ---
+            name: deeply-nested-skill
+            description: Deeply nested frontmatter should not be accepted
+            metadata: %s
+            version: 1.0.0
+            ---
+            Body
+            """.formatted(nestedValue);
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+    }
+
+    @Test
     void rejectsExplicitYamlTagsInsteadOfFallingBackToLooseParsing() {
         String content = """
             ---
