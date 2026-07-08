@@ -12,6 +12,8 @@ interface InstallCommandProps {
 }
 
 const SAFE_VERSION_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?$/
+const CONTROL_CHARACTER_PATTERN = /\p{Cc}/u
+const SHELL_SINGLE_QUOTE_ESCAPE = `'"'"'`
 
 export function buildInstallTarget(namespace: string, slug: string): string {
   return namespace === 'global' ? slug : `${namespace}--${slug}`
@@ -31,11 +33,25 @@ export function getBaseUrl(): string {
   return `${window.location.protocol}//${window.location.host}`
 }
 
+function escapeShellArgument(value: string): string | null {
+  if (!value || CONTROL_CHARACTER_PATTERN.test(value)) {
+    return null
+  }
+  if (SAFE_VERSION_PATTERN.test(value)) {
+    return value
+  }
+  return `'${value.replace(/'/g, SHELL_SINGLE_QUOTE_ESCAPE)}'`
+}
+
 function buildVersionedCommand(command: string, version?: string): string {
-  if (!version || !SAFE_VERSION_PATTERN.test(version)) {
+  if (!version) {
     return command
   }
-  return `${command} --version ${version}`
+  const escapedVersion = escapeShellArgument(version)
+  if (!escapedVersion) {
+    return command
+  }
+  return `${command} --version ${escapedVersion}`
 }
 
 export function buildInstallCommand(namespace: string, slug: string, baseUrl: string, version?: string): string {

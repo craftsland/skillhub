@@ -392,6 +392,55 @@ describe('SkillDetailPage', () => {
     expect(html).toContain('install:0.9.0')
   })
 
+  it('passes historical published versions with spaces through to the install command', () => {
+    detailSearchState = { returnTo: '/dashboard/skills', version: '1.0.0 beta' }
+    useSkillVersionsMock.mockReturnValue({
+      data: [
+        {
+          id: 10,
+          version: '1.0.0',
+          status: 'PUBLISHED',
+          changelog: '',
+          fileCount: 1,
+          totalSize: 12,
+          publishedAt: '2026-03-20T00:00:00Z',
+          downloadAvailable: true,
+        },
+        {
+          id: 9,
+          version: '1.0.0 beta',
+          status: 'PUBLISHED',
+          changelog: '',
+          fileCount: 1,
+          totalSize: 12,
+          publishedAt: '2026-03-19T00:00:00Z',
+          downloadAvailable: true,
+        },
+      ],
+    })
+    useSkillVersionDetailMock.mockImplementation((_namespace: string, _slug: string, version?: string) => ({
+      data: version === '1.0.0 beta'
+        ? {
+            id: 9,
+            version: '1.0.0 beta',
+            status: 'PUBLISHED',
+            changelog: '',
+            fileCount: 1,
+            totalSize: 12,
+            publishedAt: '2026-03-19T00:00:00Z',
+            parsedMetadataJson: '{}',
+            manifestJson: '[]',
+            complianceMappings: [],
+          }
+        : undefined,
+    }))
+
+    const html = renderToStaticMarkup(<SkillDetailPage />)
+
+    expect(useSkillVersionDetailMock).toHaveBeenCalledWith('global', 'demo-skill', '1.0.0 beta', true)
+    expect(html).toContain('install:1.0.0 beta')
+  })
+
   it('shows the label management panel for a user who can manage the skill lifecycle', () => {
     useSkillDetailMock.mockReturnValue({
       data: createSkill({
