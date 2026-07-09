@@ -81,6 +81,7 @@ curl -fsSL https://imageless.oss-cn-beijing.aliyuncs.com/runtime.sh | sh -s -- u
 ```
 
 The default command pulls the `latest` stable release images. Use `--version edge` if you want the newest build from `main`.
+`runtime.sh` also generates and persists `SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET` when the release template still contains the placeholder.
 
 **Configure public URL (recommended for production):**
 
@@ -245,6 +246,8 @@ curl -fsSL https://imageless.oss-cn-beijing.aliyuncs.com/runtime.sh | sh -s -- u
 cp .env.release.example .env.release
 ```
 
+For quick smoke tests, the release placeholder for `SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET` can boot because the server replaces it with a runtime-only random secret. Before production validation, set a persistent 32+ character value, for example the output of `openssl rand -hex 32`, so cookies remain stable across restarts and replicas.
+
 Recommended image tags:
 
 - `SKILLHUB_VERSION=latest` for the latest stable release (default)
@@ -284,6 +287,7 @@ Recommended production baseline:
 
 - set `SKILLHUB_PUBLIC_BASE_URL` to the final HTTPS entrypoint
 - keep PostgreSQL / Redis bound to `127.0.0.1`
+- replace `SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET` with a persistent 32+ character random value (`validate-release-config.sh` rejects the release placeholder)
 - use external S3 / OSS via `SKILLHUB_STORAGE_S3_*`
 - change `BOOTSTRAP_ADMIN_PASSWORD` to a strong password (`validate-release-config.sh` rejects the default `ChangeMe!2026`)
 - rotate or disable the bootstrap admin after initial setup

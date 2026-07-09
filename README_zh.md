@@ -53,6 +53,7 @@ curl -fsSL https://imageless.oss-cn-beijing.aliyuncs.com/runtime.sh | sh -s -- u
 ```
 
 默认命令会拉取 `latest` 稳定版镜像；如果你想跟随 `main` 的最新构建，请显式传 `--version edge`。
+当发布模板仍保留占位值时，`runtime.sh` 会自动生成并持久化 `SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET`。
 
 **配置公网访问地址（生产环境推荐）：**
 
@@ -99,7 +100,8 @@ curl -fsSL https://imageless.oss-cn-beijing.aliyuncs.com/runtime.sh | sh -s -- u
 
 通过 `runtime.sh` 或 `compose.release.yml` 部署时，发布模板同样默认开启管理员，
 使用相同的默认账号密码（`admin` / `ChangeMe!2026`），零配置即可登录。
-**生产环境请务必修改密码**——`validate-release-config.sh` 会拒绝默认值
+如果直接使用 `compose.release.yml` 做快速验证，匿名下载 Cookie Secret 占位值会由服务端替换为仅本次运行有效的随机值。
+**生产环境请务必修改密码，并将 `SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET` 替换为持久的 32 字符以上随机值**——`validate-release-config.sh` 会拒绝默认值和占位值。
 
 ### 停止服务
 

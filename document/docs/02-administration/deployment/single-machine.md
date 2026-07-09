@@ -26,7 +26,7 @@ cd skillhub
 cp .env.release.example .env.release
 
 # 3. 编辑配置
-# 修改 .env.release 中的配置项，特别是密码和公网地址
+# 修改 .env.release 中的配置项，特别是密码、公网地址和 SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET
 
 # 4. 验证配置
 make validate-release-config
@@ -34,6 +34,8 @@ make validate-release-config
 # 5. 启动服务
 docker compose --env-file .env.release -f compose.release.yml up -d
 ```
+
+快速验证时可以暂时保留 `SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET` 的发布模板占位值，服务端会生成仅本次运行有效的随机签名密钥。生产环境必须替换为持久的 32 字符以上随机值（例如 `openssl rand -hex 32` 的输出），否则 `make validate-release-config` 会拒绝该配置。
 
 ## 配置说明
 

@@ -234,7 +234,7 @@ ensure_anonymous_download_secret() {
   fi
 
   set_env_value "SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET" "$(generate_secret)"
-  echo "Generated SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET in $ENV_FILE"
+  echo "Generated SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET in $ENV_FILE; keep this file private."
 }
 
 wait_for_postgres_ready() {

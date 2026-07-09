@@ -102,6 +102,11 @@ make validate-release-config
 docker compose --env-file .env.release -f compose.release.yml up -d
 ```
 
+快速冒烟验证时，可以暂时保留 `.env.release.example` 中的
+`SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET` 占位值；服务端会生成仅本次运行有效的随机签名密钥，
+不会使用占位值本身作为 Cookie HMAC 密钥。生产环境必须在执行 `make validate-release-config`
+前将该变量替换为持久的 32 字符以上随机值（例如 `openssl rand -hex 32` 的输出），否则校验会失败。
+
 默认访问地址：
 
 - Web UI: `SKILLHUB_PUBLIC_BASE_URL`
@@ -117,6 +122,7 @@ docker compose --env-file .env.release -f compose.release.yml up -d
 - `.env.release.example`
   - 运行时变量模板
   - 包含镜像名、镜像版本、端口、数据库凭证、外部 OSS、站点公网地址和首登管理员参数
+  - `SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET` 默认占位值只用于快速验证；生产环境必须替换为持久随机值
 - `scripts/validate-release-config.sh`
   - 在启动前校验 `.env.release`
   - 可提前拦截占位值、URL 格式错误、缺失的 OSS 凭据、危险的明文默认值

@@ -15,6 +15,8 @@ import java.util.Base64;
 import java.util.Set;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
@@ -25,17 +27,19 @@ import org.springframework.stereotype.Component;
 @Component
 public class AnonymousDownloadIdentityService {
 
+    private static final Logger log = LoggerFactory.getLogger(AnonymousDownloadIdentityService.class);
     private static final String COOKIE_VERSION = "v1";
     private static final int MIN_SECRET_LENGTH = 32;
+    private static final String RELEASE_EXAMPLE_SECRET_PLACEHOLDER = "replace-with-random-download-secret-32-bytes";
     private static final Set<String> DISALLOWED_SECRET_VALUES = Set.of(
             "change-me-in-production",
-            "replace-me",
-            "replace-with-random-download-secret-32-bytes"
+            "replace-me"
     );
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final DownloadRateLimitProperties properties;
     private final ClientIpResolver clientIpResolver;
+    private volatile String anonymousCookieSecret;
 
     public AnonymousDownloadIdentityService(DownloadRateLimitProperties properties,
                                             ClientIpResolver clientIpResolver) {
@@ -44,18 +48,26 @@ public class AnonymousDownloadIdentityService {
     }
 
     @PostConstruct
-    void validateAnonymousCookieSecret() {
+    synchronized void validateAnonymousCookieSecret() {
         String secret = properties.getAnonymousCookieSecret();
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET is required");
         }
         String trimmedSecret = secret.trim();
-        if (DISALLOWED_SECRET_VALUES.contains(trimmedSecret)) {
+        if (RELEASE_EXAMPLE_SECRET_PLACEHOLDER.equals(trimmedSecret)) {
+            anonymousCookieSecret = generateRuntimeSecret();
+            log.warn("SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET uses the release template placeholder; "
+                    + "generated a runtime-only anonymous download cookie secret. "
+                    + "Set a persistent 32+ character value for production.");
+            return;
+        }
+        if (isDisallowedSecret(trimmedSecret)) {
             throw new IllegalStateException("SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET must not use the default placeholder");
         }
         if (trimmedSecret.length() < MIN_SECRET_LENGTH) {
             throw new IllegalStateException("SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET must be at least 32 characters");
         }
+        anonymousCookieSecret = trimmedSecret;
     }
 
     public AnonymousDownloadIdentity resolve(HttpServletRequest request, HttpServletResponse response) {
@@ -126,11 +138,31 @@ public class AnonymousDownloadIdentityService {
     private byte[] sign(String value) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(properties.getAnonymousCookieSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.init(new SecretKeySpec(signingSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             return mac.doFinal(value.getBytes(StandardCharsets.UTF_8));
         } catch (GeneralSecurityException ex) {
             throw new IllegalStateException("Failed to sign anonymous download cookie", ex);
         }
+    }
+
+    private boolean isDisallowedSecret(String secret) {
+        return DISALLOWED_SECRET_VALUES.contains(secret)
+                || secret.startsWith("TODO")
+                || secret.startsWith("todo")
+                || secret.startsWith("replace");
+    }
+
+    private String signingSecret() {
+        if (anonymousCookieSecret == null) {
+            validateAnonymousCookieSecret();
+        }
+        return anonymousCookieSecret;
+    }
+
+    private String generateRuntimeSecret() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private String generateId() {

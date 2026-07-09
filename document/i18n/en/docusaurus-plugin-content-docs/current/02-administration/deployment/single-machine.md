@@ -26,7 +26,8 @@ cd skillhub
 cp .env.release.example .env.release
 
 # 3. Edit configuration
-# Modify configuration items in .env.release, especially passwords and public URLs
+# Modify configuration items in .env.release, especially passwords, public URLs,
+# and SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET
 
 # 4. Validate configuration
 make validate-release-config
@@ -34,6 +35,8 @@ make validate-release-config
 # 5. Start services
 docker compose --env-file .env.release -f compose.release.yml up -d
 ```
+
+For quick smoke tests, you may temporarily leave the release-template placeholder for `SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET`; the server replaces it with a runtime-only random signing secret. For production, replace it with a persistent 32+ character random value, for example the output of `openssl rand -hex 32`, or `make validate-release-config` will reject the configuration.
 
 ## Configuration
 
