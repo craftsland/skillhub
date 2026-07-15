@@ -70,9 +70,26 @@ test.describe('My Namespaces super admin actions', () => {
         canDelete: true,
       },
     ]))
+
+    await page.route('**/api/web/namespaces/visible-no-role', (route) => fulfillJson(route, {
+      id: 101,
+      slug: 'visible-no-role',
+      displayName: 'Visible Without Membership',
+      description: 'Returned by SUPER_ADMIN namespace visibility',
+      type: 'TEAM',
+      status: 'ACTIVE',
+      createdAt: '2026-07-15T00:00:00Z',
+    }))
+
+    await page.route('**/api/web/skills?**', (route) => fulfillJson(route, {
+      items: [],
+      page: 0,
+      size: 20,
+      total: 0,
+    }))
   })
 
-  test('hides namespace-scoped actions for visible namespaces without membership', async ({ page }) => {
+  test('keeps namespace-scoped actions hidden and opens detail for visible namespaces without membership', async ({ page }) => {
     await page.goto('/dashboard/namespaces')
 
     const visibleCard = page.getByTestId('namespace-card-visible-no-role')
@@ -84,5 +101,11 @@ test.describe('My Namespaces super admin actions', () => {
     const ownedCard = page.getByTestId('namespace-card-owned-team')
     await expect(ownedCard.getByRole('button', { name: 'Manage Members' })).toBeVisible()
     await expect(ownedCard.getByRole('button', { name: 'Review Tasks' })).toBeVisible()
+
+    await visibleCard.click()
+
+    await expect(page).toHaveURL(/\/space\/visible-no-role$/)
+    await expect(page.getByRole('heading', { name: 'Visible Without Membership' })).toBeVisible()
+    await expect(page.getByText('@visible-no-role')).toBeVisible()
   })
 })

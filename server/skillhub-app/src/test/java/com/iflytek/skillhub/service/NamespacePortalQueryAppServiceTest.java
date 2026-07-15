@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -151,8 +152,20 @@ class NamespacePortalQueryAppServiceTest {
         when(namespaceService.getNamespaceBySlugForRead("team-a", "user-1", Map.of()))
                 .thenReturn(namespace);
 
-        assertThatThrownBy(() -> service.getNamespace("team-a", "user-1", Map.of()))
+        assertThatThrownBy(() -> service.getNamespace("team-a", "user-1", Map.of(), Set.of()))
                 .isInstanceOf(DomainForbiddenException.class);
+    }
+
+    @Test
+    void getNamespace_superAdminReadsArchivedNamespaceWithoutMembership() {
+        Namespace archived = namespace(1L, "archived-team");
+        archived.setStatus(NamespaceStatus.ARCHIVED);
+        when(namespaceService.getNamespaceBySlug("archived-team")).thenReturn(archived);
+
+        var response = service.getNamespace("archived-team", "super-1", Map.of(), Set.of("SUPER_ADMIN"));
+
+        assertThat(response.slug()).isEqualTo("archived-team");
+        assertThat(response.status()).isEqualTo(NamespaceStatus.ARCHIVED);
     }
 
     private Namespace namespace(Long id, String slug) {
@@ -218,5 +231,17 @@ class NamespacePortalQueryAppServiceTest {
         assertThatThrownBy(() -> service.listMembers("global", PageRequest.of(0, 20), "user-1", Set.of()))
                 .isInstanceOf(DomainForbiddenException.class)
                 .hasMessageContaining("error.namespace.global.members.platformAdmin.required");
+    }
+
+    @Test
+    void listMembers_teamNamespaceRejectsSuperAdminWithoutMembership() {
+        Namespace ns = namespace(1L, "team-a");
+        when(namespaceService.getNamespaceBySlug("team-a")).thenReturn(ns);
+        doThrow(new DomainForbiddenException("error.namespace.membership.required"))
+                .when(namespaceService).assertMember(1L, "super-1");
+
+        assertThatThrownBy(() -> service.listMembers("team-a", PageRequest.of(0, 20), "super-1", Set.of("SUPER_ADMIN")))
+                .isInstanceOf(DomainForbiddenException.class)
+                .hasMessageContaining("error.namespace.membership.required");
     }
 }

@@ -135,12 +135,23 @@ public class NamespacePortalQueryAppService {
 
     @Transactional(readOnly = true)
     public NamespaceResponse getNamespace(String slug, String userId, Map<Long, NamespaceRole> userNamespaceRoles) {
+        return getNamespace(slug, userId, userNamespaceRoles, Set.of());
+    }
+
+    @Transactional(readOnly = true)
+    public NamespaceResponse getNamespace(String slug,
+                                          String userId,
+                                          Map<Long, NamespaceRole> userNamespaceRoles,
+                                          Set<String> platformRoles) {
         Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
-        Namespace namespace = namespaceService.getNamespaceBySlugForRead(
-                slug,
-                userId,
-                namespaceRoles);
-        if (!namespaceRoles.containsKey(namespace.getId())) {
+        boolean superAdmin = isSuperAdmin(platformRoles);
+        Namespace namespace = superAdmin
+                ? namespaceService.getNamespaceBySlug(slug)
+                : namespaceService.getNamespaceBySlugForRead(
+                        slug,
+                        userId,
+                        namespaceRoles);
+        if (!superAdmin && !namespaceRoles.containsKey(namespace.getId())) {
             throw new DomainForbiddenException("error.namespace.membership.required");
         }
         return NamespaceResponse.from(namespace);

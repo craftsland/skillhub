@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as mod from './user-menu'
 import { UserMenu } from './user-menu'
+
+const useMyNamespacesMock = vi.hoisted(() => vi.fn(() => ({ data: [] })))
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react')
@@ -63,7 +65,7 @@ vi.mock('@/api/client', () => ({
 }))
 
 vi.mock('@/shared/hooks/use-namespace-queries', () => ({
-  useMyNamespaces: () => ({ data: [] }),
+  useMyNamespaces: useMyNamespacesMock,
 }))
 
 /**
@@ -77,6 +79,10 @@ describe('user-menu module exports', () => {
 })
 
 describe('UserMenu security settings visibility', () => {
+  beforeEach(() => {
+    useMyNamespacesMock.mockClear()
+  })
+
   it('shows security settings when password changes are allowed, independent of OAuth provider', () => {
     const html = renderToStaticMarkup(
       <UserMenu
@@ -104,5 +110,18 @@ describe('UserMenu security settings visibility', () => {
     )
 
     expect(html).not.toContain('user.menu.security')
+  })
+
+  it('does not fetch namespace memberships while rendering the global menu', () => {
+    renderToStaticMarkup(
+      <UserMenu
+        user={{
+          displayName: 'Super Admin',
+          platformRoles: ['SUPER_ADMIN'],
+        }}
+      />,
+    )
+
+    expect(useMyNamespacesMock).not.toHaveBeenCalled()
   })
 })

@@ -148,6 +148,20 @@ class NamespacePortalControllerTest {
     }
 
     @Test
+    void getNamespace_superAdminReadsNamespaceWithoutMembership() throws Exception {
+        Namespace namespace = namespace(1L, "team-a", NamespaceStatus.ACTIVE, NamespaceType.TEAM);
+        given(namespaceMemberRepository.findByUserId("super-1")).willReturn(List.of());
+        given(namespaceService.getNamespaceBySlug("team-a")).willReturn(namespace);
+
+        mockMvc.perform(get("/api/v1/namespaces/team-a")
+                        .with(auth("super-1", Set.of("SUPER_ADMIN")))
+                        .requestAttr("userId", "super-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.slug").value("team-a"));
+    }
+
+    @Test
     void archiveNamespace_returnsUpdatedNamespace() throws Exception {
         Namespace archived = namespace(1L, "team-a", NamespaceStatus.ARCHIVED, NamespaceType.TEAM);
         given(namespaceGovernanceService.archiveNamespace(eq("team-a"), eq("owner-1"), eq("cleanup"), nullable(String.class), any(), any()))
