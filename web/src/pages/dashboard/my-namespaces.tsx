@@ -286,7 +286,7 @@ export function MyNamespacesPage() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {namespace.type === 'TEAM' && (
+                  {namespace.type === 'TEAM' && Boolean(namespace.currentUserRole) && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -295,13 +295,15 @@ export function MyNamespacesPage() {
                       {t('myNamespaces.manageMembers')}
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => handleReviewsClick(namespace.slug, e)}
-                  >
-                    {t('myNamespaces.reviewTasks')}
-                  </Button>
+                  {Boolean(namespace.currentUserRole) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => handleReviewsClick(namespace.slug, e)}
+                    >
+                      {t('myNamespaces.reviewTasks')}
+                    </Button>
+                  )}
                   {namespace.canFreeze && (
                     <Button
                       variant="outline"

@@ -12,6 +12,7 @@ const restoreMutateAsync = vi.fn()
 const deleteMutateAsync = vi.fn()
 
 let mockNamespaces: ManagedNamespace[] = []
+let mockPlatformRoles: string[] = []
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -28,7 +29,7 @@ vi.mock('react-i18next', async () => {
 })
 
 vi.mock('@/features/auth/use-auth', () => ({
-  useAuth: () => ({ hasRole: () => false }),
+  useAuth: () => ({ hasRole: (role: string) => mockPlatformRoles.includes(role) }),
 }))
 
 vi.mock('@/shared/ui/button', () => ({
@@ -115,6 +116,7 @@ describe('MyNamespacesPage', () => {
     restoreMutateAsync.mockReset()
     deleteMutateAsync.mockReset()
     mockNamespaces = []
+    mockPlatformRoles = []
   })
 
   it('exports a named component function', () => {
@@ -135,6 +137,27 @@ describe('MyNamespacesPage', () => {
     const html = renderToStaticMarkup(createElement(MyNamespacesPage))
 
     expect(html).not.toContain('myNamespaces.delete')
+  })
+
+  it('hides namespace-scoped actions for super admins without namespace membership', () => {
+    mockPlatformRoles = ['SUPER_ADMIN']
+    mockNamespaces = [buildNamespace({ currentUserRole: undefined })]
+
+    const html = renderToStaticMarkup(createElement(MyNamespacesPage))
+
+    expect(html).toContain('Team ML')
+    expect(html).toContain('myNamespaces.roleUnknown')
+    expect(html).not.toContain('myNamespaces.manageMembers')
+    expect(html).not.toContain('myNamespaces.reviewTasks')
+  })
+
+  it('shows namespace-scoped actions for namespace members', () => {
+    mockNamespaces = [buildNamespace({ currentUserRole: 'ADMIN' })]
+
+    const html = renderToStaticMarkup(createElement(MyNamespacesPage))
+
+    expect(html).toContain('myNamespaces.manageMembers')
+    expect(html).toContain('myNamespaces.reviewTasks')
   })
 
   it('routes delete actions to the delete mutation and emits success feedback', async () => {

@@ -16,6 +16,7 @@ import com.iflytek.skillhub.dto.MemberResponse;
 import com.iflytek.skillhub.dto.MyNamespaceResponse;
 import com.iflytek.skillhub.dto.NamespaceResponse;
 import com.iflytek.skillhub.dto.PageResponse;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class NamespacePortalQueryAppService {
+
+    private static final String SUPER_ADMIN_ROLE = "SUPER_ADMIN";
+    private static final String NAMESPACE_SLUG_SORT = "slug";
 
     private final NamespaceRepository namespaceRepository;
     private final NamespaceService namespaceService;
@@ -56,6 +61,25 @@ public class NamespacePortalQueryAppService {
 
     @Transactional(readOnly = true)
     public PageResponse<NamespaceResponse> listNamespaces(Pageable pageable, Map<Long, NamespaceRole> userNamespaceRoles) {
+        return listNamespaces(pageable, userNamespaceRoles, Set.of());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<NamespaceResponse> listNamespaces(Pageable pageable,
+                                                          Map<Long, NamespaceRole> userNamespaceRoles,
+                                                          Set<String> platformRoles) {
+        if (isSuperAdmin(platformRoles)) {
+            Page<Namespace> namespaces = namespaceRepository.findByStatus(
+                    NamespaceStatus.ACTIVE,
+                    PageRequest.of(
+                            pageable.getPageNumber(),
+                            pageable.getPageSize(),
+                            Sort.by(NAMESPACE_SLUG_SORT).ascending()
+                    )
+            );
+            return PageResponse.from(namespaces.map(NamespaceResponse::from));
+        }
+
         Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
         if (namespaceRoles.isEmpty()) {
             Page<NamespaceResponse> empty = new PageImpl<>(
@@ -84,12 +108,22 @@ public class NamespacePortalQueryAppService {
 
     @Transactional(readOnly = true)
     public List<MyNamespaceResponse> listMyNamespaces(Map<Long, NamespaceRole> userNamespaceRoles) {
+        return listMyNamespaces(userNamespaceRoles, Set.of());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyNamespaceResponse> listMyNamespaces(Map<Long, NamespaceRole> userNamespaceRoles,
+                                                      Set<String> platformRoles) {
         Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
-        if (namespaceRoles.isEmpty()) {
+        if (namespaceRoles.isEmpty() && !isSuperAdmin(platformRoles)) {
             return List.of();
         }
 
-        return namespaceRepository.findByIdIn(namespaceRoles.keySet().stream().toList()).stream()
+        List<Namespace> visibleNamespaces = isSuperAdmin(platformRoles)
+                ? listAllNamespaces()
+                : namespaceRepository.findByIdIn(namespaceRoles.keySet().stream().toList());
+
+        return visibleNamespaces.stream()
                 .sorted(Comparator.comparing(Namespace::getSlug))
                 .map(namespace -> MyNamespaceResponse.from(
                         namespace,
@@ -137,5 +171,15 @@ public class NamespacePortalQueryAppService {
         return PageResponse.from(members.map(member ->
                 MemberResponse.from(member, userMap.get(member.getUserId()))
         ));
+    }
+
+    private List<Namespace> listAllNamespaces() {
+        return Arrays.stream(NamespaceStatus.values())
+                .flatMap(status -> namespaceRepository.findByStatus(status, Pageable.unpaged()).getContent().stream())
+                .toList();
+    }
+
+    private boolean isSuperAdmin(Set<String> platformRoles) {
+        return platformRoles != null && platformRoles.contains(SUPER_ADMIN_ROLE);
     }
 }

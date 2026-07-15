@@ -61,15 +61,19 @@ public class NamespaceController extends BaseApiController {
     @GetMapping("/namespaces")
     public ApiResponse<PageResponse<NamespaceResponse>> listNamespaces(
             Pageable pageable,
-            @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles) {
-        return ok("response.success.read", namespacePortalQueryAppService.listNamespaces(pageable, userNsRoles));
+            @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles,
+            @RequestAttribute(value = "platformRoles", required = false) Set<String> platformRoles) {
+        return ok("response.success.read",
+                namespacePortalQueryAppService.listNamespaces(pageable, userNsRoles, normalizePlatformRoles(platformRoles)));
     }
 
     @GetMapping("/me/namespaces")
     public ApiResponse<List<MyNamespaceResponse>> listMyNamespaces(
             @RequestAttribute("userId") String userId,
-            @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles) {
-        return ok("response.success.read", namespacePortalQueryAppService.listMyNamespaces(userNsRoles));
+            @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles,
+            @RequestAttribute(value = "platformRoles", required = false) Set<String> platformRoles) {
+        return ok("response.success.read",
+                namespacePortalQueryAppService.listMyNamespaces(userNsRoles, normalizePlatformRoles(platformRoles)));
     }
 
     @GetMapping("/namespaces/{slug}")
@@ -163,6 +167,12 @@ public class NamespaceController extends BaseApiController {
                 : Set.of();
         return ok("response.success.read",
                 namespacePortalQueryAppService.listMembers(slug, pageable, userId, platformRoles));
+    }
+
+    private Set<String> normalizePlatformRoles(Set<String> platformRoles) {
+        return platformRoles != null
+                ? platformRoles
+                : Set.of();
     }
 
     @GetMapping("/namespaces/{slug}/member-candidates")

@@ -25,6 +25,7 @@ import com.iflytek.skillhub.dto.PageResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -79,6 +80,25 @@ class NamespacePortalQueryAppServiceTest {
     }
 
     @Test
+    void listNamespaces_superAdminReturnsAllActiveNamespaces() {
+        Namespace teamB = namespace(2L, "team-b");
+        Namespace teamA = namespace(1L, "team-a");
+        when(namespaceRepository.findByStatus(eq(NamespaceStatus.ACTIVE), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(teamA, teamB), PageRequest.of(0, 10), 2));
+
+        var response = service.listNamespaces(
+                PageRequest.of(0, 10),
+                Map.of(),
+                Set.of("SUPER_ADMIN")
+        );
+
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.items().get(0).slug()).isEqualTo("team-a");
+        assertThat(response.items().get(1).slug()).isEqualTo("team-b");
+        assertThat(response.total()).isEqualTo(2);
+    }
+
+    @Test
     void listNamespaces_returnsOnlyCurrentUsersActiveNamespaces() {
         Namespace teamA = namespace(1L, "team-a");
         Namespace teamB = namespace(2L, "team-b");
@@ -99,6 +119,30 @@ class NamespacePortalQueryAppServiceTest {
         assertThat(response.items()).hasSize(2);
         assertThat(response.items().get(0).slug()).isEqualTo("team-a");
         assertThat(response.items().get(1).slug()).isEqualTo("team-b");
+    }
+
+    @Test
+    void listMyNamespaces_superAdminReturnsAllNamespacesWithoutGrantingNamespaceRole() {
+        Namespace active = namespace(1L, "active");
+        Namespace frozen = namespace(2L, "frozen");
+        frozen.setStatus(NamespaceStatus.FROZEN);
+        Namespace archived = namespace(3L, "archived");
+        archived.setStatus(NamespaceStatus.ARCHIVED);
+
+        when(namespaceRepository.findByStatus(eq(NamespaceStatus.ACTIVE), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(active), PageRequest.of(0, 1), 1));
+        when(namespaceRepository.findByStatus(eq(NamespaceStatus.FROZEN), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(frozen), PageRequest.of(0, 1), 1));
+        when(namespaceRepository.findByStatus(eq(NamespaceStatus.ARCHIVED), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(archived), PageRequest.of(0, 1), 1));
+
+        var response = service.listMyNamespaces(Map.of(), Set.of("SUPER_ADMIN"));
+
+        assertThat(response).hasSize(3);
+        assertThat(response).extracting("slug").containsExactly("active", "archived", "frozen");
+        assertThat(response).extracting("currentUserRole").containsOnlyNulls();
+        assertThat(response).extracting("canFreeze").containsOnly(false);
+        assertThat(response).extracting("canDelete").containsOnly(false);
     }
 
     @Test
