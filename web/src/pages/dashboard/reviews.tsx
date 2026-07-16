@@ -40,7 +40,6 @@ export function ReviewsPage() {
   const navigate = useNavigate()
   const search = useSearch({ from: '/dashboard/reviews' })
   const { hasRole, user } = useAuth()
-  const { data: myNamespaces, isLoading: isLoadingNamespaces } = useMyNamespaces()
   const [pages, setPages] = useState<Record<ReviewStatus, number>>({
     PENDING: 0,
     APPROVED: 0,
@@ -52,6 +51,7 @@ export function ReviewsPage() {
   const isSkillAdmin = hasRole('SKILL_ADMIN') || hasRole('SUPER_ADMIN')
   const isUserAdmin = hasRole('USER_ADMIN') || hasRole('SUPER_ADMIN')
   const hasGlobalReviewAccess = canAccessGlobalReviewCenter(user?.platformRoles)
+  const { data: myNamespaces, isLoading: isLoadingNamespaces } = useMyNamespaces(!hasGlobalReviewAccess)
   const namespaceReviewEntry = getPreferredNamespaceReviewEntry(myNamespaces)
   const showTypeTabs = isSkillAdmin && isUserAdmin
 

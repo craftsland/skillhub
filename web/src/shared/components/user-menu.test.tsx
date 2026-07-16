@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
+import type { ManagedNamespace } from '@/api/types'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as mod from './user-menu'
 import { UserMenu } from './user-menu'
 
-const useMyNamespacesMock = vi.hoisted(() => vi.fn(() => ({ data: [] })))
+const useMyNamespacesMock = vi.hoisted(() => vi.fn(() => ({ data: [] as ManagedNamespace[] })))
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react')
@@ -112,7 +113,41 @@ describe('UserMenu security settings visibility', () => {
     expect(html).not.toContain('user.menu.security')
   })
 
-  it('does not fetch namespace memberships while rendering the global menu', () => {
+  it('shows reviews for namespace admins without platform review roles', () => {
+    useMyNamespacesMock.mockReturnValue({
+      data: [
+        {
+          id: 10,
+          slug: 'team-admin',
+          displayName: 'Team Admin',
+          type: 'TEAM',
+          status: 'ACTIVE',
+          immutable: false,
+          canFreeze: false,
+          canUnfreeze: false,
+          canArchive: false,
+          canRestore: false,
+          canDelete: false,
+          currentUserRole: 'ADMIN',
+          createdAt: '',
+        },
+      ],
+    })
+
+    const html = renderToStaticMarkup(
+      <UserMenu
+        user={{
+          displayName: 'Namespace Admin',
+          platformRoles: ['USER'],
+        }}
+      />,
+    )
+
+    expect(useMyNamespacesMock).toHaveBeenCalledWith(true)
+    expect(html).toContain('user.menu.reviews')
+  })
+
+  it('disables namespace membership loading while rendering the global menu for platform reviewers', () => {
     renderToStaticMarkup(
       <UserMenu
         user={{
@@ -122,6 +157,6 @@ describe('UserMenu security settings visibility', () => {
       />,
     )
 
-    expect(useMyNamespacesMock).not.toHaveBeenCalled()
+    expect(useMyNamespacesMock).toHaveBeenCalledWith(false)
   })
 })

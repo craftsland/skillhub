@@ -1,4 +1,18 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const useQueryMock = vi.hoisted(() => vi.fn())
+
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: useQueryMock,
+  useMutation: vi.fn(),
+  useQueryClient: vi.fn(),
+}))
+
+vi.mock('@/api/client', () => ({
+  namespaceApi: {
+    listMine: vi.fn(),
+  },
+}))
 
 /**
  * use-namespace-queries.ts exports React hooks that wrap @tanstack/react-query
@@ -10,6 +24,10 @@ import { describe, expect, it } from 'vitest'
  * Here we verify that all expected hooks are exported.
  */
 describe('use-namespace-queries exports', () => {
+  beforeEach(() => {
+    useQueryMock.mockClear()
+  })
+
   it('exports all expected hook functions', async () => {
     const mod = await import('./use-namespace-queries')
     expect(typeof mod.useMyNamespaces).toBe('function')
@@ -24,5 +42,16 @@ describe('use-namespace-queries exports', () => {
     expect(typeof mod.useUnfreezeNamespace).toBe('function')
     expect(typeof mod.useArchiveNamespace).toBe('function')
     expect(typeof mod.useRestoreNamespace).toBe('function')
+  })
+
+  it('passes the enabled flag to the my namespaces query', async () => {
+    const mod = await import('./use-namespace-queries')
+
+    mod.useMyNamespaces(false)
+
+    expect(useQueryMock).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ['namespaces', 'my'],
+      enabled: false,
+    }))
   })
 })

@@ -76,7 +76,7 @@ vi.mock('@/features/auth/use-auth', () => ({
 
 const useMyNamespacesMock = vi.fn()
 vi.mock('@/shared/hooks/use-namespace-queries', () => ({
-  useMyNamespaces: () => useMyNamespacesMock(),
+  useMyNamespaces: (enabled?: boolean) => useMyNamespacesMock(enabled),
 }))
 
 vi.mock('@/shared/components/dashboard-page-header', () => ({
@@ -193,5 +193,14 @@ describe('ReviewsPage', () => {
 
     expect(useReviewListMock).toHaveBeenCalled()
     expect(useReviewListMock.mock.calls.every((call) => call[5] === false)).toBe(true)
+  })
+
+  it('skips namespace loading for super admins with global review access', () => {
+    hasRoleMock.mockImplementation((role: string) => role === 'SKILL_ADMIN' || role === 'USER_ADMIN' || role === 'SUPER_ADMIN')
+    userMock.platformRoles = ['SUPER_ADMIN']
+
+    renderToStaticMarkup(createElement(ReviewsPage))
+
+    expect(useMyNamespacesMock).toHaveBeenCalledWith(false)
   })
 })
