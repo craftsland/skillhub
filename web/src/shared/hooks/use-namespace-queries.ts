@@ -4,8 +4,16 @@ import { namespaceApi } from '@/api/client'
 import { replaceNamespaceMemberRole } from '@/shared/lib/namespace-member-cache'
 import { shouldEnableNamespaceMemberCandidates } from './skill-query-helpers'
 
+const MY_NAMESPACES_PAGE_SIZE = 20
+const MY_NAMESPACES_COMPAT_SIZE = 100
+
 async function getMyNamespaces(): Promise<ManagedNamespace[]> {
-  return namespaceApi.listMine()
+  const page = await namespaceApi.listMine({ page: 0, size: MY_NAMESPACES_COMPAT_SIZE })
+  return page.items
+}
+
+async function getMyNamespacesPage(page = 0, size = MY_NAMESPACES_PAGE_SIZE): Promise<PagedResponse<ManagedNamespace>> {
+  return namespaceApi.listMine({ page, size })
 }
 
 async function createNamespace(request: CreateNamespaceRequest): Promise<Namespace> {
@@ -55,6 +63,14 @@ export function useMyNamespaces(enabled = true) {
   return useQuery({
     queryKey: ['namespaces', 'my'],
     queryFn: getMyNamespaces,
+    enabled,
+  })
+}
+
+export function useMyNamespacesPage(page = 0, size = MY_NAMESPACES_PAGE_SIZE, enabled = true) {
+  return useQuery({
+    queryKey: ['namespaces', 'my', { page, size }],
+    queryFn: () => getMyNamespacesPage(page, size),
     enabled,
   })
 }

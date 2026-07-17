@@ -4514,11 +4514,11 @@ export interface components {
             /** Format: int32 */
             size?: number;
         };
-        ApiResponseListMyNamespaceResponse: {
+        ApiResponsePageResponseMyNamespaceResponse: {
             /** Format: int32 */
             code?: number;
             msg?: string;
-            data?: components["schemas"]["MyNamespaceResponse"][];
+            data?: components["schemas"]["PageResponseMyNamespaceResponse"];
             /** Format: date-time */
             timestamp?: string;
             requestId?: string;
@@ -4547,6 +4547,15 @@ export interface components {
             canArchive?: boolean;
             canRestore?: boolean;
             canDelete?: boolean;
+        };
+        PageResponseMyNamespaceResponse: {
+            items?: components["schemas"]["MyNamespaceResponse"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
         };
         ApiResponseGovernanceSummaryResponse: {
             /** Format: int32 */
@@ -10001,7 +10010,9 @@ export interface operations {
     };
     listMyNamespaces: {
         parameters: {
-            query?: never;
+            query: {
+                pageable: components["schemas"]["Pageable"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10014,14 +10025,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseListMyNamespaceResponse"];
+                    "*/*": components["schemas"]["ApiResponsePageResponseMyNamespaceResponse"];
                 };
             };
         };
     };
     listMyNamespaces_1: {
         parameters: {
-            query?: never;
+            query: {
+                pageable: components["schemas"]["Pageable"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10034,7 +10047,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseListMyNamespaceResponse"];
+                    "*/*": components["schemas"]["ApiResponsePageResponseMyNamespaceResponse"];
                 };
             };
         };

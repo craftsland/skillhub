@@ -31,6 +31,7 @@ describe('use-namespace-queries exports', () => {
   it('exports all expected hook functions', async () => {
     const mod = await import('./use-namespace-queries')
     expect(typeof mod.useMyNamespaces).toBe('function')
+    expect(typeof mod.useMyNamespacesPage).toBe('function')
     expect(typeof mod.useCreateNamespace).toBe('function')
     expect(typeof mod.useNamespaceDetail).toBe('function')
     expect(typeof mod.useNamespaceMembers).toBe('function')
@@ -52,6 +53,16 @@ describe('use-namespace-queries exports', () => {
     expect(useQueryMock).toHaveBeenCalledWith(expect.objectContaining({
       queryKey: ['namespaces', 'my'],
       enabled: false,
+    }))
+  })
+
+  it('passes page and size to the paged my namespaces query', async () => {
+    const mod = await import('./use-namespace-queries')
+
+    mod.useMyNamespacesPage(3, 15)
+
+    expect(useQueryMock).toHaveBeenCalledWith(expect.objectContaining({
+      queryKey: ['namespaces', 'my', { page: 3, size: 15 }],
     }))
   })
 })

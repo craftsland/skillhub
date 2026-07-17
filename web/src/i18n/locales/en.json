@@ -790,7 +790,9 @@
     "notFound": "Namespace not found",
     "skillList": "Skills",
     "emptyTitle": "No skills",
-    "emptyDescription": "No skills have been published in this namespace yet"
+    "emptyDescription": "No skills have been published in this namespace yet",
+    "skillListErrorTitle": "Unable to load skills",
+    "skillListErrorDescription": "The namespace exists, but its skill list could not be loaded. Please try again later."
   },
   "skillDetail": {
     "back": "Back",

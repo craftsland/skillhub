@@ -16,7 +16,6 @@ import com.iflytek.skillhub.dto.MemberResponse;
 import com.iflytek.skillhub.dto.MyNamespaceResponse;
 import com.iflytek.skillhub.dto.NamespaceResponse;
 import com.iflytek.skillhub.dto.PageResponse;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +39,8 @@ public class NamespacePortalQueryAppService {
 
     private static final String SUPER_ADMIN_ROLE = "SUPER_ADMIN";
     private static final String NAMESPACE_SLUG_SORT = "slug";
+    private static final int DEFAULT_MY_NAMESPACE_PAGE_SIZE = 20;
+    private static final int MAX_MY_NAMESPACE_PAGE_SIZE = 100;
 
     private final NamespaceRepository namespaceRepository;
     private final NamespaceService namespaceService;
@@ -114,23 +115,42 @@ public class NamespacePortalQueryAppService {
     @Transactional(readOnly = true)
     public List<MyNamespaceResponse> listMyNamespaces(Map<Long, NamespaceRole> userNamespaceRoles,
                                                       Set<String> platformRoles) {
+        return listMyNamespaces(
+                PageRequest.of(0, MAX_MY_NAMESPACE_PAGE_SIZE),
+                userNamespaceRoles,
+                platformRoles
+        ).items();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<MyNamespaceResponse> listMyNamespaces(Pageable pageable,
+                                                              Map<Long, NamespaceRole> userNamespaceRoles,
+                                                              Set<String> platformRoles) {
         Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
+        Pageable boundedPageable = normalizeMyNamespacesPageable(pageable);
         if (namespaceRoles.isEmpty() && !isSuperAdmin(platformRoles)) {
-            return List.of();
+            Page<MyNamespaceResponse> empty = new PageImpl<>(List.of(), boundedPageable, 0);
+            return PageResponse.from(empty);
         }
 
-        List<Namespace> visibleNamespaces = isSuperAdmin(platformRoles)
-                ? listAllNamespaces()
-                : namespaceRepository.findByIdIn(namespaceRoles.keySet().stream().toList());
+        if (isSuperAdmin(platformRoles)) {
+            Page<Namespace> visibleNamespaces = namespaceRepository.findAll(boundedPageable);
+            return PageResponse.from(visibleNamespaces.map(namespace -> myNamespaceResponse(namespace, namespaceRoles)));
+        }
 
-        return visibleNamespaces.stream()
+        List<Namespace> visibleNamespaces = namespaceRepository.findByIdIn(namespaceRoles.keySet().stream().toList()).stream()
                 .sorted(Comparator.comparing(Namespace::getSlug))
-                .map(namespace -> MyNamespaceResponse.from(
-                        namespace,
-                        namespaceRoles.get(namespace.getId()),
-                        namespaceAccessPolicy,
-                        namespaceService.canDelete(namespace, namespaceRoles.get(namespace.getId()))))
                 .toList();
+        int fromIndex = Math.min((int) boundedPageable.getOffset(), visibleNamespaces.size());
+        int toIndex = Math.min(fromIndex + boundedPageable.getPageSize(), visibleNamespaces.size());
+        Page<MyNamespaceResponse> responsePage = new PageImpl<>(
+                visibleNamespaces.subList(fromIndex, toIndex).stream()
+                        .map(namespace -> myNamespaceResponse(namespace, namespaceRoles))
+                        .toList(),
+                boundedPageable,
+                visibleNamespaces.size()
+        );
+        return PageResponse.from(responsePage);
     }
 
     @Transactional(readOnly = true)
@@ -184,10 +204,24 @@ public class NamespacePortalQueryAppService {
         ));
     }
 
-    private List<Namespace> listAllNamespaces() {
-        return Arrays.stream(NamespaceStatus.values())
-                .flatMap(status -> namespaceRepository.findByStatus(status, Pageable.unpaged()).getContent().stream())
-                .toList();
+    private MyNamespaceResponse myNamespaceResponse(Namespace namespace, Map<Long, NamespaceRole> namespaceRoles) {
+        NamespaceRole currentUserRole = namespaceRoles.get(namespace.getId());
+        return MyNamespaceResponse.from(
+                namespace,
+                currentUserRole,
+                namespaceAccessPolicy,
+                namespaceService.canDelete(namespace, currentUserRole));
+    }
+
+    private Pageable normalizeMyNamespacesPageable(Pageable pageable) {
+        int page = pageable != null && pageable.isPaged()
+                ? Math.max(pageable.getPageNumber(), 0)
+                : 0;
+        int requestedSize = pageable != null && pageable.isPaged()
+                ? pageable.getPageSize()
+                : DEFAULT_MY_NAMESPACE_PAGE_SIZE;
+        int size = Math.min(Math.max(requestedSize, 1), MAX_MY_NAMESPACE_PAGE_SIZE);
+        return PageRequest.of(page, size, Sort.by(NAMESPACE_SLUG_SORT).ascending());
     }
 
     private boolean isSuperAdmin(Set<String> platformRoles) {

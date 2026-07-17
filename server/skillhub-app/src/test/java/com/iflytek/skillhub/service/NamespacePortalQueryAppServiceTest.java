@@ -123,27 +123,26 @@ class NamespacePortalQueryAppServiceTest {
     }
 
     @Test
-    void listMyNamespaces_superAdminReturnsAllNamespacesWithoutGrantingNamespaceRole() {
+    void listMyNamespaces_superAdminReturnsPagedNamespacesWithoutGrantingNamespaceRole() {
         Namespace active = namespace(1L, "active");
-        Namespace frozen = namespace(2L, "frozen");
-        frozen.setStatus(NamespaceStatus.FROZEN);
-        Namespace archived = namespace(3L, "archived");
+        Namespace archived = namespace(2L, "archived");
         archived.setStatus(NamespaceStatus.ARCHIVED);
+        Namespace frozen = namespace(3L, "frozen");
+        frozen.setStatus(NamespaceStatus.FROZEN);
 
-        when(namespaceRepository.findByStatus(eq(NamespaceStatus.ACTIVE), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(active), PageRequest.of(0, 1), 1));
-        when(namespaceRepository.findByStatus(eq(NamespaceStatus.FROZEN), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(frozen), PageRequest.of(0, 1), 1));
-        when(namespaceRepository.findByStatus(eq(NamespaceStatus.ARCHIVED), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(archived), PageRequest.of(0, 1), 1));
+        when(namespaceRepository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(archived, frozen), PageRequest.of(1, 2), 4));
 
-        var response = service.listMyNamespaces(Map.of(), Set.of("SUPER_ADMIN"));
+        var response = service.listMyNamespaces(PageRequest.of(1, 2), Map.of(), Set.of("SUPER_ADMIN"));
 
-        assertThat(response).hasSize(3);
-        assertThat(response).extracting("slug").containsExactly("active", "archived", "frozen");
-        assertThat(response).extracting("currentUserRole").containsOnlyNulls();
-        assertThat(response).extracting("canFreeze").containsOnly(false);
-        assertThat(response).extracting("canDelete").containsOnly(false);
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.items()).extracting("slug").containsExactly("archived", "frozen");
+        assertThat(response.items()).extracting("currentUserRole").containsOnlyNulls();
+        assertThat(response.items()).extracting("canFreeze").containsOnly(false);
+        assertThat(response.items()).extracting("canDelete").containsOnly(false);
+        assertThat(response.total()).isEqualTo(4);
+        assertThat(response.page()).isEqualTo(1);
+        assertThat(response.size()).isEqualTo(2);
     }
 
     @Test

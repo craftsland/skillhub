@@ -163,6 +163,43 @@ describe('namespaceApi.delete', () => {
   })
 })
 
+describe('namespaceApi.listMine', () => {
+  it('requests a bounded page of current user namespaces', async () => {
+    window.__SKILLHUB_RUNTIME_CONFIG__ = { apiBaseUrl: 'https://api.example.com' }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        msg: 'ok',
+        data: {
+          items: [],
+          total: 0,
+          page: 2,
+          size: 25,
+        },
+        timestamp: '2026-05-07T00:00:00Z',
+        requestId: 'req-test',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const page = await namespaceApi.listMine({ page: 2, size: 25 })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.com/api/web/me/namespaces?page=2&size=25',
+      expect.objectContaining({
+        headers: expect.any(Headers),
+      }),
+    )
+    expect(page).toEqual({
+      items: [],
+      total: 0,
+      page: 2,
+      size: 25,
+    })
+  })
+})
+
 describe('getDirectAuthRuntimeConfig', () => {
   it('returns disabled when no runtime config is present', () => {
     const config = getDirectAuthRuntimeConfig()

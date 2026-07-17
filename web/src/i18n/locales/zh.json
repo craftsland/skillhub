@@ -790,7 +790,9 @@
     "notFound": "命名空间不存在",
     "skillList": "技能列表",
     "emptyTitle": "暂无技能",
-    "emptyDescription": "该命名空间下还没有发布任何技能"
+    "emptyDescription": "该命名空间下还没有发布任何技能",
+    "skillListErrorTitle": "无法加载技能列表",
+    "skillListErrorDescription": "命名空间存在，但技能列表暂时无法加载，请稍后重试。"
   },
   "skillDetail": {
     "back": "返回上一页",
