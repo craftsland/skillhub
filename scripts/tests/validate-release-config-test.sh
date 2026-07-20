@@ -62,6 +62,13 @@ expect_fail() {
   fi
 }
 
+render_verification_uri() {
+  local env_file="$1"
+  env -u DEVICE_AUTH_VERIFICATION_URI -u SKILLHUB_PUBLIC_BASE_URL \
+    docker compose --env-file "$env_file" -f "$REPO_ROOT/compose.release.yml" config \
+    | awk '$1 == "DEVICE_AUTH_VERIFICATION_URI:" {gsub(/"/, "", $2); print $2; exit}'
+}
+
 tmp="$(new_tmp)"
 
 valid_env="$tmp/valid.env"
@@ -92,5 +99,26 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   esac
 done <"$REPO_ROOT/.env.release.draft" >"$draft_env"
 expect_fail "$draft_env" "POSTGRES_PASSWORD"
+
+rendered_uri="$(render_verification_uri "$valid_env")"
+if [[ "$rendered_uri" != "https://skillhub.example.com/device" ]]; then
+  fail "expected rendered DEVICE_AUTH_VERIFICATION_URI default to be 'https://skillhub.example.com/device', got '${rendered_uri:-<empty>}'"
+fi
+
+empty_override_env="$tmp/empty-override.env"
+cp "$valid_env" "$empty_override_env"
+printf '%s\n' "DEVICE_AUTH_VERIFICATION_URI=" >>"$empty_override_env"
+rendered_uri="$(render_verification_uri "$empty_override_env")"
+if [[ "$rendered_uri" != "https://skillhub.example.com/device" ]]; then
+  fail "expected rendered DEVICE_AUTH_VERIFICATION_URI default with an explicitly empty override to be 'https://skillhub.example.com/device', got '${rendered_uri:-<empty>}'"
+fi
+
+override_env="$tmp/override.env"
+cp "$valid_env" "$override_env"
+printf '%s\n' "DEVICE_AUTH_VERIFICATION_URI=https://auth.example.com/verify" >>"$override_env"
+rendered_uri="$(render_verification_uri "$override_env")"
+if [[ "$rendered_uri" != "https://auth.example.com/verify" ]]; then
+  fail "expected rendered DEVICE_AUTH_VERIFICATION_URI override to be 'https://auth.example.com/verify', got '${rendered_uri:-<empty>}'"
+fi
 
 echo "validate-release-config-test passed"
