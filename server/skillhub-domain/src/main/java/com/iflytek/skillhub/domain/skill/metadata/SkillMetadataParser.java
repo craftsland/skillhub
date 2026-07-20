@@ -79,6 +79,14 @@ public class SkillMetadataParser {
         } catch (DomainBadRequestException exception) {
             throw exception;
         } catch (Exception exception) {
+            // Once strict parsing fails, tag syntax cannot be distinguished safely from prose
+            // without reimplementing YAML. Valid bang-bearing prose is handled by the event path.
+            if (yamlContent.contains("!")) {
+                throw new DomainBadRequestException(
+                        "error.skill.metadata.yaml.invalid",
+                        "Explicit YAML tags are not allowed"
+                );
+            }
             if (isLoaderConstraintException(exception)) {
                 throw new DomainBadRequestException("error.skill.metadata.yaml.invalid", exception.getMessage());
             }

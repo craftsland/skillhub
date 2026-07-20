@@ -312,6 +312,122 @@ class SkillMetadataParserTest {
     }
 
     @Test
+    void rejectsScalarYamlTagsAfterMalformedYamlInsteadOfFallingBack() {
+        String content = """
+            ---
+            name: malformed: value
+            description: !foo value
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+        assertArrayEquals(new Object[]{"Explicit YAML tags are not allowed"}, exception.messageArgs());
+    }
+
+    @Test
+    void rejectsCollectionYamlTagsAfterMalformedYamlInsteadOfFallingBack() {
+        String content = """
+            ---
+            name: malformed: value
+            description: !foo [value]
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+        assertArrayEquals(new Object[]{"Explicit YAML tags are not allowed"}, exception.messageArgs());
+    }
+
+    @Test
+    void rejectsNonSpecificScalarYamlTagsAfterMalformedYamlInsteadOfFallingBack() {
+        String content = """
+            ---
+            name: malformed: value
+            description: ! value
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+        assertArrayEquals(new Object[]{"Explicit YAML tags are not allowed"}, exception.messageArgs());
+    }
+
+    @Test
+    void rejectsNonSpecificCollectionYamlTagsAfterMalformedYamlInsteadOfFallingBack() {
+        String content = """
+            ---
+            name: malformed: value
+            description: ! [value]
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+        assertArrayEquals(new Object[]{"Explicit YAML tags are not allowed"}, exception.messageArgs());
+    }
+
+    @Test
+    void rejectsYamlTagsDedentedFromBlockScalarContentAfterMalformedYaml() {
+        String content = """
+            ---
+            name: malformed: value
+            description: |
+                prose
+              tagged: !foo value
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+        assertArrayEquals(new Object[]{"Explicit YAML tags are not allowed"}, exception.messageArgs());
+    }
+
+    @Test
+    void rejectsFlowExplicitKeyYamlTagsAfterMalformedYaml() {
+        String content = """
+            ---
+            name: malformed: value
+            description: {? !foo key: value}
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        DomainBadRequestException exception = assertThrows(
+            DomainBadRequestException.class,
+            () -> parser.parse(content)
+        );
+        assertEquals("error.skill.metadata.yaml.invalid", exception.messageCode());
+        assertArrayEquals(new Object[]{"Explicit YAML tags are not allowed"}, exception.messageArgs());
+    }
+
+    @Test
     void allowsPlainScalarExclamationMarks() {
         String content = """
             ---
