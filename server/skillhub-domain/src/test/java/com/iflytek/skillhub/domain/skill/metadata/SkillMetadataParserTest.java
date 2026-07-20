@@ -344,6 +344,23 @@ class SkillMetadataParserTest {
     }
 
     @Test
+    void allowsExclamationTextInsideBlockScalars() {
+        String content = """
+            ---
+            name: css-guidance
+            description: |-
+              !important is literal prose, not a YAML tag
+            version: 1.0.0
+            ---
+            Body
+            """;
+
+        SkillMetadata metadata = parser.parse(content);
+
+        assertEquals("!important is literal prose, not a YAML tag", metadata.description());
+    }
+
+    @Test
     void testAllowsColonInDescriptionWithoutStrictYamlQuoting() {
         String content = """
             ---
