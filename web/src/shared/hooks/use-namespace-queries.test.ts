@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const useQueryMock = vi.hoisted(() => vi.fn())
+const listMinePageMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: useQueryMock,
@@ -11,6 +12,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/api/client', () => ({
   namespaceApi: {
     listMine: vi.fn(),
+    listMinePage: listMinePageMock,
   },
 }))
 
@@ -26,6 +28,7 @@ vi.mock('@/api/client', () => ({
 describe('use-namespace-queries exports', () => {
   beforeEach(() => {
     useQueryMock.mockClear()
+    listMinePageMock.mockReset()
   })
 
   it('exports all expected hook functions', async () => {
@@ -64,5 +67,22 @@ describe('use-namespace-queries exports', () => {
     expect(useQueryMock).toHaveBeenCalledWith(expect.objectContaining({
       queryKey: ['namespaces', 'my', { page: 3, size: 15 }],
     }))
+  })
+
+  it('fetches every page for compatibility consumers instead of truncating after the first page', async () => {
+    const firstPageItems = Array.from({ length: 100 }, (_, index) => ({ id: index + 1, slug: `team-${index + 1}` }))
+    listMinePageMock
+      .mockResolvedValueOnce({ items: firstPageItems, total: 101, page: 0, size: 100 })
+      .mockResolvedValueOnce({ items: [{ id: 101, slug: 'team-101' }], total: 101, page: 1, size: 100 })
+    const mod = await import('./use-namespace-queries')
+
+    mod.useMyNamespaces()
+    const queryOptions = useQueryMock.mock.calls[useQueryMock.mock.calls.length - 1]?.[0]
+    const result = await queryOptions.queryFn()
+
+    expect(listMinePageMock).toHaveBeenNthCalledWith(1, { page: 0, size: 100 })
+    expect(listMinePageMock).toHaveBeenNthCalledWith(2, { page: 1, size: 100 })
+    expect(result).toHaveLength(101)
+    expect(result[result.length - 1]).toEqual({ id: 101, slug: 'team-101' })
   })
 })

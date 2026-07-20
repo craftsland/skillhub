@@ -146,6 +146,22 @@ class NamespacePortalQueryAppServiceTest {
     }
 
     @Test
+    void listMyNamespaces_superAdminCompatibilityCollectsAllRepositoryPages() {
+        Namespace first = namespace(1L, "first");
+        Namespace second = namespace(2L, "second");
+        Namespace third = namespace(3L, "third");
+
+        when(namespaceRepository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(first, second), PageRequest.of(0, 2), 3))
+                .thenReturn(new PageImpl<>(List.of(third), PageRequest.of(1, 2), 3));
+
+        var response = service.listMyNamespaces(Map.of(), Set.of("SUPER_ADMIN"));
+
+        assertThat(response).extracting("slug").containsExactly("first", "second", "third");
+        assertThat(response).extracting("currentUserRole").containsOnlyNulls();
+    }
+
+    @Test
     void getNamespace_throwsWhenCurrentUserIsNotNamespaceMember() {
         Namespace namespace = namespace(1L, "team-a");
         when(namespaceService.getNamespaceBySlugForRead("team-a", "user-1", Map.of()))

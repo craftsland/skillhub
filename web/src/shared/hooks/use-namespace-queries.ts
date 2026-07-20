@@ -8,12 +8,25 @@ const MY_NAMESPACES_PAGE_SIZE = 20
 const MY_NAMESPACES_COMPAT_SIZE = 100
 
 async function getMyNamespaces(): Promise<ManagedNamespace[]> {
-  const page = await namespaceApi.listMine({ page: 0, size: MY_NAMESPACES_COMPAT_SIZE })
-  return page.items
+  const namespaces: ManagedNamespace[] = []
+  let page = 0
+  let total = Number.POSITIVE_INFINITY
+
+  while (namespaces.length < total) {
+    const response = await namespaceApi.listMinePage({ page, size: MY_NAMESPACES_COMPAT_SIZE })
+    namespaces.push(...response.items)
+    total = response.total
+    page += 1
+    if (response.items.length === 0) {
+      break
+    }
+  }
+
+  return namespaces
 }
 
 async function getMyNamespacesPage(page = 0, size = MY_NAMESPACES_PAGE_SIZE): Promise<PagedResponse<ManagedNamespace>> {
-  return namespaceApi.listMine({ page, size })
+  return namespaceApi.listMinePage({ page, size })
 }
 
 async function createNamespace(request: CreateNamespaceRequest): Promise<Namespace> {

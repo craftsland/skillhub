@@ -44,13 +44,6 @@ interface NamespaceCandidate {
   status: string
 }
 
-interface PageResponse<T> {
-  items: T[]
-  total: number
-  page: number
-  size: number
-}
-
 interface ApiEnvelope<T> {
   code: number
   msg: string
@@ -256,10 +249,9 @@ export class E2eTestDataBuilder {
   }
 
   async listMyNamespaces(): Promise<SeededNamespace[]> {
-    const page = await parseEnvelope<PageResponse<SeededNamespace>>(
-      await this.request.get('/api/web/me/namespaces?page=0&size=100'),
+    return parseEnvelope<SeededNamespace[]>(
+      await this.request.get('/api/web/me/namespaces'),
     )
-    return page.items
   }
 
   private isTeamNamespace(namespace: SeededNamespace): boolean {

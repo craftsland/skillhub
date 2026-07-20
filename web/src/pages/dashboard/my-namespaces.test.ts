@@ -103,7 +103,7 @@ vi.mock('@/shared/lib/toast', () => ({
 }))
 
 import { MyNamespacesPage } from './my-namespaces'
-import { executeNamespaceAction, resolveNamespaceActionCopy } from './my-namespaces'
+import { executeNamespaceAction, resolveNamespaceActionCopy, resolveValidNamespacePage } from './my-namespaces'
 
 function buildNamespace(overrides: Partial<ManagedNamespace> = {}): ManagedNamespace {
   return {
@@ -203,6 +203,12 @@ describe('MyNamespacesPage', () => {
     expect(html).toContain('Team A')
     expect(html).toContain('pagination.prev')
     expect(html).toContain('pagination.next')
+  })
+
+  it('backs up to the last valid page when a delete empties the current page', () => {
+    expect(resolveValidNamespacePage(2, 40, 20)).toBe(1)
+    expect(resolveValidNamespacePage(1, 40, 20)).toBe(1)
+    expect(resolveValidNamespacePage(1, 0, 20)).toBe(0)
   })
 
   it('routes delete actions to the delete mutation and emits success feedback', async () => {

@@ -100,9 +100,33 @@ class NamespacePortalControllerTest {
     }
 
     @Test
-    void listMyNamespaces_superAdminReturnsPagedNamespacesWithoutMembership() throws Exception {
+    void listMyNamespaces_superAdminKeepsLegacyArrayContract() throws Exception {
         Namespace active = namespace(1L, "active", NamespaceStatus.ACTIVE, NamespaceType.TEAM);
-        Namespace frozen = namespace(2L, "frozen", NamespaceStatus.FROZEN, NamespaceType.TEAM);
+        Namespace archived = namespace(3L, "archived", NamespaceStatus.ARCHIVED, NamespaceType.TEAM);
+        given(namespaceMemberRepository.findByUserId("super-1")).willReturn(List.of());
+        given(namespaceRepository.findAll(any()))
+                .willReturn(new org.springframework.data.domain.PageImpl<>(
+                        List.of(active, archived),
+                        org.springframework.data.domain.PageRequest.of(0, 2),
+                        2
+                ));
+
+        mockMvc.perform(get("/api/v1/me/namespaces")
+                        .param("page", "0")
+                        .param("size", "2")
+                        .with(auth("super-1", Set.of("SUPER_ADMIN")))
+                        .requestAttr("userId", "super-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data[0].slug").value("active"))
+                .andExpect(jsonPath("$.data[0].currentUserRole").doesNotExist())
+                .andExpect(jsonPath("$.data[1].slug").value("archived"))
+                .andExpect(jsonPath("$.data.items").doesNotExist());
+    }
+
+    @Test
+    void listMyNamespacesPage_superAdminReturnsPagedNamespacesWithoutMembership() throws Exception {
+        Namespace active = namespace(1L, "active", NamespaceStatus.ACTIVE, NamespaceType.TEAM);
         Namespace archived = namespace(3L, "archived", NamespaceStatus.ARCHIVED, NamespaceType.TEAM);
         given(namespaceMemberRepository.findByUserId("super-1")).willReturn(List.of());
         given(namespaceRepository.findAll(any()))
@@ -112,7 +136,7 @@ class NamespacePortalControllerTest {
                         3
                 ));
 
-        mockMvc.perform(get("/api/v1/me/namespaces")
+        mockMvc.perform(get("/api/web/me/namespaces/page")
                         .param("page", "0")
                         .param("size", "2")
                         .with(auth("super-1", Set.of("SUPER_ADMIN")))
@@ -139,10 +163,10 @@ class NamespacePortalControllerTest {
                         .requestAttr("userId", "owner-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.items[0].slug").value("team-a"))
-                .andExpect(jsonPath("$.data.items[0].status").value("ARCHIVED"))
-                .andExpect(jsonPath("$.data.items[0].currentUserRole").value("OWNER"))
-                .andExpect(jsonPath("$.data.items[0].canDelete").value(false));
+                .andExpect(jsonPath("$.data[0].slug").value("team-a"))
+                .andExpect(jsonPath("$.data[0].status").value("ARCHIVED"))
+                .andExpect(jsonPath("$.data[0].currentUserRole").value("OWNER"))
+                .andExpect(jsonPath("$.data[0].canDelete").value(false));
     }
 
     @Test

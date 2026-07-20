@@ -131,12 +131,18 @@ import sys
 slug = sys.argv[1]
 data = json.loads(os.environ["JSON_INPUT"])
 items = data["data"]
-raise SystemExit(0 if all(item["slug"] != slug for item in items) else 1)
+match = next((item for item in items if item["slug"] == slug), None)
+if not match:
+    raise SystemExit(1)
+if match.get("currentUserRole") is not None:
+    raise SystemExit(2)
+if match["status"] != "ACTIVE":
+    raise SystemExit(3)
 PY
 then
-  pass "Namespace is not visible to unrelated users in my namespaces"
+  pass "SUPER_ADMIN can see namespace without namespace membership"
 else
-  fail "Unrelated user should not see team namespace in my namespaces"
+  fail "SUPER_ADMIN should see team namespace in my namespaces without namespace role"
 fi
 
 FREEZE_FORBIDDEN_RESPONSE="$(curl -sS "${ADMIN_HEADERS[@]}" \

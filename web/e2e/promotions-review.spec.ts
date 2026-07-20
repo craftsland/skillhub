@@ -74,7 +74,7 @@ test.describe('Promotion review dashboard', () => {
         }),
       })
     })
-    await page.route('**/api/web/me/namespaces?**', async (route) => {
+    await page.route('**/api/web/me/namespaces/page?**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

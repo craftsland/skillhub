@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/features/auth/use-auth'
@@ -142,6 +142,12 @@ export async function executeNamespaceAction(
   }
 }
 
+export function resolveValidNamespacePage(currentPage: number, total: number, size: number) {
+  const safeSize = Math.max(size, 1)
+  const lastPage = Math.max(Math.ceil(total / safeSize) - 1, 0)
+  return Math.min(Math.max(currentPage, 0), lastPage)
+}
+
 /**
  * Dashboard page for namespaces the current user can manage or review. It owns
  * namespace lifecycle actions because each action combines permissions, copy,
@@ -162,6 +168,16 @@ export function MyNamespacesPage() {
   const deleteMutation = useDeleteNamespace()
   const namespaces = namespacePage?.items ?? []
   const totalPages = namespacePage ? Math.max(Math.ceil(namespacePage.total / namespacePage.size), 1) : 1
+
+  useEffect(() => {
+    if (!namespacePage) {
+      return
+    }
+    const validPage = resolveValidNamespacePage(page, namespacePage.total, namespacePage.size)
+    if (validPage !== page) {
+      setPage(validPage)
+    }
+  }, [namespacePage, page])
 
   const handleNamespaceClick = (slug: string) => {
     navigate({ to: `/space/${encodeURIComponent(slug)}` })

@@ -16,6 +16,7 @@ import com.iflytek.skillhub.dto.MemberResponse;
 import com.iflytek.skillhub.dto.MyNamespaceResponse;
 import com.iflytek.skillhub.dto.NamespaceResponse;
 import com.iflytek.skillhub.dto.PageResponse;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -115,11 +116,20 @@ public class NamespacePortalQueryAppService {
     @Transactional(readOnly = true)
     public List<MyNamespaceResponse> listMyNamespaces(Map<Long, NamespaceRole> userNamespaceRoles,
                                                       Set<String> platformRoles) {
-        return listMyNamespaces(
-                PageRequest.of(0, MAX_MY_NAMESPACE_PAGE_SIZE),
-                userNamespaceRoles,
-                platformRoles
-        ).items();
+        Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
+        if (namespaceRoles.isEmpty() && !isSuperAdmin(platformRoles)) {
+            return List.of();
+        }
+
+        List<Namespace> visibleNamespaces = isSuperAdmin(platformRoles)
+                ? listAllNamespacesByPage()
+                : namespaceRepository.findByIdIn(namespaceRoles.keySet().stream().toList()).stream()
+                        .sorted(Comparator.comparing(Namespace::getSlug))
+                        .toList();
+
+        return visibleNamespaces.stream()
+                .map(namespace -> myNamespaceResponse(namespace, namespaceRoles))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -211,6 +221,25 @@ public class NamespacePortalQueryAppService {
                 currentUserRole,
                 namespaceAccessPolicy,
                 namespaceService.canDelete(namespace, currentUserRole));
+    }
+
+    private List<Namespace> listAllNamespacesByPage() {
+        List<Namespace> namespaces = new ArrayList<>();
+        int pageNumber = 0;
+        Page<Namespace> page;
+        do {
+            page = namespaceRepository.findAll(PageRequest.of(
+                    pageNumber,
+                    MAX_MY_NAMESPACE_PAGE_SIZE,
+                    Sort.by(NAMESPACE_SLUG_SORT).ascending()
+            ));
+            namespaces.addAll(page.getContent());
+            pageNumber++;
+            if (page.getContent().isEmpty()) {
+                break;
+            }
+        } while (!page.isLast() && namespaces.size() < page.getTotalElements());
+        return namespaces;
     }
 
     private Pageable normalizeMyNamespacesPageable(Pageable pageable) {

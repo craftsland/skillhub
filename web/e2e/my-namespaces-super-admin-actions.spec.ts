@@ -39,7 +39,7 @@ test.describe('My Namespaces super admin actions', () => {
 
     await page.route('**/api/web/skills/*/star', (route) => fulfillJson(route, false))
 
-    await page.route('**/api/web/me/namespaces?**', (route) => fulfillJson(route, {
+    await page.route('**/api/web/me/namespaces/page?**', (route) => fulfillJson(route, {
       items: [
         {
           id: 101,

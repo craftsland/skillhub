@@ -164,6 +164,46 @@ describe('namespaceApi.delete', () => {
 })
 
 describe('namespaceApi.listMine', () => {
+  it('keeps the compatibility endpoint as a current user namespace array', async () => {
+    window.__SKILLHUB_RUNTIME_CONFIG__ = { apiBaseUrl: 'https://api.example.com' }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        msg: 'ok',
+        data: [{
+          id: 1,
+          slug: 'team-a',
+          displayName: 'Team A',
+          type: 'TEAM',
+          status: 'ACTIVE',
+          createdAt: '2026-05-07T00:00:00Z',
+          immutable: false,
+          canFreeze: false,
+          canUnfreeze: false,
+          canArchive: false,
+          canRestore: false,
+          canDelete: false,
+        }],
+        timestamp: '2026-05-07T00:00:00Z',
+        requestId: 'req-test',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const namespaces = await namespaceApi.listMine()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.com/api/web/me/namespaces',
+      expect.objectContaining({
+        headers: expect.any(Headers),
+      }),
+    )
+    expect(namespaces).toEqual([expect.objectContaining({ slug: 'team-a' })])
+  })
+})
+
+describe('namespaceApi.listMinePage', () => {
   it('requests a bounded page of current user namespaces', async () => {
     window.__SKILLHUB_RUNTIME_CONFIG__ = { apiBaseUrl: 'https://api.example.com' }
     const fetchMock = vi.fn().mockResolvedValue({
@@ -183,10 +223,10 @@ describe('namespaceApi.listMine', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const page = await namespaceApi.listMine({ page: 2, size: 25 })
+    const page = await namespaceApi.listMinePage({ page: 2, size: 25 })
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.example.com/api/web/me/namespaces?page=2&size=25',
+      'https://api.example.com/api/web/me/namespaces/page?page=2&size=25',
       expect.objectContaining({
         headers: expect.any(Headers),
       }),

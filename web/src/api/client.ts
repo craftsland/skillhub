@@ -639,10 +639,14 @@ export const namespaceApi = {
     return namespace
   },
 
-  async listMine(params: { page?: number; size?: number } = {}): Promise<PagedResponse<ManagedNamespace>> {
+  async listMine(): Promise<ManagedNamespace[]> {
+    return fetchJson<ManagedNamespace[]>(`${WEB_API_PREFIX}/me/namespaces`)
+  },
+
+  async listMinePage(params: { page?: number; size?: number } = {}): Promise<PagedResponse<ManagedNamespace>> {
     const page = params.page ?? 0
     const size = params.size ?? 20
-    return fetchJson<PagedResponse<ManagedNamespace>>(`${WEB_API_PREFIX}/me/namespaces?page=${page}&size=${size}`)
+    return fetchJson<PagedResponse<ManagedNamespace>>(`${WEB_API_PREFIX}/me/namespaces/page?page=${page}&size=${size}`)
   },
 
   async getDetail(slug: string): Promise<Namespace> {
