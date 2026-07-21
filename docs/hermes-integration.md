@@ -209,7 +209,7 @@ skills:
     - ~/.agents/skills
 ```
 
-Hermes 会把 external skill 与本地技能一起列出和加载。本地 `$HERMES_HOME/skills` 中的同名技能优先。
+Hermes 会把 external skill 与本地技能一起列出和加载。不要依赖本地技能覆盖 external skill：Hermes 0.18.2 会拒绝加载本地技能目录与 `external_dirs` 之间存在歧义的 `skill_view` 匹配；请改名或移除其中一个冲突副本。
 
 > `external_dirs` 不是只读边界。只要 Hermes 进程拥有写权限，Hermes 的技能管理工具就可能修改其中的文件。共享目录需要只读保护时，请使用文件系统权限或隔离的 Hermes profile。
 

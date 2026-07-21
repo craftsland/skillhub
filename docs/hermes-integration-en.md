@@ -209,7 +209,7 @@ skills:
     - ~/.agents/skills
 ```
 
-Hermes lists and loads external skills alongside local skills. A skill under local `$HERMES_HOME/skills` wins when names collide.
+Hermes lists and loads external skills alongside local skills. Do not rely on local shadowing: Hermes 0.18.2 refuses ambiguous `skill_view` matches across the local skills directory and `external_dirs`. Rename or remove a colliding copy instead.
 
 > `external_dirs` is not a read-only boundary. If the Hermes process can write to an external directory, Hermes skill-management tools can modify its files. Use filesystem permissions or an isolated Hermes profile when shared skills must remain read-only.
 
