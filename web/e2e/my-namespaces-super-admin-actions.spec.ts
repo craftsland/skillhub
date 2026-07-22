@@ -1,186 +1,122 @@
-import { expect, test, type Route } from '@playwright/test'
+import { expect, test, type BrowserContext } from '@playwright/test'
 import { setEnglishLocale } from './helpers/auth-fixtures'
+import { csrfHeaders } from './helpers/csrf'
+import { E2eTestDataBuilder } from './helpers/test-data-builder'
 
-function apiEnvelope(data: unknown) {
-  return {
-    code: 0,
-    msg: 'OK',
-    data,
-    timestamp: '2026-07-15T00:00:00Z',
-    requestId: 'e2e-super-admin-namespaces',
-  }
-}
+test.describe('My Namespaces super admin actions (Real API)', () => {
+  test.describe.configure({ timeout: 150_000 })
 
-async function fulfillJson(route: Route, data: unknown) {
-  await route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(apiEnvelope(data)),
-  })
-}
-
-test.describe('My Namespaces super admin actions', () => {
   test.beforeEach(async ({ page }) => {
     await setEnglishLocale(page)
-
-    await page.route('**/api/v1/auth/me', (route) => fulfillJson(route, {
-      userId: 'super-admin',
-      username: 'super-admin',
-      displayName: 'Super Admin',
-      platformRoles: ['SUPER_ADMIN'],
-    }))
-
-    await page.route('**/api/web/notifications/sse', (route) => route.fulfill({
-      status: 204,
-      body: '',
-    }))
-
-    await page.route('**/api/web/notifications/unread-count', (route) => fulfillJson(route, { count: 0 }))
-
-    await page.route('**/api/web/skills/*/star', (route) => fulfillJson(route, false))
-
-    await page.route('**/api/web/me/namespaces/page?**', (route) => fulfillJson(route, {
-      items: [
-        {
-          id: 101,
-          slug: 'visible-no-role',
-          displayName: 'Visible Without Membership',
-          description: 'Returned by SUPER_ADMIN namespace visibility',
-          type: 'TEAM',
-          status: 'ACTIVE',
-          createdAt: '2026-07-15T00:00:00Z',
-          immutable: false,
-          canFreeze: false,
-          canUnfreeze: false,
-          canArchive: false,
-          canRestore: false,
-          canDelete: false,
-        },
-        {
-          id: 102,
-          slug: 'owned-team',
-          displayName: 'Owned Team',
-          description: 'Namespace where the user is a member',
-          type: 'TEAM',
-          status: 'ACTIVE',
-          createdAt: '2026-07-15T00:00:00Z',
-          currentUserRole: 'OWNER',
-          immutable: false,
-          canFreeze: true,
-          canUnfreeze: false,
-          canArchive: true,
-          canRestore: false,
-          canDelete: true,
-        },
-        {
-          id: 103,
-          slug: 'archived-no-role',
-          displayName: 'Archived Without Membership',
-          description: 'Archived namespace visible to SUPER_ADMIN',
-          type: 'TEAM',
-          status: 'ARCHIVED',
-          createdAt: '2026-07-15T00:00:00Z',
-          immutable: false,
-          canFreeze: false,
-          canUnfreeze: false,
-          canArchive: false,
-          canRestore: false,
-          canDelete: false,
-        },
-      ],
-      page: 0,
-      size: 20,
-      total: 3,
-    }))
-
-    await page.route('**/api/web/namespaces/visible-no-role', (route) => fulfillJson(route, {
-      id: 101,
-      slug: 'visible-no-role',
-      displayName: 'Visible Without Membership',
-      description: 'Returned by SUPER_ADMIN namespace visibility',
-      type: 'TEAM',
-      status: 'ACTIVE',
-      createdAt: '2026-07-15T00:00:00Z',
-    }))
-
-    await page.route('**/api/web/namespaces/archived-no-role', (route) => fulfillJson(route, {
-      id: 103,
-      slug: 'archived-no-role',
-      displayName: 'Archived Without Membership',
-      description: 'Archived namespace visible to SUPER_ADMIN',
-      type: 'TEAM',
-      status: 'ARCHIVED',
-      createdAt: '2026-07-15T00:00:00Z',
-    }))
-
-    await page.route('**/api/web/skills?**', (route) => {
-      const url = new URL(route.request().url())
-      if (url.searchParams.get('namespace') === 'archived-no-role') {
-        return fulfillJson(route, {
-          items: [
-            {
-              id: 301,
-              slug: 'archived-skill',
-              displayName: 'Archived Namespace Skill',
-              summary: 'Visible when archived namespace read semantics are consistent',
-              visibility: 'PUBLIC',
-              status: 'ACTIVE',
-              namespace: 'archived-no-role',
-              downloadCount: 0,
-              starCount: 0,
-              ratingCount: 0,
-              updatedAt: '2026-07-15T00:00:00Z',
-              publishedVersion: { id: 401, version: '1.0.0', status: 'PUBLISHED' },
-            },
-          ],
-          page: 0,
-          size: 20,
-          total: 1,
-        })
-      }
-      return fulfillJson(route, {
-        items: [],
-        page: 0,
-        size: 20,
-        total: 0,
-      })
+    await page.context().setExtraHTTPHeaders({
+      'X-Mock-User-Id': 'local-admin',
     })
   })
 
-  test('keeps namespace-scoped actions hidden and opens detail for visible namespaces without membership', async ({ page }) => {
-    await page.goto('/dashboard/namespaces')
+  test('opens and downloads a published namespace-only skill in an archived non-member namespace', async ({ page, browser }, testInfo) => {
+    let adminBuilder: E2eTestDataBuilder | undefined
+    let ownerContext: BrowserContext | undefined
+    let ownerBuilder: E2eTestDataBuilder | undefined
+    let namespaceSlug: string | undefined
+    let namespaceArchived = false
 
-    const visibleCard = page.getByTestId('namespace-card-visible-no-role')
-    await expect(visibleCard.getByText('@visible-no-role')).toBeVisible()
-    await expect(visibleCard.getByText('Current role: Unknown')).toBeVisible()
-    await expect(visibleCard.getByRole('button', { name: 'Manage Members' })).toHaveCount(0)
-    await expect(visibleCard.getByRole('button', { name: 'Review Tasks' })).toHaveCount(0)
+    try {
+      adminBuilder = new E2eTestDataBuilder(page, testInfo)
+      await adminBuilder.init()
+      const namespace = await adminBuilder.createNamespace('e2e-super-admin-read')
+      namespaceSlug = namespace.slug
 
-    const ownedCard = page.getByTestId('namespace-card-owned-team')
-    await expect(ownedCard.getByRole('button', { name: 'Manage Members' })).toBeVisible()
-    await expect(ownedCard.getByRole('button', { name: 'Review Tasks' })).toBeVisible()
+      ownerContext = await browser.newContext({
+        extraHTTPHeaders: {
+          'X-Mock-User-Id': 'local-user',
+        },
+      })
+      const ownerPage = await ownerContext.newPage()
+      ownerBuilder = new E2eTestDataBuilder(ownerPage, testInfo)
+      await ownerBuilder.init()
 
-    await visibleCard.click()
+      await adminBuilder.addNamespaceMember(namespace.slug, 'local-user')
+      const transferResponse = await page.context().request.post(
+        `/api/web/namespaces/${encodeURIComponent(namespace.slug)}/transfer-ownership`,
+        {
+          data: { newOwnerId: 'local-user' },
+          headers: await csrfHeaders(page),
+        },
+      )
+      expect(transferResponse.ok()).toBe(true)
 
-    await expect(page).toHaveURL(/\/space\/visible-no-role$/)
-    await expect(page.getByRole('heading', { name: 'Visible Without Membership' })).toBeVisible()
-    await expect(page.getByText('@visible-no-role')).toBeVisible()
-  })
+      const removeAdminResponse = await ownerPage.context().request.delete(
+        `/api/web/namespaces/${encodeURIComponent(namespace.slug)}/members/local-admin`,
+        { headers: await csrfHeaders(ownerPage) },
+      )
+      expect(removeAdminResponse.ok()).toBe(true)
 
-  test('opens archived non-member namespaces without showing a false empty skill list', async ({ page }) => {
-    await page.goto('/dashboard/namespaces')
+      const skillName = `super-admin-read-${Date.now().toString(36)}`
+      const skill = await ownerBuilder.publishSkill(namespace.slug, {
+        name: skillName,
+        description: 'Published namespace-only skill for the SUPER_ADMIN read-chain regression',
+        visibility: 'NAMESPACE_ONLY',
+        readmeHeading: skillName,
+      })
 
-    const archivedCard = page.getByTestId('namespace-card-archived-no-role')
-    await expect(archivedCard.getByText('@archived-no-role')).toBeVisible()
-    await expect(archivedCard.getByText('Current role: Unknown')).toBeVisible()
-    await expect(archivedCard.getByRole('button', { name: 'Manage Members' })).toHaveCount(0)
-    await expect(archivedCard.getByRole('button', { name: 'Review Tasks' })).toHaveCount(0)
+      const reviewTaskId = await adminBuilder.waitForPendingReview(namespace.slug, skill.slug, skill.version)
+      await adminBuilder.approveReview(reviewTaskId)
 
-    await archivedCard.click()
+      const archiveResponse = await ownerPage.context().request.post(
+        `/api/web/namespaces/${encodeURIComponent(namespace.slug)}/archive`,
+        {
+          data: { reason: 'Validate SUPER_ADMIN archived namespace reads' },
+          headers: await csrfHeaders(ownerPage),
+        },
+      )
+      expect(archiveResponse.ok()).toBe(true)
+      namespaceArchived = true
 
-    await expect(page).toHaveURL(/\/space\/archived-no-role$/)
-    await expect(page.getByRole('heading', { name: 'Archived Without Membership' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Archived Namespace Skill' })).toBeVisible()
-    await expect(page.getByText('namespace.emptyTitle')).toHaveCount(0)
+      await page.goto('/dashboard/namespaces')
+
+      const namespaceCard = page.getByTestId(`namespace-card-${namespace.slug}`)
+      await expect(namespaceCard.getByText(`@${namespace.slug}`)).toBeVisible()
+      await expect(namespaceCard.getByText('Current role: Unknown')).toBeVisible()
+      await expect(namespaceCard.getByRole('button', { name: 'Manage Members' })).toHaveCount(0)
+      await expect(namespaceCard.getByRole('button', { name: 'Review Tasks' })).toHaveCount(0)
+
+      await namespaceCard.click()
+      await expect(page).toHaveURL(new RegExp(`/space/${namespace.slug}$`))
+      await expect(page.getByRole('heading', { name: namespace.displayName })).toBeVisible()
+
+      const skillHeading = page.getByRole('heading', { name: skillName, exact: true })
+      await expect(skillHeading).toBeVisible()
+      await skillHeading.click()
+
+      await expect(page).toHaveURL(new RegExp(`/space/${namespace.slug}/${skill.slug}$`))
+      await expect(page.getByRole('heading', { name: skillName, exact: true }).first()).toBeVisible()
+
+      const downloadPromise = page.waitForEvent('download')
+      await page.getByRole('button', { name: 'Download', exact: true }).click()
+      const download = await downloadPromise
+      expect(await download.failure()).toBeNull()
+      expect(download.suggestedFilename()).toContain(skill.version)
+    } finally {
+      if (namespaceArchived && namespaceSlug && ownerContext) {
+        const ownerPage = ownerContext.pages()[0]
+        await ownerPage.context().request.post(
+          `/api/web/namespaces/${encodeURIComponent(namespaceSlug)}/restore`,
+          { headers: await csrfHeaders(ownerPage) },
+        ).catch(() => undefined)
+      }
+      await ownerBuilder?.cleanup()
+      if (namespaceSlug && ownerContext) {
+        const ownerPage = ownerContext.pages()[0]
+        await ownerPage.context().request.post(
+          `/api/web/namespaces/${encodeURIComponent(namespaceSlug)}/archive`,
+          {
+            data: { reason: 'E2E cleanup' },
+            headers: await csrfHeaders(ownerPage),
+          },
+        ).catch(() => undefined)
+      }
+      await adminBuilder?.cleanup()
+      await ownerContext?.close()
+    }
   })
 })
