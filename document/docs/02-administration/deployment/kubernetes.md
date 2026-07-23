@@ -1,54 +1,54 @@
 ---
-title: Kubernetes 部署
+title: Kubernetes Deployment
 sidebar_position: 2
-description: 在 Kubernetes 集群中部署 SkillHub
+description: Deploy SkillHub in a Kubernetes cluster
 ---
 
-# Kubernetes 部署
+# Kubernetes Deployment
 
-本文介绍如何在 Kubernetes 集群中部署 SkillHub。
+This guide describes how to deploy SkillHub in a Kubernetes cluster.
 
-## 前置要求
+## Prerequisites
 
 - Kubernetes 1.24+
-- kubectl 配置完成
-- Helm 3.0+（可选）
-- 可用的持久化存储类
+- kubectl configured
+- Helm 3.0+ (optional)
+- Available persistent storage class
 
-## 部署清单
+## Deployment Manifests
 
-项目提供了 Kubernetes 部署清单：
+Kubernetes deployment manifests are provided in the project:
 
 ```bash
 cd deploy/k8s
 
-# 1. 创建命名空间
+# 1. Create namespace
 kubectl create namespace skillhub
 
-# 2. 配置 Secret
+# 2. Configure Secret
 cp secret.yaml.example secret.yaml
-# 编辑 secret.yaml 填入真实凭证
+# Edit secret.yaml and fill in real credentials
 
-# 3. 应用配置
+# 3. Apply configuration
 kubectl apply -f configmap.yaml
 kubectl apply -f secret.yaml
 
-# 4. 部署服务
+# 4. Deploy services
 kubectl apply -f backend-deployment.yaml
 kubectl apply -f frontend-deployment.yaml
 kubectl apply -f services.yaml
 
-# 5. 配置 Ingress
+# 5. Configure Ingress
 kubectl apply -f ingress.yaml
 ```
 
-## 高可用配置
+## High Availability Configuration
 
-- 后端和前端建议至少部署 2 个副本
-- PostgreSQL 使用主从复制
-- Redis 使用 Sentinel 或 Cluster 模式
-- 存储使用高可用对象存储（如 MinIO 集群或云厂商 OSS）
+- Deploy at least 2 replicas for backend and frontend
+- Use PostgreSQL with primary-replica replication
+- Use Redis with Sentinel or Cluster mode
+- Use highly available object storage (like MinIO cluster or cloud provider OSS)
 
-## 下一步
+## Next Steps
 
-- [配置说明](./configuration) - 详细配置项说明
+- [Configuration](./configuration) - Detailed configuration reference

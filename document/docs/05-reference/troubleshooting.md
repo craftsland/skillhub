@@ -1,63 +1,63 @@
 ---
-title: 故障排查
+title: Troubleshooting
 sidebar_position: 2
-description: 常见问题诊断和解决方案
+description: Common problem diagnosis and solutions
 ---
 
-# 故障排查
+# Troubleshooting
 
-## 服务无法启动
+## Service Cannot Start
 
-### 检查清单
+### Checklist
 
-1. 检查容器状态：`docker compose ps`
-2. 查看服务日志：`docker compose logs <service>`
-3. 验证环境变量：检查 `.env.release` 配置
-4. 检查端口占用：`netstat -tlnp`
+1. Check container status: `docker compose ps`
+2. View service logs: `docker compose logs <service>`
+3. Verify environment variables: Check `.env.release` configuration
+4. Check port occupancy: `netstat -tlnp`
 
-### 常见原因
+### Common Causes
 
-- 端口被占用
-- 数据库连接失败
-- Redis 连接失败
-- 环境变量缺失
+- Port occupied
+- Database connection failed
+- Redis connection failed
+- Environment variables missing
 
-## 上传失败
+## Upload Failed
 
-### 技能包上传失败
+### Skill Package Upload Failed
 
-1. 检查文件大小
-2. 检查文件类型
-3. 检查 SKILL.md 格式
-4. 查看服务端日志
+1. Check file size
+2. Check file type
+3. Check SKILL.md format
+4. View server logs
 
-## 认证问题
+## Authentication Issues
 
-### 无法登录
+### Cannot Login
 
-1. 检查 OAuth 配置
-2. 检查回调地址配置
-3. 检查 `SKILLHUB_PUBLIC_BASE_URL` 配置
+1. Check OAuth configuration
+2. Check callback URL configuration
+3. Check `SKILLHUB_PUBLIC_BASE_URL` configuration
 
-## 性能问题
+## Performance Issues
 
-### 搜索慢
+### Slow Search
 
-1. 检查 PostgreSQL 全文索引
-2. 考虑升级到 Elasticsearch（后续版本）
+1. Check PostgreSQL full-text index
+2. Consider upgrading to Elasticsearch (future version)
 
-### 下载慢
+### Slow Download
 
-1. 检查对象存储配置
-2. 检查网络带宽
+1. Check object storage configuration
+2. Check network bandwidth
 
-## 获取帮助
+## Get Help
 
-如以上方案无法解决问题：
-1. 查看日志
-2. 提交 Issue
-3. 联系技术支持
+If above solutions cannot resolve the issue:
+1. View logs
+2. Submit Issue
+3. Contact technical support
 
-## 下一步
+## Next Steps
 
-- [变更日志](./changelog) - 版本历史
+- [Changelog](./changelog) - Version history

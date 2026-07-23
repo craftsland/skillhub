@@ -1,14 +1,14 @@
 ---
-title: 技能协议
+title: Skill Protocol
 sidebar_position: 1
-description: SKILL.md 规范和技能包协议
+description: SKILL.md specification and skill package protocol
 ---
 
-# 技能协议
+# Skill Protocol
 
-## SKILL.md 规范
+## SKILL.md Specification
 
-### 基本格式
+### Basic Format
 
 ```markdown
 ---
@@ -16,53 +16,53 @@ name: my-skill
 description: When to use this skill
 ---
 
-# Markdown 正文
+# Markdown Body
 
-技能指令内容...
+Skill instruction content...
 ```
 
-### 必需字段
+### Required Fields
 
-| 字段 | 说明 |
-|------|------|
-| `name` | 技能标识，kebab-case |
-| `description` | 技能简短描述 |
+| Field | Description |
+|-------|-------------|
+| `name` | Skill identifier, kebab-case |
+| `description` | Brief skill description |
 
-### 扩展字段
+### Extension Fields
 
-| 字段 | 说明 |
-|------|------|
-| `x-astron-category` | 分类标签 |
-| `x-astron-runtime` | 运行时要求 |
-| `x-astron-min-version` | 最低版本要求 |
+| Field | Description |
+|-------|-------------|
+| `x-astron-category` | Category tag |
+| `x-astron-runtime` | Runtime requirement |
+| `x-astron-min-version` | Minimum version requirement |
 
-## 技能包结构
+## Skill Package Structure
 
 ```
 my-skill/
-├── SKILL.md              # 主入口文件（必需）
-├── references/           # 参考资料（可选）
-├── scripts/              # 脚本（可选）
-└── assets/               # 静态资源（可选）
+├── SKILL.md              # Main entry file (required)
+├── references/           # References (optional)
+├── scripts/              # Scripts (optional)
+└── assets/               # Static assets (optional)
 ```
 
-## 文件校验
+## File Validation
 
-- 根目录必须包含 `SKILL.md`
-- 文件类型白名单
-- 单文件大小限制：1MB
-- 总包大小限制：10MB
-- 文件数量限制：100 个
+- Root directory must contain `SKILL.md`
+- File type whitelist
+- Single file size limit: 1MB
+- Total package size limit: 10MB
+- File count limit: 100
 
-## 客户端安装目录
+## Client Installation Directory
 
-按以下优先级安装：
+Install by the following priority:
 
 1. `./.agent/skills/`
 2. `~/.agent/skills/`
 3. `./.claude/skills/`
 4. `~/.claude/skills/`
 
-## 下一步
+## Next Steps
 
-- [存储 SPI](./storage-spi) - 扩展存储后端
+- [Storage SPI](./storage-spi) - Extend storage backend

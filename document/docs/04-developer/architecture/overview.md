@@ -1,49 +1,49 @@
 ---
-title: 系统架构
+title: System Architecture
 sidebar_position: 1
-description: SkillHub 系统架构概览
+description: SkillHub system architecture overview
 ---
 
-# 系统架构
+# System Architecture
 
-## 架构原则
+## Architecture Principles
 
-- **单体优先**：一期采用模块化单体，不拆微服务
-- **依赖倒置**：领域层不依赖基础设施
-- **可替换边界**：搜索、存储都有 SPI 抽象
+- **Monolith-first**: Phase 1 uses modular monolith, no microservices
+- **Dependency Inversion**: Domain layer does not depend on infrastructure
+- **Replaceable Boundaries**: Search and storage both have SPI abstractions
 
-## 模块结构
+## Module Structure
 
 ```
 server/
-├── skillhub-app/          # 启动、配置装配、Controller
-├── skillhub-domain/       # 领域模型 + 领域服务 + 应用服务
-├── skillhub-auth/         # OAuth2 认证 + RBAC + 授权判定
-├── skillhub-search/       # 搜索 SPI + PostgreSQL 全文实现
-├── skillhub-storage/      # 对象存储抽象 + LocalFile/S3
-└── skillhub-infra/        # JPA、通用工具、配置基础
+├── skillhub-app/          # Startup, configuration assembly, Controllers
+├── skillhub-domain/       # Domain models + domain services + application services
+├── skillhub-auth/         # OAuth2 authentication + RBAC + authorization decisions
+├── skillhub-search/       # Search SPI + PostgreSQL full-text implementation
+├── skillhub-storage/      # Object storage abstraction + LocalFile/S3
+└── skillhub-infra/        # JPA, utilities, configuration foundation
 ```
 
-## 模块依赖
+## Module Dependencies
 
 ```
 app → domain, auth, search, storage, infra
 infra → domain
 auth → domain
 search → domain
-storage → (独立)
+storage → (independent)
 ```
 
-## 技术栈
+## Tech Stack
 
-| 层级 | 技术 | 版本 |
-|------|------|------|
-| 运行时 | Java | 21 |
-| 框架 | Spring Boot | 3.2.3 |
-| 数据库 | PostgreSQL | 16.x |
-| 缓存/会话 | Redis | 7.x |
+| Layer | Technology | Version |
+|-------|------------|---------|
+| Runtime | Java | 21 |
+| Framework | Spring Boot | 3.2.3 |
+| Database | PostgreSQL | 16.x |
+| Cache/Session | Redis | 7.x |
 
-## 部署架构
+## Deployment Architecture
 
 ```
 ┌──────────────┐
@@ -64,6 +64,6 @@ storage → (独立)
 PostgreSQL  Redis
 ```
 
-## 下一步
+## Next Steps
 
-- [领域模型](./domain-model) - 核心实体
+- [Domain Model](./domain-model) - Core entities

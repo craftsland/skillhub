@@ -1,56 +1,56 @@
 ---
-title: 创建技能包
+title: Create Skill Package
 sidebar_position: 1
-description: 学习如何创建符合规范的技能包
+description: Learn how to create a compliant skill package
 ---
 
-# 创建技能包
+# Create Skill Package
 
-## 技能包结构
+## Skill Package Structure
 
-一个标准的 SkillHub 技能包结构如下：
+A standard SkillHub skill package structure looks like this:
 
 ```
 my-skill/
-├── SKILL.md              # 主入口文件（必需）
-├── references/           # 参考资料（可选）
-├── scripts/              # 脚本（可选）
-└── assets/               # 静态资源（可选）
+├── SKILL.md              # Main entry file (required)
+├── references/           # References (optional)
+├── scripts/              # Scripts (optional)
+└── assets/               # Static assets (optional)
 ```
 
-## SKILL.md 格式
+## SKILL.md Format
 
-SKILL.md 是技能包的主入口文件，使用 YAML frontmatter + Markdown 正文格式：
+SKILL.md is the main entry file of a skill package, using YAML frontmatter + Markdown body format:
 
 ```markdown
 ---
 name: my-skill
-description: 一句话描述这个技能的用途
+description: One sentence describing what this skill is for
 x-astron-category: code-review
 ---
 
-# 技能说明
+# Skill Description
 
-这里是技能的详细说明...
+Detailed skill description goes here...
 ```
 
-### Frontmatter 字段
+### Frontmatter Fields
 
-| 字段 | 必需 | 说明 |
-|------|------|------|
-| `name` | 是 | 技能标识，kebab-case 格式 |
-| `description` | 是 | 技能简短描述 |
-| `x-astron-category` | 否 | 分类标签 |
-| `x-astron-runtime` | 否 | 运行时要求 |
-| `x-astron-min-version` | 否 | 最低版本要求 |
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Skill identifier, kebab-case format |
+| `description` | Yes | Brief skill description |
+| `x-astron-category` | No | Category tag |
+| `x-astron-runtime` | No | Runtime requirement |
+| `x-astron-min-version` | No | Minimum version requirement |
 
-## 文件限制
+## File Limits
 
-- 单文件大小：最大 1MB
-- 总包大小：最大 10MB
-- 文件数量：最多 100 个
-- 允许的文件类型：`.md`, `.txt`, `.json`, `.yaml`, `.yml`, `.js`, `.ts`, `.py`, `.sh`, `.png`, `.jpg`, `.svg`
+- Single file size: Max 1MB
+- Total package size: Max 10MB
+- File count: Max 100
+- Allowed file types: `.md`, `.txt`, `.json`, `.yaml`, `.yml`, `.js`, `.ts`, `.py`, `.sh`, `.png`, `.jpg`, `.svg`
 
-## 下一步
+## Next Steps
 
-- [发布流程](./publish) - 发布技能包
+- [Publish Workflow](./publish) - Publish skill package

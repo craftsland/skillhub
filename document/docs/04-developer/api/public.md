@@ -1,72 +1,72 @@
 ---
-title: 公开 API
+title: Public APIs
 sidebar_position: 2
-description: 无需认证的公开 API
+description: Public APIs without authentication
 ---
 
-# 公开 API
+# Public APIs
 
-## 技能搜索
+## Skill Search
 
 ```http
 GET /api/v1/skills?keyword=...&namespace=...&page=1&size=20
 ```
 
 **Query Parameters:**
-- `keyword`: 搜索关键词
-- `namespace`: 命名空间筛选
-- `page`: 页码
-- `size`: 每页数量
+- `keyword`: Search keyword
+- `namespace`: Namespace filter
+- `page`: Page number
+- `size`: Page size
 
-## 技能详情
+## Skill Details
 
 ```http
 GET /api/v1/skills/{namespace}/{slug}
 ```
 
-## 版本列表
+## Version List
 
 ```http
 GET /api/v1/skills/{namespace}/{slug}/versions
 ```
 
-## 版本详情
+## Version Details
 
 ```http
 GET /api/v1/skills/{namespace}/{slug}/versions/{version}
 ```
 
-## 文件清单
+## File List
 
 ```http
 GET /api/v1/skills/{namespace}/{slug}/versions/{version}/files
 ```
 
-## 下载技能
+## Download Skill
 
 ```http
 GET /api/v1/skills/{namespace}/{slug}/download
 GET /api/v1/skills/{namespace}/{slug}/versions/{version}/download
 ```
 
-## 解析版本
+## Resolve Version
 
 ```http
 GET /api/v1/skills/{namespace}/{slug}/resolve?version=...&tag=...
 ```
 
-## 命名空间列表
+## Namespace List
 
 ```http
 GET /api/v1/namespaces
 ```
 
-## 命名空间详情
+## Namespace Details
 
 ```http
 GET /api/v1/namespaces/{slug}
 ```
 
-## 下一步
+## Next Steps
 
-- [认证 API](./authenticated) - 查看认证接口
+- [Authenticated APIs](./authenticated) - View authenticated endpoints

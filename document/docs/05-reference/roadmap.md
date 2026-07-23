@@ -1,45 +1,45 @@
 ---
-title: 路线图
+title: Roadmap
 sidebar_position: 4
-description: 未来发展路线图
+description: Future development roadmap
 ---
 
-# 路线图
+# Roadmap
 
-## Phase 1: 基础能力 ✅
+## Phase 1: Foundation ✅
 
-- GitHub OAuth 登录
-- Session 管理
-- RBAC 权限体系
+- GitHub OAuth login
+- Session management
+- RBAC permission system
 
-## Phase 2: 技能核心 ✅
+## Phase 2: Skill Core ✅
 
-- 命名空间管理
-- 技能发布与下载
-- 版本管理
-- PostgreSQL 全文搜索
+- Namespace management
+- Skill publishing and download
+- Version management
+- PostgreSQL full-text search
 
-## Phase 3: 审核与 CLI
+## Phase 3: Review and CLI
 
-- 审核流程
-- 技能提升到全局
-- CLI 工具
-- 收藏与评分
+- Review workflow
+- Skill promotion to global
+- CLI tool
+- Favorites and ratings
 
-## Phase 4: 运维与完善
+## Phase 4: Operations and Polish
 
-- 审计日志
-- 管理后台
-- 可观测性
-- 部署优化
+- Audit logs
+- Admin dashboard
+- Observability
+- Deployment optimization
 
-## Phase 5: 高级特性
+## Phase 5: Advanced Features
 
-- 评论与举报
-- 自动安全扫描
-- 向量搜索
-- Webhook 通知
+- Comments and reports
+- Automatic security scanning
+- Vector search
+- Webhook notifications
 
-## 下一步
+## Next Steps
 
-- [快速开始](../getting-started/quick-start) - 开始使用
+- [Quick Start](../getting-started/quick-start) - Get started

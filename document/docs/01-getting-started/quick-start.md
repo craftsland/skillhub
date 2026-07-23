@@ -1,20 +1,20 @@
 ---
-title: 快速开始
+title: Quick Start
 sidebar_position: 2
-description: 一键启动 SkillHub 开发环境
+description: One-click startup of SkillHub development environment
 ---
 
-# 快速开始
+# Quick Start
 
-## 一键启动
+## One-click Startup
 
-使用以下命令一键启动完整的 SkillHub 环境：
+Use the following command to start a complete SkillHub environment with one command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/iflytek/skillhub/main/scripts/runtime.sh | sh -s -- up
 ```
 
-或者克隆仓库后手动启动：
+Or clone the repository and start manually:
 
 ```bash
 git clone https://github.com/iflytek/skillhub.git
@@ -22,64 +22,64 @@ cd skillhub
 make dev-all
 ```
 
-## 默认账号
+## Default Account
 
-两种启动方式都会默认创建一个 bootstrap 管理员账号：
+Both startup methods create a bootstrap admin account by default:
 
-- 用户名：`admin`
-- 密码：`ChangeMe!2026`
+- username: `admin`
+- password: `ChangeMe!2026`
 
-### `curl` 一键部署
+### `curl` One-click Deployment
 
-| 服务 | 地址 |
-|------|------|
+| Service | Address |
+|---------|---------|
 | Web UI | http://localhost |
 | Backend API | http://localhost:8080 |
 
-使用上述默认账号密码登录即可。**生产环境请务必修改密码。**
+Log in with the default credentials above. **Change the password for production.**
 
-### `make dev-all` 本地开发
+### `make dev-all` Local Development
 
-| 服务 | 地址 |
-|------|------|
+| Service | Address |
+|---------|---------|
 | Web UI | http://localhost:3000 |
 | Backend API | http://localhost:8080 |
 | MinIO Console | http://localhost:9001 |
 
-除了上述 bootstrap 管理员，本地开发还预置两个模拟用户（无需密码）：
+In addition to the bootstrap admin, local development includes two mock users (no password needed):
 
-| 用户 | 角色 | 说明 |
-|------|------|------|
-| `local-user` | 普通用户 | 可发布技能、管理命名空间 |
-| `local-admin` | 超级管理员 | 拥有所有权限，包括审核和用户管理 |
+| User | Role | Description |
+|------|------|-------------|
+| `local-user` | Regular user | Can publish skills, manage namespaces |
+| `local-admin` | Super admin | Has all permissions including review and user management |
 
-使用 `X-Mock-User-Id` 请求头切换模拟用户。
-如需关闭 bootstrap 管理员，启动前设置 `BOOTSTRAP_ADMIN_ENABLED=false`。
+Use the `X-Mock-User-Id` request header to switch mock users.
+To disable the bootstrap admin, set `BOOTSTRAP_ADMIN_ENABLED=false` before starting.
 
-## 常用命令
+## Common Commands
 
 ```bash
-# 启动完整开发环境
+# Start complete development environment
 make dev-all
 
-# 停止所有服务
+# Stop all services
 make dev-all-down
 
-# 重置并重新启动
+# Reset and restart
 make dev-all-reset
 
-# 仅启动后端
+# Start backend only
 make dev
 
-# 仅启动前端
+# Start frontend only
 make dev-web
 
-# 查看所有可用命令
+# View all available commands
 make help
 ```
 
-## 下一步
+## Next Steps
 
-- [产品概述](./overview) - 深入了解产品特性
-- [典型应用场景](./use-cases) - 探索企业应用场景
-- [单机部署](../administration/deployment/single-machine) - 生产环境部署指南
+- [Overview](./overview) - Deep dive into product features
+- [Use Cases](./use-cases) - Explore enterprise application scenarios
+- [Single Machine Deployment](../administration/deployment/single-machine) - Production deployment guide

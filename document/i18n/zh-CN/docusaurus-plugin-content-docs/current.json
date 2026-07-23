@@ -1,0 +1,62 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.docsSidebar.category.Getting Started": {
+    "message": "快速入门",
+    "description": "The label for category 'Getting Started' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Administration Guide": {
+    "message": "管理员指南",
+    "description": "The label for category 'Administration Guide' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Deployment Guide": {
+    "message": "部署指南",
+    "description": "The label for category 'Deployment Guide' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Security & Compliance": {
+    "message": "安全与合规",
+    "description": "The label for category 'Security & Compliance' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Governance & Operations": {
+    "message": "治理与运营",
+    "description": "The label for category 'Governance & Operations' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.User Guide": {
+    "message": "用户指南",
+    "description": "The label for category 'User Guide' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Publishing Skills": {
+    "message": "发布技能",
+    "description": "The label for category 'Publishing Skills' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Discovery & Usage": {
+    "message": "发现与使用",
+    "description": "The label for category 'Discovery & Usage' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Collaboration": {
+    "message": "协作",
+    "description": "The label for category 'Collaboration' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Developer Reference": {
+    "message": "开发者参考",
+    "description": "The label for category 'Developer Reference' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.API Reference": {
+    "message": "API 参考",
+    "description": "The label for category 'API Reference' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Architecture": {
+    "message": "架构设计",
+    "description": "The label for category 'Architecture' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Extensions & Integrations": {
+    "message": "扩展与集成",
+    "description": "The label for category 'Extensions & Integrations' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Reference": {
+    "message": "参考资料",
+    "description": "The label for category 'Reference' in sidebar 'docsSidebar'"
+  }
+}

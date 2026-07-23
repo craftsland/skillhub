@@ -1,54 +1,54 @@
 ---
-title: CLI 兼容层
+title: CLI Compatibility Layer
 sidebar_position: 4
-description: ClawHub CLI 协议兼容层
+description: ClawHub CLI protocol compatibility layer
 ---
 
-# CLI 兼容层
+# CLI Compatibility Layer
 
-SkillHub 提供 ClawHub CLI 协议兼容层，现有工具可无缝迁移。
+SkillHub provides a ClawHub CLI protocol compatibility layer for seamless migration of existing tools.
 
-## 配置 ClawHub CLI
+## Configuring ClawHub CLI
 
-要让 ClawHub CLI 连接到你的 SkillHub 实例，需要配置以下环境变量：
+To connect ClawHub CLI to your SkillHub instance, configure the following environment variables:
 
-### 环境变量配置
+### Environment Variable Configuration
 
 **Linux/macOS (bash/zsh):**
 ```bash
-# ~/.bashrc 或 ~/.zshrc
+# ~/.bashrc or ~/.zshrc
 export CLAWHUB_SITE=https://skill.xfyun.cn
 export CLAWHUB_REGISTRY=https://skill.xfyun.cn
 ```
 
 **Windows (PowerShell):**
 ```powershell
-# 永久设置（当前用户）
+# Permanent setting (current user)
 [Environment]::SetEnvironmentVariable('CLAWHUB_SITE', 'https://skill.xfyun.cn', 'User')
 [Environment]::SetEnvironmentVariable('CLAWHUB_REGISTRY', 'https://skill.xfyun.cn', 'User')
 
-# 或者临时设置（当前会话）
+# Or temporary setting (current session)
 $env:CLAWHUB_SITE = 'https://skill.xfyun.cn'
 $env:CLAWHUB_REGISTRY = 'https://skill.xfyun.cn'
 ```
 
-### 使用 CLI 标志（单次命令）
+### Using CLI Flags (Single Command)
 
 ```bash
 clawhub --site https://skill.xfyun.cn --registry https://skill.xfyun.cn install <skill>
 ```
 
-### 前端一键复制
+### One-click Copy from Web UI
 
-SkillHub 网页端的技能详情页会自动显示带有正确环境变量的安装命令，直接复制即可使用。
+The SkillHub skill detail page automatically displays install commands with the correct environment variables pre-configured. Simply copy and use.
 
-## Well-known 发现
+## Well-known Discovery
 
 ```http
 GET /.well-known/clawhub.json
 ```
 
-响应：
+Response:
 
 ```json
 {
@@ -56,7 +56,7 @@ GET /.well-known/clawhub.json
 }
 ```
 
-## 兼容层 API
+## Compatibility Layer APIs
 
 ### Whoami
 
@@ -64,7 +64,7 @@ GET /.well-known/clawhub.json
 GET /api/v1/whoami
 ```
 
-响应：
+Response:
 
 ```json
 {
@@ -74,13 +74,13 @@ GET /api/v1/whoami
 }
 ```
 
-### 搜索
+### Search
 
 ```http
 GET /api/v1/search?q={keyword}&page={page}&limit={limit}
 ```
 
-响应：
+Response:
 
 ```json
 {
@@ -106,13 +106,13 @@ GET /api/v1/search?q={keyword}&page={page}&limit={limit}
 }
 ```
 
-### 解析
+### Resolve
 
 ```http
 GET /api/v1/resolve?slug={slug}&version={version}
 ```
 
-响应：
+Response:
 
 ```json
 {
@@ -122,13 +122,13 @@ GET /api/v1/resolve?slug={slug}&version={version}
 }
 ```
 
-### 下载
+### Download
 
 ```http
 GET /api/v1/download/{slug}/{version}
 ```
 
-### 发布
+### Publish
 
 ```http
 POST /api/v1/publish
@@ -137,7 +137,7 @@ Content-Type: multipart/form-data
 file: <zip-file>
 ```
 
-响应：
+Response:
 
 ```json
 {
@@ -147,13 +147,13 @@ file: <zip-file>
 }
 ```
 
-## 坐标映射
+## Coordinate Mapping
 
-| SkillHub 坐标 | ClawHub canonical slug |
-|---------------|------------------------|
+| SkillHub Coordinate | ClawHub canonical slug |
+|---------------------|------------------------|
 | `@global/my-skill` | `my-skill` |
 | `@team-name/my-skill` | `team-name--my-skill` |
 
-## 下一步
+## Next Steps
 
-- [系统架构](../architecture/overview) - 了解架构设计
+- [System Architecture](../architecture/overview) - Understand architecture design

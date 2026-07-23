@@ -1,77 +1,77 @@
 ---
-title: 领域模型
+title: Domain Model
 sidebar_position: 2
-description: 核心领域实体和关系
+description: Core domain entities and relationships
 ---
 
-# 领域模型
+# Domain Model
 
-## 核心实体
+## Core Entities
 
-### Namespace（命名空间）
+### Namespace
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | bigint | 主键 |
-| slug | varchar(64) | URL 友好标识 |
-| display_name | varchar(128) | 展示名 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | bigint | Primary key |
+| slug | varchar(64) | URL-friendly identifier |
+| display_name | varchar(128) | Display name |
 | type | enum | `GLOBAL` / `TEAM` |
-| description | text | 描述 |
+| description | text | Description |
 | status | enum | `ACTIVE` / `FROZEN` / `ARCHIVED` |
 
-### NamespaceMember（命名空间成员）
+### NamespaceMember
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | bigint | 主键 |
-| namespace_id | bigint | 命名空间 ID |
-| user_id | varchar(128) | 用户 ID |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | bigint | Primary key |
+| namespace_id | bigint | Namespace ID |
+| user_id | varchar(128) | User ID |
 | role | enum | `OWNER` / `ADMIN` / `MEMBER` |
 
-### Skill（技能）
+### Skill
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | bigint | 主键 |
-| namespace_id | bigint | 所属命名空间 |
-| slug | varchar(128) | URL 友好标识 |
-| display_name | varchar(256) | 展示名 |
-| summary | varchar(512) | 摘要 |
-| owner_id | varchar(128) | 主要维护人 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | bigint | Primary key |
+| namespace_id | bigint | Parent namespace |
+| slug | varchar(128) | URL-friendly identifier |
+| display_name | varchar(256) | Display name |
+| summary | varchar(512) | Summary |
+| owner_id | varchar(128) | Primary maintainer |
 | visibility | enum | `PUBLIC` / `NAMESPACE_ONLY` / `PRIVATE` |
 | status | enum | `ACTIVE` / `HIDDEN` / `ARCHIVED` |
-| latest_version_id | bigint | 最新已发布版本 |
+| latest_version_id | bigint | Latest published version |
 
-**唯一约束**：`(namespace_id, slug)`
+**Unique constraint**: `(namespace_id, slug)`
 
-### SkillVersion（技能版本）
+### SkillVersion
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | bigint | 主键 |
-| skill_id | bigint | 技能 ID |
-| version | varchar(32) | semver 版本号 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | bigint | Primary key |
+| skill_id | bigint | Skill ID |
+| version | varchar(32) | semver version |
 | status | enum | `DRAFT` / `PENDING_REVIEW` / `PUBLISHED` / `REJECTED` / `YANKED` |
-| manifest_json | json | 文件清单 |
-| parsed_metadata_json | json | SKILL.md 解析结果 |
+| manifest_json | json | File manifest |
+| parsed_metadata_json | json | SKILL.md parsed result |
 
-**唯一约束**：`(skill_id, version)`
+**Unique constraint**: `(skill_id, version)`
 
-### SkillTag（技能标签）
+### SkillTag
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | bigint | 主键 |
-| skill_id | bigint | 技能 ID |
-| tag_name | varchar(64) | 标签名 |
-| target_version_id | bigint | 目标版本 |
+| Field | Type | Description |
+|-------|------|-------------|
+| id | bigint | Primary key |
+| skill_id | bigint | Skill ID |
+| tag_name | varchar(64) | Tag name |
+| target_version_id | bigint | Target version |
 
-**唯一约束**：`(skill_id, tag_name)`
+**Unique constraint**: `(skill_id, tag_name)`
 
-## 坐标系统
+## Coordinate System
 
-技能完整寻址：`@{namespace_slug}/{skill_slug}`
+Full skill address: `@{namespace_slug}/{skill_slug}`
 
-## 下一步
+## Next Steps
 
-- [安全架构](./security) - 安全设计
+- [Security Architecture](./security) - Security design

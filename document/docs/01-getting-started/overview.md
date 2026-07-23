@@ -1,70 +1,70 @@
 ---
-title: 产品概述
+title: Overview
 sidebar_position: 1
-description: SkillHub 产品概述和核心特性介绍
+description: SkillHub product overview and core features
 ---
 
-# 产品概述
+# Overview
 
-SkillHub 是企业级 AI 技能注册平台，支持技能发布、发现与管理，采用自托管架构保障数据安全。
+SkillHub is an enterprise-grade AI skill registry platform for publishing, discovering, and managing skills with a self-hosted architecture ensuring data security.
 
-## 核心特性
+## Core Features
 
-### 发布管理
-- 版本控制与语义化版本（Semantic Versioning）
-- 自定义标签（如 `beta`/`stable`）
-- `latest` 标签自动跟随最新发布版本
+### Publishing Management
+- Version control and Semantic Versioning
+- Custom tags (like `beta`/`stable`)
+- `latest` tag automatically follows the latest published version
 
-### 发现机制
-- 全文搜索
-- 多维度筛选（命名空间、下载量、评分）
-- 可见性控制（公开/命名空间内/私有）
+### Discovery
+- Full-text search
+- Multi-dimensional filtering (namespace, downloads, ratings)
+- Visibility control
 
-### 组织架构
-- 命名空间隔离
-- 基于角色的访问控制（RBAC）
-- 团队与全局双层空间
+### Organization
+- Namespace isolation
+- Role-based access control (RBAC)
+- Team and global two-tier scopes
 
-### 治理体系
-- 双层审核流程
-- 审计日志
-- 权限分离
+### Governance
+- Two-tier review workflow
+- Audit logs
+- Permission separation
 
-### 存储与部署
-- 支持 S3/MinIO/本地存储
-- Docker/Kubernetes 部署
-- 企业级可观测性
+### Storage and Deployment
+- S3/MinIO/Local storage support
+- Docker/Kubernetes deployment
+- Enterprise-grade observability
 
-## 技术栈
+## Tech Stack
 
-### 后端
-- **Java 21** - 运行时
-- **Spring Boot 3.2.3** - 应用框架
-- **PostgreSQL 16.x** - 主数据库 + 全文搜索
-- **Redis 7.x** - 缓存与会话存储
+### Backend
+- **Java 21** - Runtime
+- **Spring Boot 3.2.3** - Application framework
+- **PostgreSQL 16.x** - Primary database + full-text search
+- **Redis 7.x** - Cache and session storage
 
-### 前端
-- **React 19** - UI 框架
-- **TypeScript** - 类型安全
-- **Vite** - 构建工具
-- **Tailwind CSS** - 样式框架
+### Frontend
+- **React 19** - UI framework
+- **TypeScript** - Type safety
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling framework
 
-### 部署
-- **Docker Compose** - 单机部署
-- **Kubernetes** - 生产环境编排
+### Deployment
+- **Docker Compose** - Single-machine deployment
+- **Kubernetes** - Production orchestration
 
-## 核心概念
+## Core Concepts
 
-### 命名空间
-技能隔离边界，支持 `@global`（全局）和 `@team-*`（团队）前缀。
+### Namespace
+Skill isolation boundary, supporting `@global` (global) and `@team-*` (team) prefixes.
 
-### 坐标系统
-技能标识格式为 `@{namespace_slug}/{skill_slug}`，支持语义化版本。
+### Coordinate System
+Skill identifier format: `@{namespace_slug}/{skill_slug}`, supports semantic versioning.
 
-### 兼容性
-提供 REST API 和 ClawHub 兼容层，支持现有工具集成。
+### Compatibility
+Provides REST API and ClawHub compatibility layer for existing tool integration.
 
-## 下一步
+## Next Steps
 
-- [快速开始](./quick-start) - 一键启动体验
-- [典型应用场景](./use-cases) - 了解如何在企业中应用
+- [Quick Start](./quick-start) - One-click startup experience
+- [Use Cases](./use-cases) - Explore enterprise application scenarios

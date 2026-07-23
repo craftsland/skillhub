@@ -1,52 +1,52 @@
 ---
-title: API 概述
+title: API Overview
 sidebar_position: 1
-description: SkillHub API 概述
+description: SkillHub API overview
 ---
 
-# API 概述
+# API Overview
 
-SkillHub 提供 RESTful API 用于集成和自动化。
+SkillHub provides RESTful APIs for integration and automation.
 
-## API 分类
+## API Categories
 
-### 公开 API
-- 技能搜索
-- 技能详情
-- 版本列表
-- 下载技能
-- 无需认证（PUBLIC 技能）
+### Public APIs
+- Skill search
+- Skill details
+- Version list
+- Download skills
+- No authentication required (for PUBLIC skills)
 
-### 认证 API
-- 发布技能
-- 收藏/评分
-- 命名空间管理
-- 需要登录或 Bearer Token
+### Authenticated APIs
+- Publish skills
+- Favorites/ratings
+- Namespace management
+- Requires login or Bearer Token
 
-### CLI 兼容层
-- 兼容 ClawHub CLI 协议
-- 现有工具可无缝迁移
+### CLI Compatibility Layer
+- ClawHub CLI protocol compatible
+- Existing tools can migrate seamlessly
 
-## 响应格式
+## Response Format
 
-### 统一响应结构
+### Unified Response Structure
 
 ```json
 {
   "code": 0,
-  "msg": "成功",
+  "msg": "Success",
   "data": {},
   "timestamp": "2026-03-15T06:00:00Z",
   "requestId": "req-123"
 }
 ```
 
-### 分页响应
+### Pagination Response
 
 ```json
 {
   "code": 0,
-  "msg": "成功",
+  "msg": "Success",
   "data": {
     "items": [],
     "total": 100,
@@ -58,29 +58,29 @@ SkillHub 提供 RESTful API 用于集成和自动化。
 }
 ```
 
-## 认证方式
+## Authentication Methods
 
 ### Session Cookie
-Web 端使用 Session Cookie 认证。
+Web side uses Session Cookie authentication.
 
 ### Bearer Token
-CLI 和 API 集成使用 Bearer Token：
+CLI and API integration use Bearer Token:
 
 ```bash
 Authorization: Bearer <token>
 ```
 
 ### API Token
-可创建长期有效的 API Token 用于自动化。
+Can create long-lived API Tokens for automation.
 
-## 幂等性
+## Idempotency
 
-所有写操作支持 `X-Request-Id` 请求头实现幂等：
+All write operations support `X-Request-Id` header for idempotency:
 
 ```bash
 X-Request-Id: <uuid-v4>
 ```
 
-## 下一步
+## Next Steps
 
-- [公开 API](./public) - 查看公开接口
+- [Public APIs](./public) - View public endpoints

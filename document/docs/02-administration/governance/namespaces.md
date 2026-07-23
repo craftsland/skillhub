@@ -1,56 +1,56 @@
 ---
-title: 命名空间管理
+title: Namespace Management
 sidebar_position: 1
-description: 命名空间创建与管理
+description: Namespace creation and management
 ---
 
-# 命名空间管理
+# Namespace Management
 
-命名空间是 SkillHub 中技能的隔离边界和协作单元。
+Namespaces are the isolation boundary and collaboration unit for skills in SkillHub.
 
-## 命名空间类型
+## Namespace Types
 
-| 类型 | 前缀 | 说明 |
-|------|------|------|
-| 全局 | `@global` | 平台级公共空间，由平台管理员管理 |
-| 团队 | `@team-*` | 团队/部门空间，由团队管理员管理 |
+| Type | Prefix | Description |
+|------|--------|-------------|
+| Global | `@global` | Platform-level public space, managed by platform admins |
+| Team | `@team-*` | Team/department space, managed by team admins |
 
-## 创建命名空间
+## Create Namespace
 
-1. 登录后进入"我的命名空间"
-2. 点击"创建命名空间"
-3. 填写信息：
-   - 标识（slug）：URL 友好名称
-   - 显示名：展示名称
-   - 描述：空间用途说明
-4. 提交创建
+1. After login, go to "My Namespaces"
+2. Click "Create Namespace"
+3. Fill in information:
+   - Slug: URL-friendly name
+   - Display name: Display name
+   - Description: Space purpose description
+4. Submit creation
 
-## 命名空间成员管理
+## Namespace Member Management
 
-### 添加成员
+### Add Member
 
-1. 进入命名空间设置
-2. 进入"成员管理"
-3. 输入用户名搜索
-4. 选择角色（OWNER/ADMIN/MEMBER）
-5. 确认添加
+1. Go to namespace settings
+2. Go to "Member Management"
+3. Enter username to search
+4. Select role (OWNER/ADMIN/MEMBER)
+5. Confirm addition
 
-### 角色变更
+### Role Change
 
-命名空间 OWNER 或 ADMIN 可变更成员角色。
+Namespace OWNER or ADMIN can change member roles.
 
-### 移除成员
+### Remove Member
 
-命名空间 OWNER 或 ADMIN 可移除成员。
+Namespace OWNER or ADMIN can remove members.
 
-## 命名空间状态
+## Namespace Status
 
-| 状态 | 说明 |
-|------|------|
-| `ACTIVE` | 正常使用 |
-| `FROZEN` | 冻结，只读不可发布 |
-| `ARCHIVED` | 归档，对外不可见 |
+| Status | Description |
+|--------|-------------|
+| `ACTIVE` | Normal use |
+| `FROZEN` | Frozen, read-only, cannot publish |
+| `ARCHIVED` | Archived, not visible externally |
 
-## 下一步
+## Next Steps
 
-- [审核流程](./review-workflow) - 了解技能审核
+- [Review Workflow](./review-workflow) - Understand skill review

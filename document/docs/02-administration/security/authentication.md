@@ -1,36 +1,36 @@
 ---
-title: 认证配置
+title: Authentication Configuration
 sidebar_position: 1
-description: 配置用户认证方式
+description: Configure user authentication methods
 ---
 
-# 认证配置
+# Authentication Configuration
 
-SkillHub 支持多种认证方式，满足不同企业的安全需求。
+SkillHub supports multiple authentication methods to meet different enterprise security requirements.
 
-## OAuth2 登录
+## OAuth2 Login
 
 ### GitHub OAuth
 
-1. 在 GitHub 创建 OAuth App
-2. 配置环境变量：
+1. Create an OAuth App on GitHub
+2. Configure environment variables:
    ```bash
    OAUTH2_GITHUB_CLIENT_ID=your-client-id
    OAUTH2_GITHUB_CLIENT_SECRET=your-client-secret
    ```
 
-### 扩展 OAuth Provider
+### Extend OAuth Provider
 
-架构支持扩展其他 OAuth Provider，如 GitLab、Gitee 等。
+The architecture supports extending to other OAuth providers like GitLab, Gitee, etc.
 
-## 本地账号登录
+## Local Account Login
 
-开发环境支持本地账号登录，生产环境默认关闭。
+Local account login is supported in development environment, disabled by default in production.
 
-## 企业 SSO 集成
+## Enterprise SSO Integration
 
-支持通过扩展点集成企业 SSO（SAML/OIDC）。
+Supports integrating enterprise SSO (SAML/OIDC) through extension points.
 
-## 下一步
+## Next Steps
 
-- [权限管理](./authorization) - 配置权限控制
+- [Authorization](./authorization) - Configure access control

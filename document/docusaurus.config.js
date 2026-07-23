@@ -3,26 +3,25 @@ import { themes as prismThemes } from 'prism-react-renderer';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'SkillHub',
-  tagline: '企业级 AI 技能注册表',
-  favicon: 'img/favicon.ico',
+  tagline: 'Enterprise-grade Open Source Agent Skill Registry',
 
-  url: 'https://skillhub.iflytek.com',
+  url: 'https://www.astron-skillhub.org',
   baseUrl: '/',
 
   organizationName: 'iflytek',
   projectName: 'skillhub',
 
   i18n: {
-    defaultLocale: 'zh-CN',
-    locales: ['zh-CN', 'en'],
+    defaultLocale: 'en',
+    locales: ['en', 'zh-CN'],
     localeConfigs: {
-      'zh-CN': {
-        label: '中文',
-        htmlLang: 'zh-CN',
-      },
       'en': {
         label: 'English',
         htmlLang: 'en',
+      },
+      'zh-CN': {
+        label: '中文',
+        htmlLang: 'zh-CN',
       },
     },
   },
@@ -33,7 +32,7 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
-          routeBasePath: '/',
+          routeBasePath: '/docs',
           sidebarPath: './sidebars.js',
           editUrl: 'https://github.com/iflytek/skillhub/edit/main/document/',
         },
@@ -47,19 +46,31 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      image: 'img/og-image.png',
       navbar: {
-        title: 'SkillHub',
         logo: {
-          alt: 'SkillHub Logo',
-          src: 'img/logo.svg',
+          alt: 'Astron SkillHub Logo',
+          src: 'img/astron-skillhub-logo.svg',
         },
         items: [
           {
-            type: 'docSidebar',
-            sidebarId: 'docsSidebar',
+            to: '/docs/getting-started/quick-start',
             position: 'left',
-            label: '文档',
+            label: 'Quick Start',
+          },
+          {
+            to: '/docs/getting-started/overview',
+            position: 'left',
+            label: 'Overview',
+          },
+          {
+            to: '/docs/user-guide/publishing/publish',
+            position: 'left',
+            label: 'Publish Workflow',
+          },
+          {
+            to: '/docs/administration/deployment/single-machine',
+            position: 'left',
+            label: 'Single Node',
           },
           {
             type: 'localeDropdown',
@@ -76,24 +87,24 @@ const config = {
         style: 'dark',
         links: [
           {
-            title: '文档',
+            title: 'Documentation',
             items: [
               {
-                label: '快速开始',
-                to: '/getting-started/quick-start',
+                label: 'Quick Start',
+                to: '/docs/getting-started/quick-start',
               },
               {
-                label: '部署指南',
-                to: '/administration/deployment/single-machine',
+                label: 'Deployment',
+                to: '/docs/administration/deployment/single-machine',
               },
               {
-                label: 'API 参考',
-                to: '/developer/api/overview',
+                label: 'API Reference',
+                to: '/docs/developer/api/overview',
               },
             ],
           },
           {
-            title: '社区',
+            title: 'Community',
             items: [
               {
                 label: 'GitHub',
@@ -104,12 +115,74 @@ const config = {
         ],
         copyright: `Copyright © ${new Date().getFullYear()} iFlytek. Built with Docusaurus.`,
       },
+      metadata: [
+        {
+          name: 'keywords',
+          content: 'SkillHub, skill registry, agent skills, self-hosted, enterprise ai',
+        },
+      ],
       prism: {
         theme: prismThemes.github,
         darkTheme: prismThemes.dracula,
         additionalLanguages: ['java', 'bash', 'yaml', 'json'],
       },
     }),
+  plugins: [
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        createRedirects(existingPath) {
+          if (existingPath === '/docs/' || existingPath === '/zh-CN/docs/') {
+            return undefined;
+          }
+
+          if (existingPath.includes('/docs/')) {
+            return [existingPath.replace('/docs', '')];
+          }
+
+          return undefined;
+        },
+        redirects: [
+          {
+            from: ['/quickstart.html'],
+            to: '/docs/getting-started/quick-start',
+          },
+          {
+            from: ['/introduction.html'],
+            to: '/docs/getting-started/overview',
+          },
+          {
+            from: ['/faq.html'],
+            to: '/docs/reference/faq',
+          },
+          {
+            from: ['/guide/skill-publish.html'],
+            to: '/docs/user-guide/publishing/publish',
+          },
+          {
+            from: ['/guide/skill-discovery.html'],
+            to: '/docs/user-guide/discovery/search',
+          },
+          {
+            from: ['/guide/namespace.html'],
+            to: '/docs/user-guide/collaboration/namespaces',
+          },
+          {
+            from: ['/guide/review.html'],
+            to: '/docs/administration/governance/review-workflow',
+          },
+          {
+            from: ['/guide/social.html'],
+            to: '/docs/user-guide/discovery/ratings',
+          },
+          {
+            from: ['/guide/scanner.html'],
+            to: '/docs/administration/security/scanner',
+          },
+        ],
+      },
+    ],
+  ],
 };
 
 export default config;
