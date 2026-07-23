@@ -25,8 +25,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.test.util.ReflectionTestUtils;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.time.Clock;
 import java.util.List;
 
@@ -92,16 +94,44 @@ class SkillPublishServiceReplaceTest {
                 Clock.systemUTC());
     }
 
+    /** The id is database-generated, so tests set it directly. */
+    private static void setId(Object target, Long id) {
+        try {
+            Field field = target.getClass().getDeclaredField("id");
+            field.setAccessible(true);
+            field.set(target, id);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Invokes the package-private replacement routine under test. */
+    private void invokeDelete(SkillPublishService target, Skill skill, SkillVersion version) {
+        try {
+            Method method = SkillPublishService.class.getDeclaredMethod(
+                    "deleteReplaceableVersionArtifacts", Skill.class, SkillVersion.class, String.class);
+            method.setAccessible(true);
+            method.invoke(target, skill, version, "ns");
+        } catch (InvocationTargetException e) {
+            if (e.getCause() instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException(e.getCause());
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private Skill skill(Long id, Long latestVersionId) {
         Skill skill = new Skill(1L, "demo", "owner", SkillVisibility.PUBLIC);
-        ReflectionTestUtils.setField(skill, "id", id);
+        setId(skill, id);
         skill.setLatestVersionId(latestVersionId);
         return skill;
     }
 
     private SkillVersion version(Long id, SkillVersionStatus status) {
         SkillVersion version = new SkillVersion(1L, "1.0.0", "owner");
-        ReflectionTestUtils.setField(version, "id", id);
+        setId(version, id);
         version.setStatus(status);
         return version;
     }
@@ -118,8 +148,7 @@ class SkillPublishServiceReplaceTest {
         when(skillFileRepository.findByVersionId(10L)).thenReturn(List.of());
 
         SkillPublishService target = newService();
-        ReflectionTestUtils.invokeMethod(
-                target, "deleteReplaceableVersionArtifacts", skill, rejected, "ns");
+        invokeDelete(target, skill, rejected);
 
         verify(reviewTaskRepository).deleteBySkillVersionIdIn(List.of(10L));
         verify(reviewTaskRepository, never())
@@ -134,8 +163,7 @@ class SkillPublishServiceReplaceTest {
         when(skillFileRepository.findByVersionId(10L)).thenReturn(List.of());
 
         SkillPublishService target = newService();
-        ReflectionTestUtils.invokeMethod(
-                target, "deleteReplaceableVersionArtifacts", skill, pending, "ns");
+        invokeDelete(target, skill, pending);
 
         assertThat(skill.getLatestVersionId()).isNull();
         verify(skillRepository).save(skill);
@@ -148,8 +176,7 @@ class SkillPublishServiceReplaceTest {
         SkillVersion published = version(10L, SkillVersionStatus.PUBLISHED);
 
         SkillPublishService target = newService();
-        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
-                target, "deleteReplaceableVersionArtifacts", skill, published, "ns"))
+        assertThatThrownBy(() -> invokeDelete(target, skill, published))
                 .isInstanceOf(DomainBadRequestException.class);
 
         verify(reviewTaskRepository, never()).deleteBySkillVersionIdIn(any());
