@@ -3,6 +3,7 @@ package com.iflytek.skillhub.controller.portal;
 import com.iflytek.skillhub.controller.BaseApiController;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
+import com.iflytek.skillhub.domain.namespace.NamespaceStatus;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.dto.BatchMemberRequest;
@@ -79,11 +80,22 @@ public class NamespaceController extends BaseApiController {
     @GetMapping("/me/namespaces/page")
     public ApiResponse<PageResponse<MyNamespaceResponse>> listMyNamespacesPage(
             Pageable pageable,
+            @RequestParam(required = false) NamespaceStatus status,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String slug,
+            @RequestParam(required = false) Set<NamespaceRole> roles,
             @RequestAttribute("userId") String userId,
             @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles,
             @RequestAttribute(value = "platformRoles", required = false) Set<String> platformRoles) {
         return ok("response.success.read",
-                namespacePortalQueryAppService.listMyNamespaces(pageable, userNsRoles, normalizePlatformRoles(platformRoles)));
+                namespacePortalQueryAppService.listMyNamespaces(
+                        pageable,
+                        userNsRoles,
+                        normalizePlatformRoles(platformRoles),
+                        status,
+                        q,
+                        slug,
+                        roles));
     }
 
     @GetMapping("/namespaces/{slug}")

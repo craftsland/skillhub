@@ -129,7 +129,7 @@ class NamespacePortalControllerTest {
         Namespace active = namespace(1L, "active", NamespaceStatus.ACTIVE, NamespaceType.TEAM);
         Namespace archived = namespace(3L, "archived", NamespaceStatus.ARCHIVED, NamespaceType.TEAM);
         given(namespaceMemberRepository.findByUserId("super-1")).willReturn(List.of());
-        given(namespaceRepository.findAll(any()))
+        given(namespaceRepository.search(eq(null), eq(null), eq(null), any()))
                 .willReturn(new org.springframework.data.domain.PageImpl<>(
                         List.of(active, archived),
                         org.springframework.data.domain.PageRequest.of(0, 2),
@@ -149,6 +149,38 @@ class NamespacePortalControllerTest {
                 .andExpect(jsonPath("$.data.total").value(3))
                 .andExpect(jsonPath("$.data.page").value(0))
                 .andExpect(jsonPath("$.data.size").value(2));
+    }
+
+    @Test
+    void listMyNamespacesPage_bindsAndAppliesOptionalFilters() throws Exception {
+        Namespace active = namespace(1L, "team-ai", NamespaceStatus.ACTIVE, NamespaceType.TEAM);
+        given(namespaceMemberRepository.findByUserId("owner-1"))
+                .willReturn(List.of(new NamespaceMember(1L, "owner-1", NamespaceRole.OWNER)));
+        given(namespaceRepository.searchByIdIn(
+                eq(List.of(1L)),
+                eq(NamespaceStatus.ACTIVE),
+                eq("team"),
+                eq("team-ai"),
+                any()
+        )).willReturn(new org.springframework.data.domain.PageImpl<>(
+                List.of(active),
+                org.springframework.data.domain.PageRequest.of(0, 20),
+                1
+        ));
+
+        mockMvc.perform(get("/api/v1/me/namespaces/page")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .param("status", "ACTIVE")
+                        .param("q", "team")
+                        .param("slug", "team-ai")
+                        .param("roles", "OWNER", "ADMIN")
+                        .with(auth("owner-1"))
+                        .requestAttr("userId", "owner-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].slug").value("team-ai"))
+                .andExpect(jsonPath("$.data.items[0].currentUserRole").value("OWNER"))
+                .andExpect(jsonPath("$.data.total").value(1));
     }
 
     @Test

@@ -10053,6 +10053,10 @@ export interface operations {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
+                status?: "ACTIVE" | "FROZEN" | "ARCHIVED";
+                q?: string;
+                slug?: string;
+                roles?: ("OWNER" | "ADMIN" | "MEMBER")[];
             };
             header?: never;
             path?: never;
@@ -10075,6 +10079,10 @@ export interface operations {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
+                status?: "ACTIVE" | "FROZEN" | "ARCHIVED";
+                q?: string;
+                slug?: string;
+                roles?: ("OWNER" | "ADMIN" | "MEMBER")[];
             };
             header?: never;
             path?: never;
