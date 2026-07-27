@@ -23,6 +23,7 @@ test.describe('My Namespaces super admin actions (Real API)', () => {
     try {
       adminBuilder = new E2eTestDataBuilder(page, testInfo)
       await adminBuilder.init()
+      const activeNamespace = await adminBuilder.createNamespace('e2e-super-admin-publish-active')
       const namespace = await adminBuilder.createNamespace('e2e-super-admin-read')
       namespaceSlug = namespace.slug
 
@@ -71,6 +72,22 @@ test.describe('My Namespaces super admin actions (Real API)', () => {
       )
       expect(archiveResponse.ok()).toBe(true)
       namespaceArchived = true
+
+      await page.goto('/dashboard/publish')
+      await page.getByRole('button', { name: 'Select namespace', exact: true }).click()
+      await page.getByRole('searchbox', { name: 'Search namespaces' }).fill(activeNamespace.slug)
+      const activeOption = page.getByRole('button', {
+        name: `${activeNamespace.displayName} (@${activeNamespace.slug})`,
+      })
+      await expect(activeOption).toBeVisible()
+      await activeOption.click()
+
+      await page.getByRole('button', { name: `@${activeNamespace.slug}`, exact: true }).click()
+      await page.getByRole('searchbox', { name: 'Search namespaces' }).fill(namespace.slug)
+      await expect(page.getByText('No namespaces found')).toBeVisible()
+      await expect(page.getByRole('button', {
+        name: `${namespace.displayName} (@${namespace.slug})`,
+      })).toHaveCount(0)
 
       await page.goto('/dashboard/namespaces')
 

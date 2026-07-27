@@ -20,12 +20,19 @@ interface NamespacePickerProps {
   onValueChange: (slug: string) => void
   status?: 'ACTIVE' | 'FROZEN' | 'ARCHIVED'
   disabled?: boolean
+  emptyValueLabel?: string
 }
 
 /**
  * Server-paged namespace selector that keeps request and render size bounded.
  */
-export function NamespacePicker({ value, onValueChange, status, disabled = false }: NamespacePickerProps) {
+export function NamespacePicker({
+  value,
+  onValueChange,
+  status,
+  disabled = false,
+  emptyValueLabel,
+}: NamespacePickerProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState(0)
@@ -70,6 +77,15 @@ export function NamespacePicker({ value, onValueChange, status, disabled = false
         />
 
         <div className="min-h-44 space-y-2">
+          {emptyValueLabel ? (
+            <button
+              type="button"
+              onClick={() => selectNamespace('')}
+              className="flex w-full items-center rounded-lg border border-border px-4 py-3 text-left text-sm font-medium hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {emptyValueLabel}
+            </button>
+          ) : null}
           {query.isLoading ? (
             <p className="py-8 text-center text-sm text-muted-foreground">{t('namespacePicker.loading')}</p>
           ) : query.error ? (

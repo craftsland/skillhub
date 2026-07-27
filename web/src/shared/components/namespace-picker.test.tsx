@@ -93,4 +93,21 @@ describe('NamespacePicker', () => {
     expect(onValueChange).toHaveBeenCalledWith('next-team')
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('supports clearing an optional namespace filter', () => {
+    const onValueChange = vi.fn()
+    render(
+      <NamespacePicker
+        value="active-team"
+        onValueChange={onValueChange}
+        emptyValueLabel="All namespaces"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '@active-team' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All namespaces' }))
+
+    expect(onValueChange).toHaveBeenCalledWith('')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
 })

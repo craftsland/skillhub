@@ -1,9 +1,10 @@
-import { createElement } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const useSearchMock = vi.fn()
 const selectRecords: Array<{ value?: string }> = []
+const useMyNamespacesPageMock = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('@/features/publish/upload-zone', () => ({
 }))
 
 vi.mock('@/shared/ui/button', () => ({
-  Button: ({ children }: { children: unknown }) => children,
+  Button: ({ children, ...props }: { children: ReactNode }) => createElement('button', props, children),
 }))
 
 vi.mock('@/shared/ui/select', () => ({
@@ -53,7 +54,7 @@ vi.mock('@/shared/hooks/use-skill-queries', () => ({
 }))
 
 vi.mock('@/shared/hooks/use-namespace-queries', () => ({
-  useMyNamespaces: () => ({ data: [], isLoading: false }),
+  useMyNamespacesPage: (...args: unknown[]) => useMyNamespacesPageMock(...args),
 }))
 
 vi.mock('@/shared/components/dashboard-page-header', () => ({
@@ -75,6 +76,13 @@ import { PublishPage } from './publish'
 describe('PublishPage', () => {
   beforeEach(() => {
     selectRecords.length = 0
+    useMyNamespacesPageMock.mockReset()
+    useMyNamespacesPageMock.mockReturnValue({
+      data: { items: [], total: 0, page: 0, size: 20 },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
     useSearchMock.mockReturnValue({
       namespace: '  team-ai  ',
       visibility: 'private',
@@ -84,8 +92,9 @@ describe('PublishPage', () => {
   it('prefills namespace and visibility from route search params', () => {
     renderToStaticMarkup(createElement(PublishPage))
 
-    expect(selectRecords[0]?.value).toBe('team-ai')
-    expect(selectRecords[1]?.value).toBe('PRIVATE')
+    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({ page: 0, size: 1, slug: 'team-ai' }, true)
+    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({ page: 0, size: 20, status: 'ACTIVE' }, false)
+    expect(selectRecords[0]?.value).toBe('PRIVATE')
   })
 
   it('falls back to public visibility when search params are missing', () => {
@@ -93,8 +102,8 @@ describe('PublishPage', () => {
 
     renderToStaticMarkup(createElement(PublishPage))
 
-    expect(selectRecords[0]?.value).toBe('__select_namespace__')
-    expect(selectRecords[1]?.value).toBe('PUBLIC')
+    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({ page: 0, size: 1 }, false)
+    expect(selectRecords[0]?.value).toBe('PUBLIC')
   })
 
   it('exports a named component function', () => {

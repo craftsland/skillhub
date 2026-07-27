@@ -17,18 +17,16 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  normalizeSelectValue,
 } from '@/shared/ui/select'
 import { Label } from '@/shared/ui/label'
 import { Card } from '@/shared/ui/card'
 import { usePublishSkill } from '@/shared/hooks/use-skill-queries'
-import { useMyNamespaces } from '@/shared/hooks/use-namespace-queries'
+import { useMyNamespacesPage } from '@/shared/hooks/use-namespace-queries'
 import { ConfirmDialog } from '@/shared/components/confirm-dialog'
 import { DashboardPageHeader } from '@/shared/components/dashboard-page-header'
+import { NamespacePicker } from '@/shared/components/namespace-picker'
 import { toast } from '@/shared/lib/toast'
 import { ApiError } from '@/api/client'
-
-const EMPTY_NAMESPACE_VALUE = '__select_namespace__'
 
 export function PublishPage() {
   const { t } = useTranslation()
@@ -41,9 +39,13 @@ export function PublishPage() {
   const [warningDialogOpen, setWarningDialogOpen] = useState(false)
   const [precheckWarnings, setPrecheckWarnings] = useState<string[]>([])
 
-  const { data: namespaces, isLoading: isLoadingNamespaces } = useMyNamespaces()
+  const { data: selectedNamespacePage } = useMyNamespacesPage({
+    page: 0,
+    size: 1,
+    ...(namespaceSlug ? { slug: namespaceSlug } : {}),
+  }, !!namespaceSlug)
   const publishMutation = usePublishSkill()
-  const selectedNamespace = namespaces?.find((ns) => ns.slug === namespaceSlug)
+  const selectedNamespace = selectedNamespacePage?.items.find((ns) => ns.slug === namespaceSlug)
   const namespaceOnlyLabel = selectedNamespace?.type === 'GLOBAL'
     ? t('publish.visibilityOptions.loggedInUsersOnly')
     : t('publish.visibilityOptions.namespaceOnly')
@@ -155,29 +157,13 @@ export function PublishPage() {
 
       <Card className="p-8 space-y-8">
         <div className="space-y-3">
-          <Label htmlFor="namespace" className="text-sm font-semibold font-heading">{t('publish.namespace')}</Label>
-          {isLoadingNamespaces ? (
-            <div className="h-11 animate-shimmer rounded-lg" />
-          ) : (
-            <Select
-              value={normalizeSelectValue(namespaceSlug) ?? EMPTY_NAMESPACE_VALUE}
-              onValueChange={(value) => {
-                setNamespaceSlug(value === EMPTY_NAMESPACE_VALUE ? '' : value)
-              }}
-            >
-              <SelectTrigger id="namespace">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={EMPTY_NAMESPACE_VALUE}>{t('publish.selectNamespace')}</SelectItem>
-                {namespaces?.map((ns) => (
-                  <SelectItem key={ns.id} value={ns.slug}>
-                    {ns.displayName} (@{ns.slug})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Label className="text-sm font-semibold font-heading">{t('publish.namespace')}</Label>
+          <NamespacePicker
+            value={namespaceSlug}
+            onValueChange={setNamespaceSlug}
+            status="ACTIVE"
+            disabled={publishMutation.isPending}
+          />
         </div>
 
         <div className="space-y-3">

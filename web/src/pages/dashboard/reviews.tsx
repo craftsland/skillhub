@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { FileCheck2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useMyNamespaces } from '@/shared/hooks/use-namespace-queries'
+import { useMyNamespacesPage } from '@/shared/hooks/use-namespace-queries'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs'
@@ -51,8 +51,12 @@ export function ReviewsPage() {
   const isSkillAdmin = hasRole('SKILL_ADMIN') || hasRole('SUPER_ADMIN')
   const isUserAdmin = hasRole('USER_ADMIN') || hasRole('SUPER_ADMIN')
   const hasGlobalReviewAccess = canAccessGlobalReviewCenter(user?.platformRoles)
-  const { data: myNamespaces, isLoading: isLoadingNamespaces } = useMyNamespaces(!hasGlobalReviewAccess)
-  const namespaceReviewEntry = getPreferredNamespaceReviewEntry(myNamespaces)
+  const { data: myNamespacesPage, isLoading: isLoadingNamespaces } = useMyNamespacesPage({
+    page: 0,
+    size: 1,
+    roles: ['OWNER', 'ADMIN'],
+  }, !hasGlobalReviewAccess)
+  const namespaceReviewEntry = getPreferredNamespaceReviewEntry(myNamespacesPage?.items)
   const showTypeTabs = isSkillAdmin && isUserAdmin
 
   // Determine default top-level tab

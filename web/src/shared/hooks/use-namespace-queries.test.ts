@@ -33,7 +33,6 @@ describe('use-namespace-queries exports', () => {
 
   it('exports all expected hook functions', async () => {
     const mod = await import('./use-namespace-queries')
-    expect(typeof mod.useMyNamespaces).toBe('function')
     expect(typeof mod.useMyNamespacesPage).toBe('function')
     expect(typeof mod.useCreateNamespace).toBe('function')
     expect(typeof mod.useNamespaceDetail).toBe('function')
@@ -46,17 +45,6 @@ describe('use-namespace-queries exports', () => {
     expect(typeof mod.useUnfreezeNamespace).toBe('function')
     expect(typeof mod.useArchiveNamespace).toBe('function')
     expect(typeof mod.useRestoreNamespace).toBe('function')
-  })
-
-  it('passes the enabled flag to the my namespaces query', async () => {
-    const mod = await import('./use-namespace-queries')
-
-    mod.useMyNamespaces(false)
-
-    expect(useQueryMock).toHaveBeenCalledWith(expect.objectContaining({
-      queryKey: ['namespaces', 'my'],
-      enabled: false,
-    }))
   })
 
   it('passes bounded filters to a single paged my namespaces query', async () => {
@@ -97,20 +85,4 @@ describe('use-namespace-queries exports', () => {
     })
   })
 
-  it('fetches every page for compatibility consumers instead of truncating after the first page', async () => {
-    const firstPageItems = Array.from({ length: 100 }, (_, index) => ({ id: index + 1, slug: `team-${index + 1}` }))
-    listMinePageMock
-      .mockResolvedValueOnce({ items: firstPageItems, total: 101, page: 0, size: 100 })
-      .mockResolvedValueOnce({ items: [{ id: 101, slug: 'team-101' }], total: 101, page: 1, size: 100 })
-    const mod = await import('./use-namespace-queries')
-
-    mod.useMyNamespaces()
-    const queryOptions = useQueryMock.mock.calls[useQueryMock.mock.calls.length - 1]?.[0]
-    const result = await queryOptions.queryFn()
-
-    expect(listMinePageMock).toHaveBeenNthCalledWith(1, { page: 0, size: 100 })
-    expect(listMinePageMock).toHaveBeenNthCalledWith(2, { page: 1, size: 100 })
-    expect(result).toHaveLength(101)
-    expect(result[result.length - 1]).toEqual({ id: 101, slug: 'team-101' })
-  })
 })

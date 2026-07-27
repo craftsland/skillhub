@@ -5,25 +5,6 @@ import { replaceNamespaceMemberRole } from '@/shared/lib/namespace-member-cache'
 import { shouldEnableNamespaceMemberCandidates } from './skill-query-helpers'
 
 const MY_NAMESPACES_PAGE_SIZE = 20
-const MY_NAMESPACES_COMPAT_SIZE = 100
-
-async function getMyNamespaces(): Promise<ManagedNamespace[]> {
-  const namespaces: ManagedNamespace[] = []
-  let page = 0
-  let total = Number.POSITIVE_INFINITY
-
-  while (namespaces.length < total) {
-    const response = await namespaceApi.listMinePage({ page, size: MY_NAMESPACES_COMPAT_SIZE })
-    namespaces.push(...response.items)
-    total = response.total
-    page += 1
-    if (response.items.length === 0) {
-      break
-    }
-  }
-
-  return namespaces
-}
 
 function normalizeMyNamespacePageParams(params: MyNamespacePageParams = {}): MyNamespacePageParams {
   const q = params.q?.trim()
@@ -83,14 +64,6 @@ function invalidateNamespaceQueries(queryClient: ReturnType<typeof useQueryClien
   queryClient.invalidateQueries({ queryKey: ['namespaces', slug] })
   queryClient.invalidateQueries({ queryKey: ['namespaces', slug, 'members'] })
   queryClient.invalidateQueries({ queryKey: ['reviews'] })
-}
-
-export function useMyNamespaces(enabled = true) {
-  return useQuery({
-    queryKey: ['namespaces', 'my'],
-    queryFn: getMyNamespaces,
-    enabled,
-  })
 }
 
 export function useMyNamespacesPage(params: MyNamespacePageParams = {}, enabled = true) {

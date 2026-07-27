@@ -82,7 +82,6 @@ vi.mock('@/shared/hooks/use-namespace-queries', () => ({
   useArchiveNamespace: () => ({ mutateAsync: archiveMutateAsync }),
   useDeleteNamespace: () => ({ mutateAsync: deleteMutateAsync }),
   useFreezeNamespace: () => ({ mutateAsync: freezeMutateAsync }),
-  useMyNamespaces: () => ({ data: mockNamespaces, isLoading: false }),
   useMyNamespacesPage: () => ({
     data: mockNamespacePage.total > 0 || mockNamespacePage.items.length > 0
       ? mockNamespacePage

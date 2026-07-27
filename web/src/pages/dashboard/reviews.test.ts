@@ -74,9 +74,9 @@ vi.mock('@/features/auth/use-auth', () => ({
   useAuth: () => ({ hasRole: hasRoleMock, user: userMock }),
 }))
 
-const useMyNamespacesMock = vi.fn()
+const useMyNamespacesPageMock = vi.fn()
 vi.mock('@/shared/hooks/use-namespace-queries', () => ({
-  useMyNamespaces: (enabled?: boolean) => useMyNamespacesMock(enabled),
+  useMyNamespacesPage: (...args: unknown[]) => useMyNamespacesPageMock(...args),
 }))
 
 vi.mock('@/shared/components/dashboard-page-header', () => ({
@@ -114,11 +114,11 @@ describe('ReviewsPage', () => {
     paginationProps.length = 0
     hasRoleMock.mockReset()
     useReviewListMock.mockReset()
-    useMyNamespacesMock.mockReset()
+    useMyNamespacesPageMock.mockReset()
     hasRoleMock.mockImplementation((role: string) => role === 'SKILL_ADMIN')
     userMock.platformRoles = ['SKILL_ADMIN']
-    useMyNamespacesMock.mockReturnValue({
-      data: [],
+    useMyNamespacesPageMock.mockReturnValue({
+      data: { items: [], total: 0, page: 0, size: 1 },
       isLoading: false,
     })
     useSearchMock.mockReturnValue({})
@@ -201,6 +201,10 @@ describe('ReviewsPage', () => {
 
     renderToStaticMarkup(createElement(ReviewsPage))
 
-    expect(useMyNamespacesMock).toHaveBeenCalledWith(false)
+    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({
+      page: 0,
+      size: 1,
+      roles: ['OWNER', 'ADMIN'],
+    }, false)
   })
 })
