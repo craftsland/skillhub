@@ -74,7 +74,8 @@ test.describe('My Namespaces super admin actions (Real API)', () => {
       namespaceArchived = true
 
       await page.goto('/dashboard/publish')
-      await page.getByRole('button', { name: 'Select namespace', exact: true }).click()
+      const namespaceTrigger = page.locator('#namespace')
+      await namespaceTrigger.click()
       await page.getByRole('searchbox', { name: 'Search namespaces' }).fill(activeNamespace.slug)
       const activeOption = page.getByRole('button', {
         name: `${activeNamespace.displayName} (@${activeNamespace.slug})`,
@@ -82,7 +83,8 @@ test.describe('My Namespaces super admin actions (Real API)', () => {
       await expect(activeOption).toBeVisible()
       await activeOption.click()
 
-      await page.getByRole('button', { name: `@${activeNamespace.slug}`, exact: true }).click()
+      await expect(namespaceTrigger).toContainText(`@${activeNamespace.slug}`)
+      await namespaceTrigger.click()
       await page.getByRole('searchbox', { name: 'Search namespaces' }).fill(namespace.slug)
       await expect(page.getByText('No namespaces found')).toBeVisible()
       await expect(page.getByRole('button', {
@@ -90,7 +92,7 @@ test.describe('My Namespaces super admin actions (Real API)', () => {
       })).toHaveCount(0)
 
       await page.goto(`/dashboard/publish?namespace=${encodeURIComponent(namespace.slug)}&visibility=PUBLIC`)
-      await expect(page.getByRole('button', { name: `@${namespace.slug}`, exact: true })).toBeVisible()
+      await expect(namespaceTrigger).toContainText(`@${namespace.slug}`)
       await expect(page.getByText('The selected namespace is not active or is no longer available.')).toBeVisible()
 
       await page.goto('/dashboard/namespaces')

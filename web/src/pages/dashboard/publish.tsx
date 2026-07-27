@@ -166,6 +166,7 @@ export function PublishPage() {
           <Label htmlFor="namespace" className="text-sm font-semibold font-heading">{t('publish.namespace')}</Label>
           <NamespacePicker
             id="namespace"
+            accessibleLabel={t('publish.namespace')}
             value={namespaceSlug}
             onValueChange={setNamespaceSlug}
             status="ACTIVE"

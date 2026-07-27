@@ -79,11 +79,21 @@ describe('NamespacePicker', () => {
     }, true)
   })
 
-  it('forwards the trigger id for labels and stable form selectors', () => {
-    render(<NamespacePicker id="namespace" value="" onValueChange={vi.fn()} />)
+  it('keeps the current value in the accessible name when associated with a label', () => {
+    render(
+      <>
+        <label htmlFor="namespace">Namespace</label>
+        <NamespacePicker
+          id="namespace"
+          accessibleLabel="Namespace"
+          value="active-team"
+          onValueChange={vi.fn()}
+        />
+      </>,
+    )
 
     expect(document.getElementById('namespace')).toBe(
-      screen.getByRole('button', { name: 'namespacePicker.placeholder' }),
+      screen.getByRole('button', { name: 'Namespace: @active-team' }),
     )
   })
 

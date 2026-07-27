@@ -17,6 +17,7 @@ const PAGE_SIZE = 20
 
 interface NamespacePickerProps {
   id?: string
+  accessibleLabel?: string
   value: string
   onValueChange: (slug: string) => void
   status?: 'ACTIVE' | 'FROZEN' | 'ARCHIVED'
@@ -29,6 +30,7 @@ interface NamespacePickerProps {
  */
 export function NamespacePicker({
   id,
+  accessibleLabel,
   value,
   onValueChange,
   status,
@@ -40,6 +42,7 @@ export function NamespacePicker({
   const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search.trim(), 300)
+  const triggerText = value ? `@${value}` : emptyValueLabel ?? t('namespacePicker.placeholder')
   const query = useMyNamespacesPage({
     page,
     size: PAGE_SIZE,
@@ -60,8 +63,15 @@ export function NamespacePicker({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button id={id} type="button" variant="outline" disabled={disabled} className="w-full justify-start">
-          {value ? `@${value}` : emptyValueLabel ?? t('namespacePicker.placeholder')}
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          disabled={disabled}
+          aria-label={accessibleLabel ? `${accessibleLabel}: ${triggerText}` : undefined}
+          className="w-full justify-start"
+        >
+          {triggerText}
         </Button>
       </DialogTrigger>
       <DialogContent aria-label={t('namespacePicker.title')}>
