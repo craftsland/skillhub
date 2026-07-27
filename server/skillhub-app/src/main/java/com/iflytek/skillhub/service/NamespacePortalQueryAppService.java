@@ -164,6 +164,50 @@ public class NamespacePortalQueryAppService {
     }
 
     @Transactional(readOnly = true)
+    public PageResponse<MyNamespaceResponse> listMyNamespaces(Pageable pageable,
+                                                              Map<Long, NamespaceRole> userNamespaceRoles,
+                                                              Set<String> platformRoles,
+                                                              NamespaceStatus status,
+                                                              String query,
+                                                              String slug,
+                                                              Set<NamespaceRole> roles) {
+        Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
+        Set<NamespaceRole> requestedRoles = roles != null ? roles : Set.of();
+        Pageable boundedPageable = normalizeMyNamespacesPageable(pageable);
+        String normalizedQuery = normalizeFilter(query);
+        String normalizedSlug = normalizeFilter(slug);
+
+        if (isSuperAdmin(platformRoles) && requestedRoles.isEmpty()) {
+            Page<Namespace> visibleNamespaces = namespaceRepository.search(
+                    status,
+                    normalizedQuery,
+                    normalizedSlug,
+                    boundedPageable
+            );
+            return PageResponse.from(visibleNamespaces.map(namespace -> myNamespaceResponse(namespace, namespaceRoles)));
+        }
+
+        List<Long> scopedNamespaceIds = namespaceRoles.entrySet().stream()
+                .filter(entry -> requestedRoles.isEmpty() || requestedRoles.contains(entry.getValue()))
+                .map(Map.Entry::getKey)
+                .sorted()
+                .toList();
+        if (scopedNamespaceIds.isEmpty()) {
+            Page<MyNamespaceResponse> empty = new PageImpl<>(List.of(), boundedPageable, 0);
+            return PageResponse.from(empty);
+        }
+
+        Page<Namespace> visibleNamespaces = namespaceRepository.searchByIdIn(
+                scopedNamespaceIds,
+                status,
+                normalizedQuery,
+                normalizedSlug,
+                boundedPageable
+        );
+        return PageResponse.from(visibleNamespaces.map(namespace -> myNamespaceResponse(namespace, namespaceRoles)));
+    }
+
+    @Transactional(readOnly = true)
     public NamespaceResponse getNamespace(String slug, String userId, Map<Long, NamespaceRole> userNamespaceRoles) {
         return getNamespace(slug, userId, userNamespaceRoles, Set.of());
     }
@@ -251,6 +295,13 @@ public class NamespacePortalQueryAppService {
                 : DEFAULT_MY_NAMESPACE_PAGE_SIZE;
         int size = Math.min(Math.max(requestedSize, 1), MAX_MY_NAMESPACE_PAGE_SIZE);
         return PageRequest.of(page, size, Sort.by(NAMESPACE_SLUG_SORT).ascending());
+    }
+
+    private String normalizeFilter(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private boolean isSuperAdmin(Set<String> platformRoles) {

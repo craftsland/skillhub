@@ -7,6 +7,9 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.iflytek.skillhub.domain.namespace.Namespace;
@@ -143,6 +146,127 @@ class NamespacePortalQueryAppServiceTest {
         assertThat(response.total()).isEqualTo(4);
         assertThat(response.page()).isEqualTo(1);
         assertThat(response.size()).isEqualTo(2);
+    }
+
+    @Test
+    void listMyNamespaces_superAdminWithRequestedRolesSearchesOnlyMatchingMembershipIds() {
+        Namespace owned = namespace(1L, "team-ai");
+        Pageable expectedPageable = PageRequest.of(0, 20);
+        when(namespaceRepository.searchByIdIn(
+                eq(List.of(1L)),
+                eq(NamespaceStatus.ACTIVE),
+                eq("team"),
+                eq("team-ai"),
+                any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(owned), expectedPageable, 1));
+
+        var response = service.listMyNamespaces(
+                expectedPageable,
+                Map.of(1L, NamespaceRole.OWNER, 2L, NamespaceRole.MEMBER),
+                Set.of("SUPER_ADMIN"),
+                NamespaceStatus.ACTIVE,
+                " team ",
+                " team-ai ",
+                Set.of(NamespaceRole.OWNER, NamespaceRole.ADMIN)
+        );
+
+        assertThat(response.items()).extracting("slug").containsExactly("team-ai");
+        assertThat(response.items()).extracting("currentUserRole").containsExactly(NamespaceRole.OWNER);
+        verify(namespaceRepository).searchByIdIn(
+                eq(List.of(1L)),
+                eq(NamespaceStatus.ACTIVE),
+                eq("team"),
+                eq("team-ai"),
+                any(Pageable.class)
+        );
+        verify(namespaceRepository, never()).search(any(), any(), any(), any());
+    }
+
+    @Test
+    void listMyNamespaces_superAdminWithoutRequestedRolesUsesUnrestrictedFilteredSearch() {
+        Namespace archived = namespace(2L, "ops-team");
+        archived.setStatus(NamespaceStatus.ARCHIVED);
+        Pageable expectedPageable = PageRequest.of(1, 10);
+        when(namespaceRepository.search(
+                eq(NamespaceStatus.ARCHIVED),
+                eq("ops"),
+                eq("ops-team"),
+                any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(archived), expectedPageable, 11));
+
+        var response = service.listMyNamespaces(
+                expectedPageable,
+                Map.of(),
+                Set.of("SUPER_ADMIN"),
+                NamespaceStatus.ARCHIVED,
+                " ops ",
+                " ops-team ",
+                Set.of()
+        );
+
+        assertThat(response.items()).extracting("slug").containsExactly("ops-team");
+        assertThat(response.total()).isEqualTo(11);
+        verify(namespaceRepository).search(
+                eq(NamespaceStatus.ARCHIVED),
+                eq("ops"),
+                eq("ops-team"),
+                any(Pageable.class)
+        );
+        verify(namespaceRepository, never()).searchByIdIn(anyList(), any(), any(), any(), any());
+    }
+
+    @Test
+    void listMyNamespaces_nonSuperAdminWithoutRequestedRolesSearchesAllMembershipIds() {
+        Namespace member = namespace(1L, "member-team");
+        Namespace administered = namespace(2L, "admin-team");
+        when(namespaceRepository.searchByIdIn(
+                eq(List.of(1L, 2L)),
+                eq(null),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(administered, member), PageRequest.of(0, 20), 2));
+
+        var response = service.listMyNamespaces(
+                PageRequest.of(0, 20),
+                Map.of(2L, NamespaceRole.ADMIN, 1L, NamespaceRole.MEMBER),
+                Set.of(),
+                null,
+                "   ",
+                "\t",
+                Set.of()
+        );
+
+        assertThat(response.items()).extracting("slug").containsExactly("admin-team", "member-team");
+        assertThat(response.items()).extracting("currentUserRole")
+                .containsExactly(NamespaceRole.ADMIN, NamespaceRole.MEMBER);
+        verify(namespaceRepository).searchByIdIn(
+                eq(List.of(1L, 2L)),
+                eq(null),
+                eq(null),
+                eq(null),
+                any(Pageable.class)
+        );
+        verify(namespaceRepository, never()).search(any(), any(), any(), any());
+    }
+
+    @Test
+    void listMyNamespaces_emptyRoleRestrictedScopeReturnsEmptyPageWithoutRepositoryQuery() {
+        var response = service.listMyNamespaces(
+                PageRequest.of(2, 10),
+                Map.of(1L, NamespaceRole.MEMBER),
+                Set.of("SUPER_ADMIN"),
+                NamespaceStatus.ACTIVE,
+                " team ",
+                null,
+                Set.of(NamespaceRole.OWNER, NamespaceRole.ADMIN)
+        );
+
+        assertThat(response.items()).isEmpty();
+        assertThat(response.total()).isZero();
+        assertThat(response.page()).isEqualTo(2);
+        assertThat(response.size()).isEqualTo(10);
+        verifyNoInteractions(namespaceRepository);
     }
 
     @Test
