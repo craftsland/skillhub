@@ -79,6 +79,14 @@ describe('NamespacePicker', () => {
     }, true)
   })
 
+  it('forwards the trigger id for labels and stable form selectors', () => {
+    render(<NamespacePicker id="namespace" value="" onValueChange={vi.fn()} />)
+
+    expect(document.getElementById('namespace')).toBe(
+      screen.getByRole('button', { name: 'namespacePicker.placeholder' }),
+    )
+  })
+
   it('paginates bounded results and emits the selected slug', () => {
     const onValueChange = vi.fn()
     render(<NamespacePicker value="selected-outside-page" onValueChange={onValueChange} />)

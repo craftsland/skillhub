@@ -16,6 +16,7 @@ import { useMyNamespacesPage } from '@/shared/hooks/use-namespace-queries'
 const PAGE_SIZE = 20
 
 interface NamespacePickerProps {
+  id?: string
   value: string
   onValueChange: (slug: string) => void
   status?: 'ACTIVE' | 'FROZEN' | 'ARCHIVED'
@@ -27,6 +28,7 @@ interface NamespacePickerProps {
  * Server-paged namespace selector that keeps request and render size bounded.
  */
 export function NamespacePicker({
+  id,
   value,
   onValueChange,
   status,
@@ -58,7 +60,7 @@ export function NamespacePicker({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" disabled={disabled} className="w-full justify-start">
+        <Button id={id} type="button" variant="outline" disabled={disabled} className="w-full justify-start">
           {value ? `@${value}` : emptyValueLabel ?? t('namespacePicker.placeholder')}
         </Button>
       </DialogTrigger>

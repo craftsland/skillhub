@@ -163,8 +163,9 @@ export function PublishPage() {
 
       <Card className="p-8 space-y-8">
         <div className="space-y-3">
-          <Label className="text-sm font-semibold font-heading">{t('publish.namespace')}</Label>
+          <Label htmlFor="namespace" className="text-sm font-semibold font-heading">{t('publish.namespace')}</Label>
           <NamespacePicker
+            id="namespace"
             value={namespaceSlug}
             onValueChange={setNamespaceSlug}
             status="ACTIVE"
