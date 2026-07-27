@@ -403,6 +403,20 @@
     },
     "publishSkill": "Publish Skill"
   },
+  "namespacePicker": {
+    "placeholder": "Select namespace",
+    "title": "Select namespace",
+    "description": "Search or browse namespaces without loading the entire registry.",
+    "search": "Search namespaces",
+    "searchPlaceholder": "Search by slug or display name",
+    "loading": "Loading namespaces...",
+    "empty": "No namespaces found",
+    "error": "Failed to load namespaces",
+    "retry": "Retry",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{current}} of {{total}}"
+  },
   "myNamespaces": {
     "title": "My Namespaces",
     "subtitle": "Manage your namespaces and teams",

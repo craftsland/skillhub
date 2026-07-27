@@ -403,6 +403,20 @@
     },
     "publishSkill": "发布技能"
   },
+  "namespacePicker": {
+    "placeholder": "选择命名空间",
+    "title": "选择命名空间",
+    "description": "通过搜索或分页浏览命名空间，无需加载全部数据。",
+    "search": "搜索命名空间",
+    "searchPlaceholder": "按标识或显示名称搜索",
+    "loading": "正在加载命名空间...",
+    "empty": "未找到命名空间",
+    "error": "命名空间加载失败",
+    "retry": "重试",
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "第 {{current}} / {{total}} 页"
+  },
   "myNamespaces": {
     "title": "我的命名空间",
     "subtitle": "管理你的命名空间和团队",
