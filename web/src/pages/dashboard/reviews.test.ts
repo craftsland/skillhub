@@ -204,6 +204,7 @@ describe('ReviewsPage', () => {
     expect(useMyNamespacesPageMock).toHaveBeenCalledWith({
       page: 0,
       size: 1,
+      status: 'ACTIVE',
       roles: ['OWNER', 'ADMIN'],
     }, false)
   })

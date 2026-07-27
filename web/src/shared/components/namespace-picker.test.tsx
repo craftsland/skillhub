@@ -110,4 +110,16 @@ describe('NamespacePicker', () => {
     expect(onValueChange).toHaveBeenCalledWith('')
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('uses the optional empty label for an empty trigger value', () => {
+    render(
+      <NamespacePicker
+        value=""
+        onValueChange={vi.fn()}
+        emptyValueLabel="All namespaces"
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'All namespaces' })).toBeTruthy()
+  })
 })

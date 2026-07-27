@@ -39,9 +39,10 @@ export function PublishPage() {
   const [warningDialogOpen, setWarningDialogOpen] = useState(false)
   const [precheckWarnings, setPrecheckWarnings] = useState<string[]>([])
 
-  const { data: selectedNamespacePage } = useMyNamespacesPage({
+  const { data: selectedNamespacePage, isLoading: isLoadingSelectedNamespace } = useMyNamespacesPage({
     page: 0,
     size: 1,
+    status: 'ACTIVE',
     ...(namespaceSlug ? { slug: namespaceSlug } : {}),
   }, !!namespaceSlug)
   const publishMutation = usePublishSkill()
@@ -68,7 +69,7 @@ export function PublishPage() {
   }
 
   const publishSkill = async (confirmWarnings = false) => {
-    if (!selectedFile || !namespaceSlug) {
+    if (!selectedFile || !namespaceSlug || !selectedNamespace) {
       toast.error(t('publish.selectRequired'))
       return
     }
@@ -164,6 +165,9 @@ export function PublishPage() {
             status="ACTIVE"
             disabled={publishMutation.isPending}
           />
+          {namespaceSlug && !isLoadingSelectedNamespace && !selectedNamespace ? (
+            <p className="text-sm text-destructive">{t('publish.namespaceUnavailable')}</p>
+          ) : null}
         </div>
 
         <div className="space-y-3">
@@ -214,7 +218,7 @@ export function PublishPage() {
           className="w-full text-primary-foreground disabled:text-primary-foreground"
           size="lg"
           onClick={handlePublish}
-          disabled={!selectedFile || !namespaceSlug || publishMutation.isPending}
+          disabled={!selectedFile || !namespaceSlug || !selectedNamespace || publishMutation.isPending}
         >
           {publishMutation.isPending ? t('publish.publishing') : t('publish.confirm')}
         </Button>

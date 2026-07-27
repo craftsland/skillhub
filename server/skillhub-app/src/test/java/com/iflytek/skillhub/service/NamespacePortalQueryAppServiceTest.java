@@ -216,6 +216,34 @@ class NamespacePortalQueryAppServiceTest {
     }
 
     @Test
+    void listMyNamespaces_escapesLikeWildcardsForLiteralSubstringSearch() {
+        Pageable expectedPageable = PageRequest.of(0, 20);
+        when(namespaceRepository.search(
+                eq(null),
+                eq("50!%!_!!off"),
+                eq(null),
+                any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(), expectedPageable, 0));
+
+        service.listMyNamespaces(
+                expectedPageable,
+                Map.of(),
+                Set.of("SUPER_ADMIN"),
+                null,
+                " 50%_!off ",
+                null,
+                Set.of()
+        );
+
+        verify(namespaceRepository).search(
+                eq(null),
+                eq("50!%!_!!off"),
+                eq(null),
+                any(Pageable.class)
+        );
+    }
+
+    @Test
     void listMyNamespaces_nonSuperAdminWithoutRequestedRolesSearchesAllMembershipIds() {
         Namespace member = namespace(1L, "member-team");
         Namespace administered = namespace(2L, "admin-team");

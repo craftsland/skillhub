@@ -30,8 +30,8 @@ public interface NamespaceJpaRepository
             WHERE (:status IS NULL OR n.status = :status)
               AND (
                 :query IS NULL
-                OR lower(n.slug) LIKE lower(concat('%', :query, '%'))
-                OR lower(n.displayName) LIKE lower(concat('%', :query, '%'))
+                OR lower(n.slug) LIKE lower(concat('%', :query, '%')) ESCAPE '!'
+                OR lower(n.displayName) LIKE lower(concat('%', :query, '%')) ESCAPE '!'
               )
               AND (:slug IS NULL OR n.slug = :slug)
             """)
@@ -48,8 +48,8 @@ public interface NamespaceJpaRepository
               AND (:status IS NULL OR n.status = :status)
               AND (
                 :query IS NULL
-                OR lower(n.slug) LIKE lower(concat('%', :query, '%'))
-                OR lower(n.displayName) LIKE lower(concat('%', :query, '%'))
+                OR lower(n.slug) LIKE lower(concat('%', :query, '%')) ESCAPE '!'
+                OR lower(n.displayName) LIKE lower(concat('%', :query, '%')) ESCAPE '!'
               )
               AND (:slug IS NULL OR n.slug = :slug)
             """)

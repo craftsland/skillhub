@@ -174,7 +174,7 @@ public class NamespacePortalQueryAppService {
         Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
         Set<NamespaceRole> requestedRoles = roles != null ? roles : Set.of();
         Pageable boundedPageable = normalizeMyNamespacesPageable(pageable);
-        String normalizedQuery = normalizeFilter(query);
+        String normalizedQuery = normalizeSearchFilter(query);
         String normalizedSlug = normalizeFilter(slug);
 
         if (isSuperAdmin(platformRoles) && requestedRoles.isEmpty()) {
@@ -302,6 +302,17 @@ public class NamespacePortalQueryAppService {
             return null;
         }
         return value.trim();
+    }
+
+    private String normalizeSearchFilter(String value) {
+        String normalized = normalizeFilter(value);
+        if (normalized == null) {
+            return null;
+        }
+        return normalized
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
     }
 
     private boolean isSuperAdmin(Set<String> platformRoles) {

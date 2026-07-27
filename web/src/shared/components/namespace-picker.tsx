@@ -59,7 +59,7 @@ export function NamespacePicker({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button type="button" variant="outline" disabled={disabled} className="w-full justify-start">
-          {value ? `@${value}` : t('namespacePicker.placeholder')}
+          {value ? `@${value}` : emptyValueLabel ?? t('namespacePicker.placeholder')}
         </Button>
       </DialogTrigger>
       <DialogContent aria-label={t('namespacePicker.title')}>

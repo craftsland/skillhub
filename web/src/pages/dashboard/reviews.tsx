@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { FileCheck2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useMyNamespacesPage } from '@/shared/hooks/use-namespace-queries'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs'
 import {
   buildNamespaceReviewsPath,
   canAccessGlobalReviewCenter,
-  getPreferredNamespaceReviewEntry,
 } from '@/features/review/review-paths'
+import { useNamespaceReviewEntry } from '@/features/review/use-namespace-review-entry'
 import {
   Table,
   TableBody,
@@ -51,12 +50,11 @@ export function ReviewsPage() {
   const isSkillAdmin = hasRole('SKILL_ADMIN') || hasRole('SUPER_ADMIN')
   const isUserAdmin = hasRole('USER_ADMIN') || hasRole('SUPER_ADMIN')
   const hasGlobalReviewAccess = canAccessGlobalReviewCenter(user?.platformRoles)
-  const { data: myNamespacesPage, isLoading: isLoadingNamespaces } = useMyNamespacesPage({
-    page: 0,
-    size: 1,
-    roles: ['OWNER', 'ADMIN'],
-  }, !hasGlobalReviewAccess)
-  const namespaceReviewEntry = getPreferredNamespaceReviewEntry(myNamespacesPage?.items)
+  const {
+    namespaceReviewEntry,
+    isLoadingNamespaces,
+    hasNamespaceQueryError,
+  } = useNamespaceReviewEntry(hasGlobalReviewAccess)
   const showTypeTabs = isSkillAdmin && isUserAdmin
 
   // Determine default top-level tab
@@ -66,7 +64,7 @@ export function ReviewsPage() {
   const skillReviewEnabled = hasGlobalReviewAccess && isSkillAdmin && activeType === 'skill'
 
   useEffect(() => {
-    if (hasGlobalReviewAccess || isLoadingNamespaces) {
+    if (hasGlobalReviewAccess || isLoadingNamespaces || hasNamespaceQueryError) {
       return
     }
 
@@ -76,7 +74,7 @@ export function ReviewsPage() {
     }
 
     void navigate({ to: '/dashboard', replace: true })
-  }, [hasGlobalReviewAccess, isLoadingNamespaces, namespaceReviewEntry, navigate])
+  }, [hasGlobalReviewAccess, hasNamespaceQueryError, isLoadingNamespaces, namespaceReviewEntry, navigate])
 
   const pendingQuery = useReviewList('PENDING', undefined, pages.PENDING, PAGE_SIZE, sortDirection, skillReviewEnabled && activeStatus === 'PENDING')
   const approvedQuery = useReviewList('APPROVED', undefined, pages.APPROVED, PAGE_SIZE, sortDirection, skillReviewEnabled && activeStatus === 'APPROVED')

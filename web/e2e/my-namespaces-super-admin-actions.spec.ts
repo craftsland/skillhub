@@ -89,6 +89,10 @@ test.describe('My Namespaces super admin actions (Real API)', () => {
         name: `${namespace.displayName} (@${namespace.slug})`,
       })).toHaveCount(0)
 
+      await page.goto(`/dashboard/publish?namespace=${encodeURIComponent(namespace.slug)}&visibility=PUBLIC`)
+      await expect(page.getByRole('button', { name: `@${namespace.slug}`, exact: true })).toBeVisible()
+      await expect(page.getByText('The selected namespace is not active or is no longer available.')).toBeVisible()
+
       await page.goto('/dashboard/namespaces')
 
       const namespaceCard = page.getByTestId(`namespace-card-${namespace.slug}`)

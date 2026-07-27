@@ -1365,6 +1365,7 @@
     },
     "namespace": "命名空间",
     "selectNamespace": "选择命名空间",
+    "namespaceUnavailable": "所选命名空间未启用或已不可用。",
     "visibility": "可见性",
     "visibilityOptions": {
       "public": "公开",

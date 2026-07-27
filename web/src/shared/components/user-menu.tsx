@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { authApi } from '@/api/client'
-import { useMyNamespacesPage } from '@/shared/hooks/use-namespace-queries'
-import { buildGlobalReviewsPath, canAccessGlobalReviewCenter, canAccessReviewCenter } from '@/features/review/review-paths'
+import { buildGlobalReviewsPath, canAccessGlobalReviewCenter } from '@/features/review/review-paths'
+import { useNamespaceReviewEntry } from '@/features/review/use-namespace-review-entry'
 import { clearSessionScopedQueries } from '@/features/notification/notification-session'
 import { canViewGovernanceCenter } from '@/shared/lib/governance-access'
 import { cn } from '@/shared/lib/utils'
@@ -37,12 +37,8 @@ export function UserMenu({ user, triggerClassName }: UserMenuProps) {
   const isAuditor = hasRole('AUDITOR') || hasRole('SUPER_ADMIN')
   const isSuperAdmin = hasRole('SUPER_ADMIN')
   const hasGlobalReviewAccess = canAccessGlobalReviewCenter(user.platformRoles)
-  const { data: myNamespacesPage } = useMyNamespacesPage({
-    page: 0,
-    size: 1,
-    roles: ['OWNER', 'ADMIN'],
-  }, !hasGlobalReviewAccess)
-  const reviewCenterVisible = canAccessReviewCenter(user.platformRoles, myNamespacesPage?.items)
+  const { namespaceReviewEntry } = useNamespaceReviewEntry(hasGlobalReviewAccess)
+  const reviewCenterVisible = hasGlobalReviewAccess || namespaceReviewEntry !== null
   const canChangePassword = user.canChangePassword === true
   const open = isHovered || isClickOpen
 

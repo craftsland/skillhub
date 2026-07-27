@@ -77,12 +77,23 @@ describe('PublishPage', () => {
   beforeEach(() => {
     selectRecords.length = 0
     useMyNamespacesPageMock.mockReset()
-    useMyNamespacesPageMock.mockReturnValue({
-      data: { items: [], total: 0, page: 0, size: 20 },
+    useMyNamespacesPageMock.mockImplementation((params: { slug?: string }) => ({
+      data: {
+        items: params.slug ? [{
+          id: 1,
+          slug: params.slug,
+          displayName: 'Team AI',
+          status: 'ACTIVE',
+          type: 'TEAM',
+        }] : [],
+        total: params.slug ? 1 : 0,
+        page: 0,
+        size: params.slug ? 1 : 20,
+      },
       isLoading: false,
       error: null,
       refetch: vi.fn(),
-    })
+    }))
     useSearchMock.mockReturnValue({
       namespace: '  team-ai  ',
       visibility: 'private',
@@ -92,7 +103,12 @@ describe('PublishPage', () => {
   it('prefills namespace and visibility from route search params', () => {
     renderToStaticMarkup(createElement(PublishPage))
 
-    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({ page: 0, size: 1, slug: 'team-ai' }, true)
+    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({
+      page: 0,
+      size: 1,
+      status: 'ACTIVE',
+      slug: 'team-ai',
+    }, true)
     expect(useMyNamespacesPageMock).toHaveBeenCalledWith({ page: 0, size: 20, status: 'ACTIVE' }, false)
     expect(selectRecords[0]?.value).toBe('PRIVATE')
   })
@@ -102,8 +118,21 @@ describe('PublishPage', () => {
 
     renderToStaticMarkup(createElement(PublishPage))
 
-    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({ page: 0, size: 1 }, false)
+    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({ page: 0, size: 1, status: 'ACTIVE' }, false)
     expect(selectRecords[0]?.value).toBe('PUBLIC')
+  })
+
+  it('marks an archived or unavailable prefilled namespace as invalid', () => {
+    useMyNamespacesPageMock.mockReturnValue({
+      data: { items: [], total: 0, page: 0, size: 1 },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    const html = renderToStaticMarkup(createElement(PublishPage))
+
+    expect(html).toContain('publish.namespaceUnavailable')
   })
 
   it('exports a named component function', () => {

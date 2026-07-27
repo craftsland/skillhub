@@ -1364,6 +1364,7 @@
     },
     "namespace": "Namespace",
     "selectNamespace": "Select namespace",
+    "namespaceUnavailable": "The selected namespace is not active or is no longer available.",
     "visibility": "Visibility",
     "visibilityOptions": {
       "public": "Public",

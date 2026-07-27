@@ -148,8 +148,14 @@ describe('UserMenu security settings visibility', () => {
     expect(useMyNamespacesPageMock).toHaveBeenCalledWith({
       page: 0,
       size: 1,
+      status: 'ACTIVE',
       roles: ['OWNER', 'ADMIN'],
     }, true)
+    expect(useMyNamespacesPageMock).toHaveBeenCalledWith({
+      page: 0,
+      size: 1,
+      roles: ['OWNER', 'ADMIN'],
+    }, false)
     expect(html).toContain('user.menu.reviews')
   })
 
@@ -166,6 +172,7 @@ describe('UserMenu security settings visibility', () => {
     expect(useMyNamespacesPageMock).toHaveBeenCalledWith({
       page: 0,
       size: 1,
+      status: 'ACTIVE',
       roles: ['OWNER', 'ADMIN'],
     }, false)
   })
