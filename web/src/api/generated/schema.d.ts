@@ -10054,6 +10054,7 @@ export interface operations {
             query: {
                 pageable: components["schemas"]["Pageable"];
                 status?: "ACTIVE" | "FROZEN" | "ARCHIVED";
+                type?: "GLOBAL" | "TEAM";
                 q?: string;
                 slug?: string;
                 roles?: ("OWNER" | "ADMIN" | "MEMBER")[];
@@ -10080,6 +10081,7 @@ export interface operations {
             query: {
                 pageable: components["schemas"]["Pageable"];
                 status?: "ACTIVE" | "FROZEN" | "ARCHIVED";
+                type?: "GLOBAL" | "TEAM";
                 q?: string;
                 slug?: string;
                 roles?: ("OWNER" | "ADMIN" | "MEMBER")[];

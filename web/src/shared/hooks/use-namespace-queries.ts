@@ -13,6 +13,7 @@ function normalizeMyNamespacePageParams(params: MyNamespacePageParams = {}): MyN
     page: params.page ?? 0,
     size: params.size ?? MY_NAMESPACES_PAGE_SIZE,
     ...(params.status ? { status: params.status } : {}),
+    ...(params.type ? { type: params.type } : {}),
     ...(q ? { q } : {}),
     ...(slug ? { slug } : {}),
     ...(params.roles?.length ? { roles: [...params.roles] } : {}),

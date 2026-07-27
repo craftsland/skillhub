@@ -155,6 +155,7 @@ class NamespacePortalQueryAppServiceTest {
         when(namespaceRepository.searchByIdIn(
                 eq(List.of(1L)),
                 eq(NamespaceStatus.ACTIVE),
+                eq(NamespaceType.TEAM),
                 eq("team"),
                 eq("team-ai"),
                 any(Pageable.class)
@@ -165,6 +166,7 @@ class NamespacePortalQueryAppServiceTest {
                 Map.of(1L, NamespaceRole.OWNER, 2L, NamespaceRole.MEMBER),
                 Set.of("SUPER_ADMIN"),
                 NamespaceStatus.ACTIVE,
+                NamespaceType.TEAM,
                 " team ",
                 " team-ai ",
                 Set.of(NamespaceRole.OWNER, NamespaceRole.ADMIN)
@@ -175,11 +177,12 @@ class NamespacePortalQueryAppServiceTest {
         verify(namespaceRepository).searchByIdIn(
                 eq(List.of(1L)),
                 eq(NamespaceStatus.ACTIVE),
+                eq(NamespaceType.TEAM),
                 eq("team"),
                 eq("team-ai"),
                 any(Pageable.class)
         );
-        verify(namespaceRepository, never()).search(any(), any(), any(), any());
+        verify(namespaceRepository, never()).search(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -189,6 +192,7 @@ class NamespacePortalQueryAppServiceTest {
         Pageable expectedPageable = PageRequest.of(1, 10);
         when(namespaceRepository.search(
                 eq(NamespaceStatus.ARCHIVED),
+                eq(null),
                 eq("ops"),
                 eq("ops-team"),
                 any(Pageable.class)
@@ -199,6 +203,7 @@ class NamespacePortalQueryAppServiceTest {
                 Map.of(),
                 Set.of("SUPER_ADMIN"),
                 NamespaceStatus.ARCHIVED,
+                null,
                 " ops ",
                 " ops-team ",
                 Set.of()
@@ -208,17 +213,19 @@ class NamespacePortalQueryAppServiceTest {
         assertThat(response.total()).isEqualTo(11);
         verify(namespaceRepository).search(
                 eq(NamespaceStatus.ARCHIVED),
+                eq(null),
                 eq("ops"),
                 eq("ops-team"),
                 any(Pageable.class)
         );
-        verify(namespaceRepository, never()).searchByIdIn(anyList(), any(), any(), any(), any());
+        verify(namespaceRepository, never()).searchByIdIn(anyList(), any(), any(), any(), any(), any());
     }
 
     @Test
     void listMyNamespaces_escapesLikeWildcardsForLiteralSubstringSearch() {
         Pageable expectedPageable = PageRequest.of(0, 20);
         when(namespaceRepository.search(
+                eq(null),
                 eq(null),
                 eq("50!%!_!!off"),
                 eq(null),
@@ -230,12 +237,14 @@ class NamespacePortalQueryAppServiceTest {
                 Map.of(),
                 Set.of("SUPER_ADMIN"),
                 null,
+                null,
                 " 50%_!off ",
                 null,
                 Set.of()
         );
 
         verify(namespaceRepository).search(
+                eq(null),
                 eq(null),
                 eq("50!%!_!!off"),
                 eq(null),
@@ -252,6 +261,7 @@ class NamespacePortalQueryAppServiceTest {
                 eq(null),
                 eq(null),
                 eq(null),
+                eq(null),
                 any(Pageable.class)
         )).thenReturn(new PageImpl<>(List.of(administered, member), PageRequest.of(0, 20), 2));
 
@@ -259,6 +269,7 @@ class NamespacePortalQueryAppServiceTest {
                 PageRequest.of(0, 20),
                 Map.of(2L, NamespaceRole.ADMIN, 1L, NamespaceRole.MEMBER),
                 Set.of(),
+                null,
                 null,
                 "   ",
                 "\t",
@@ -273,9 +284,10 @@ class NamespacePortalQueryAppServiceTest {
                 eq(null),
                 eq(null),
                 eq(null),
+                eq(null),
                 any(Pageable.class)
         );
-        verify(namespaceRepository, never()).search(any(), any(), any(), any());
+        verify(namespaceRepository, never()).search(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -285,6 +297,7 @@ class NamespacePortalQueryAppServiceTest {
                 Map.of(1L, NamespaceRole.MEMBER),
                 Set.of("SUPER_ADMIN"),
                 NamespaceStatus.ACTIVE,
+                NamespaceType.TEAM,
                 " team ",
                 null,
                 Set.of(NamespaceRole.OWNER, NamespaceRole.ADMIN)

@@ -492,6 +492,8 @@
     "pageSubtitle": "管理 CLI 和 API 使用的访问凭证"
   },
   "reviews": {
+    "namespaceLoadError": "无法加载命名空间审核权限。",
+    "retryNamespaceLoad": "重试",
     "title": "审核中心",
     "subtitle": "管理平台审核事务",
     "typeSkill": "技能审核",
@@ -1366,6 +1368,8 @@
     "namespace": "命名空间",
     "selectNamespace": "选择命名空间",
     "namespaceUnavailable": "所选命名空间未启用或已不可用。",
+    "namespaceValidationError": "无法校验所选命名空间。",
+    "retryNamespaceValidation": "重新校验",
     "visibility": "可见性",
     "visibilityOptions": {
       "public": "公开",

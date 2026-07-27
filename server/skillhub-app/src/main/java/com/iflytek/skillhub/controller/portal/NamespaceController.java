@@ -4,6 +4,7 @@ import com.iflytek.skillhub.controller.BaseApiController;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.namespace.NamespaceStatus;
+import com.iflytek.skillhub.domain.namespace.NamespaceType;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.dto.BatchMemberRequest;
@@ -81,6 +82,7 @@ public class NamespaceController extends BaseApiController {
     public ApiResponse<PageResponse<MyNamespaceResponse>> listMyNamespacesPage(
             Pageable pageable,
             @RequestParam(required = false) NamespaceStatus status,
+            @RequestParam(required = false) NamespaceType type,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String slug,
             @RequestParam(required = false) Set<NamespaceRole> roles,
@@ -93,6 +95,7 @@ public class NamespaceController extends BaseApiController {
                         userNsRoles,
                         normalizePlatformRoles(platformRoles),
                         status,
+                        type,
                         q,
                         slug,
                         roles));

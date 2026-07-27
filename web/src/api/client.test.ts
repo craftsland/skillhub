@@ -257,6 +257,7 @@ describe('namespaceApi.listMinePage', () => {
       page: 1,
       size: 20,
       status: 'ACTIVE',
+      type: 'TEAM',
       q: 'team ai',
       slug: 'team-ai',
       roles: ['OWNER', 'ADMIN'],
@@ -264,7 +265,7 @@ describe('namespaceApi.listMinePage', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.example.com/api/web/me/namespaces/page?page=1&size=20&status=ACTIVE&q=team+ai&slug=team-ai&roles=OWNER&roles=ADMIN',
+      'https://api.example.com/api/web/me/namespaces/page?page=1&size=20&status=ACTIVE&type=TEAM&q=team+ai&slug=team-ai&roles=OWNER&roles=ADMIN',
       expect.objectContaining({ headers: expect.any(Headers) }),
     )
   })

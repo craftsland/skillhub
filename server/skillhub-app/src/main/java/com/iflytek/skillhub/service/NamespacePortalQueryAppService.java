@@ -168,6 +168,7 @@ public class NamespacePortalQueryAppService {
                                                               Map<Long, NamespaceRole> userNamespaceRoles,
                                                               Set<String> platformRoles,
                                                               NamespaceStatus status,
+                                                              NamespaceType type,
                                                               String query,
                                                               String slug,
                                                               Set<NamespaceRole> roles) {
@@ -180,6 +181,7 @@ public class NamespacePortalQueryAppService {
         if (isSuperAdmin(platformRoles) && requestedRoles.isEmpty()) {
             Page<Namespace> visibleNamespaces = namespaceRepository.search(
                     status,
+                    type,
                     normalizedQuery,
                     normalizedSlug,
                     boundedPageable
@@ -200,6 +202,7 @@ public class NamespacePortalQueryAppService {
         Page<Namespace> visibleNamespaces = namespaceRepository.searchByIdIn(
                 scopedNamespaceIds,
                 status,
+                type,
                 normalizedQuery,
                 normalizedSlug,
                 boundedPageable

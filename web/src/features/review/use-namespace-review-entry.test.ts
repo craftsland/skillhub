@@ -34,9 +34,14 @@ describe('useNamespaceReviewEntry', () => {
 
   it('uses one bounded ACTIVE query when an active review namespace exists', () => {
     const active = namespace('zeta-active', 'ACTIVE')
-    useMyNamespacesPageMock.mockImplementation((params: { status?: string }) => ({
+    const global = { ...namespace('global', 'ACTIVE'), type: 'GLOBAL' as const }
+    useMyNamespacesPageMock.mockImplementation((params: { status?: string; type?: string }) => ({
       data: {
-        items: params.status === 'ACTIVE' ? [active] : [namespace('alpha-archived', 'ARCHIVED')],
+        items: params.type !== 'TEAM'
+          ? [global]
+          : params.status === 'ACTIVE'
+            ? [active]
+            : [namespace('alpha-archived', 'ARCHIVED')],
         total: 1,
         page: 0,
         size: 1,
@@ -51,11 +56,13 @@ describe('useNamespaceReviewEntry', () => {
       page: 0,
       size: 1,
       status: 'ACTIVE',
+      type: 'TEAM',
       roles: ['OWNER', 'ADMIN'],
     }, true)
     expect(useMyNamespacesPageMock).toHaveBeenNthCalledWith(2, {
       page: 0,
       size: 1,
+      type: 'TEAM',
       roles: ['OWNER', 'ADMIN'],
     }, false)
     expect(result.namespaceReviewEntry?.slug).toBe('zeta-active')
@@ -79,6 +86,7 @@ describe('useNamespaceReviewEntry', () => {
     expect(useMyNamespacesPageMock).toHaveBeenNthCalledWith(2, {
       page: 0,
       size: 1,
+      type: 'TEAM',
       roles: ['OWNER', 'ADMIN'],
     }, true)
     expect(result.namespaceReviewEntry?.slug).toBe('alpha-archived')

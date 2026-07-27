@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.iflytek.skillhub.domain.namespace.Namespace;
 import com.iflytek.skillhub.domain.namespace.NamespaceStatus;
+import com.iflytek.skillhub.domain.namespace.NamespaceType;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +35,9 @@ class NamespaceJpaRepositoryTest {
         Namespace archived = new Namespace("archived-percent", "50% Archived", "owner-1");
         archived.setStatus(NamespaceStatus.ARCHIVED);
         persist(archived);
+        Namespace global = new Namespace("global", "50% Global", "owner-1");
+        global.setType(NamespaceType.GLOBAL);
+        persist(global);
         entityManager.flush();
     }
 
@@ -41,6 +45,7 @@ class NamespaceJpaRepositoryTest {
     void search_treatsEscapedWildcardsLiterallyAndAppliesStatus() {
         var percentPage = repository.search(
                 NamespaceStatus.ACTIVE,
+                NamespaceType.TEAM,
                 "!%",
                 null,
                 PageRequest.of(0, 10)
@@ -48,6 +53,7 @@ class NamespaceJpaRepositoryTest {
         var underscorePage = repository.searchByIdIn(
                 List.of(percentNamespace.getId(), underscoreNamespace.getId()),
                 NamespaceStatus.ACTIVE,
+                NamespaceType.TEAM,
                 "!_",
                 null,
                 PageRequest.of(0, 10)

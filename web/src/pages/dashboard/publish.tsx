@@ -39,7 +39,12 @@ export function PublishPage() {
   const [warningDialogOpen, setWarningDialogOpen] = useState(false)
   const [precheckWarnings, setPrecheckWarnings] = useState<string[]>([])
 
-  const { data: selectedNamespacePage, isLoading: isLoadingSelectedNamespace } = useMyNamespacesPage({
+  const {
+    data: selectedNamespacePage,
+    isLoading: isLoadingSelectedNamespace,
+    error: selectedNamespaceError,
+    refetch: refetchSelectedNamespace,
+  } = useMyNamespacesPage({
     page: 0,
     size: 1,
     status: 'ACTIVE',
@@ -165,8 +170,17 @@ export function PublishPage() {
             status="ACTIVE"
             disabled={publishMutation.isPending}
           />
-          {namespaceSlug && !isLoadingSelectedNamespace && !selectedNamespace ? (
-            <p className="text-sm text-destructive">{t('publish.namespaceUnavailable')}</p>
+          {namespaceSlug && !isLoadingSelectedNamespace ? (
+            selectedNamespaceError ? (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-destructive">{t('publish.namespaceValidationError')}</p>
+                <Button type="button" size="sm" variant="outline" onClick={() => refetchSelectedNamespace()}>
+                  {t('publish.retryNamespaceValidation')}
+                </Button>
+              </div>
+            ) : !selectedNamespace ? (
+              <p className="text-sm text-destructive">{t('publish.namespaceUnavailable')}</p>
+            ) : null
           ) : null}
         </div>
 

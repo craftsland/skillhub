@@ -205,7 +205,25 @@ describe('ReviewsPage', () => {
       page: 0,
       size: 1,
       status: 'ACTIVE',
+      type: 'TEAM',
       roles: ['OWNER', 'ADMIN'],
     }, false)
+  })
+
+  it('renders a recoverable error when namespace review access cannot be loaded', () => {
+    userMock.platformRoles = ['USER']
+    hasRoleMock.mockReturnValue(false)
+    useMyNamespacesPageMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('network down'),
+      refetch: vi.fn(),
+    })
+
+    const html = renderToStaticMarkup(createElement(ReviewsPage))
+
+    expect(html).toContain('reviews.namespaceLoadError')
+    expect(html).toContain('reviews.retryNamespaceLoad')
+    expect(html).not.toContain('Loading...')
   })
 })

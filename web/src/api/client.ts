@@ -52,6 +52,7 @@ export interface MyNamespacePageParams {
   page?: number
   size?: number
   status?: 'ACTIVE' | 'FROZEN' | 'ARCHIVED'
+  type?: 'GLOBAL' | 'TEAM'
   q?: string
   slug?: string
   roles?: Array<'OWNER' | 'ADMIN' | 'MEMBER'>
@@ -658,6 +659,9 @@ export const namespaceApi = {
     const query = new URLSearchParams({ page: String(page), size: String(size) })
     if (params.status) {
       query.set('status', params.status)
+    }
+    if (params.type) {
+      query.set('type', params.type)
     }
     if (params.q?.trim()) {
       query.set('q', params.q.trim())

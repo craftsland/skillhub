@@ -135,6 +135,21 @@ describe('PublishPage', () => {
     expect(html).toContain('publish.namespaceUnavailable')
   })
 
+  it('distinguishes a namespace validation request failure from an unavailable namespace', () => {
+    useMyNamespacesPageMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error('network down'),
+      refetch: vi.fn(),
+    })
+
+    const html = renderToStaticMarkup(createElement(PublishPage))
+
+    expect(html).toContain('publish.namespaceValidationError')
+    expect(html).toContain('publish.retryNamespaceValidation')
+    expect(html).not.toContain('publish.namespaceUnavailable')
+  })
+
   it('exports a named component function', () => {
     expect(typeof PublishPage).toBe('function')
   })

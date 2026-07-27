@@ -12,6 +12,7 @@ export function useNamespaceReviewEntry(hasGlobalReviewAccess: boolean) {
     page: 0,
     size: 1,
     status: 'ACTIVE',
+    type: 'TEAM',
     roles: [...REVIEW_ROLES],
   }, !hasGlobalReviewAccess)
   const activeEntry = getPreferredNamespaceReviewEntry(activeQuery.data?.items)
@@ -23,6 +24,7 @@ export function useNamespaceReviewEntry(hasGlobalReviewAccess: boolean) {
   const fallbackQuery = useMyNamespacesPage({
     page: 0,
     size: 1,
+    type: 'TEAM',
     roles: [...REVIEW_ROLES],
   }, fallbackEnabled)
   const fallbackEntry = fallbackEnabled
@@ -34,5 +36,8 @@ export function useNamespaceReviewEntry(hasGlobalReviewAccess: boolean) {
     isLoadingNamespaces: !hasGlobalReviewAccess
       && (activeQuery.isLoading || (fallbackEnabled && fallbackQuery.isLoading)),
     hasNamespaceQueryError: Boolean(activeQuery.error || (fallbackEnabled && fallbackQuery.error)),
+    retryNamespaceQueries: () => fallbackEnabled
+      ? fallbackQuery.refetch()
+      : activeQuery.refetch(),
   }
 }

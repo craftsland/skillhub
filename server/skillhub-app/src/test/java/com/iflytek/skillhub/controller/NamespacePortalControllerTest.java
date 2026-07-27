@@ -129,7 +129,7 @@ class NamespacePortalControllerTest {
         Namespace active = namespace(1L, "active", NamespaceStatus.ACTIVE, NamespaceType.TEAM);
         Namespace archived = namespace(3L, "archived", NamespaceStatus.ARCHIVED, NamespaceType.TEAM);
         given(namespaceMemberRepository.findByUserId("super-1")).willReturn(List.of());
-        given(namespaceRepository.search(eq(null), eq(null), eq(null), any()))
+        given(namespaceRepository.search(eq(null), eq(null), eq(null), eq(null), any()))
                 .willReturn(new org.springframework.data.domain.PageImpl<>(
                         List.of(active, archived),
                         org.springframework.data.domain.PageRequest.of(0, 2),
@@ -159,6 +159,7 @@ class NamespacePortalControllerTest {
         given(namespaceRepository.searchByIdIn(
                 eq(List.of(1L)),
                 eq(NamespaceStatus.ACTIVE),
+                eq(NamespaceType.TEAM),
                 eq("team"),
                 eq("team-ai"),
                 any()
@@ -172,6 +173,7 @@ class NamespacePortalControllerTest {
                         .param("page", "0")
                         .param("size", "20")
                         .param("status", "ACTIVE")
+                        .param("type", "TEAM")
                         .param("q", "team")
                         .param("slug", "team-ai")
                         .param("roles", "OWNER", "ADMIN")

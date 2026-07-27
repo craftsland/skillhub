@@ -3,6 +3,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { FileCheck2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
+import { Button } from '@/shared/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs'
 import {
@@ -54,6 +55,7 @@ export function ReviewsPage() {
     namespaceReviewEntry,
     isLoadingNamespaces,
     hasNamespaceQueryError,
+    retryNamespaceQueries,
   } = useNamespaceReviewEntry(hasGlobalReviewAccess)
   const showTypeTabs = isSkillAdmin && isUserAdmin
 
@@ -252,7 +254,16 @@ export function ReviewsPage() {
       <div className="space-y-8 animate-fade-up">
         <DashboardPageHeader title={t('reviews.title')} subtitle={t('reviews.subtitle')} />
         <Card className="p-8 text-center text-muted-foreground">
-          Loading...
+          {hasNamespaceQueryError ? (
+            <div className="space-y-3">
+              <p>{t('reviews.namespaceLoadError')}</p>
+              <Button type="button" variant="outline" onClick={() => retryNamespaceQueries()}>
+                {t('reviews.retryNamespaceLoad')}
+              </Button>
+            </div>
+          ) : (
+            'Loading...'
+          )}
         </Card>
       </div>
     )

@@ -492,6 +492,8 @@
     "pageSubtitle": "Manage access credentials for CLI and API"
   },
   "reviews": {
+    "namespaceLoadError": "Failed to load namespace review access.",
+    "retryNamespaceLoad": "Retry",
     "title": "Review Center",
     "subtitle": "Manage platform review tasks",
     "typeSkill": "Skill Reviews",
@@ -1365,6 +1367,8 @@
     "namespace": "Namespace",
     "selectNamespace": "Select namespace",
     "namespaceUnavailable": "The selected namespace is not active or is no longer available.",
+    "namespaceValidationError": "Failed to validate the selected namespace.",
+    "retryNamespaceValidation": "Retry validation",
     "visibility": "Visibility",
     "visibilityOptions": {
       "public": "Public",
