@@ -48,6 +48,15 @@ import type {
 import { ApiError } from '@/shared/lib/api-error'
 import i18n from '@/i18n/config'
 
+export interface MyNamespacePageParams {
+  page?: number
+  size?: number
+  status?: 'ACTIVE' | 'FROZEN' | 'ARCHIVED'
+  q?: string
+  slug?: string
+  roles?: Array<'OWNER' | 'ADMIN' | 'MEMBER'>
+}
+
 /**
  * Front-end API foundation for generated OpenAPI calls and hand-written convenience wrappers.
  *
@@ -643,10 +652,21 @@ export const namespaceApi = {
     return fetchJson<ManagedNamespace[]>(`${WEB_API_PREFIX}/me/namespaces`)
   },
 
-  async listMinePage(params: { page?: number; size?: number } = {}): Promise<PagedResponse<ManagedNamespace>> {
+  async listMinePage(params: MyNamespacePageParams = {}): Promise<PagedResponse<ManagedNamespace>> {
     const page = params.page ?? 0
     const size = params.size ?? 20
-    return fetchJson<PagedResponse<ManagedNamespace>>(`${WEB_API_PREFIX}/me/namespaces/page?page=${page}&size=${size}`)
+    const query = new URLSearchParams({ page: String(page), size: String(size) })
+    if (params.status) {
+      query.set('status', params.status)
+    }
+    if (params.q?.trim()) {
+      query.set('q', params.q.trim())
+    }
+    if (params.slug?.trim()) {
+      query.set('slug', normalizeNamespaceSlug(params.slug))
+    }
+    params.roles?.forEach((role) => query.append('roles', role))
+    return fetchJson<PagedResponse<ManagedNamespace>>(`${WEB_API_PREFIX}/me/namespaces/page?${query.toString()}`)
   },
 
   async getDetail(slug: string): Promise<Namespace> {

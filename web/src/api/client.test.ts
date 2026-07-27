@@ -238,6 +238,36 @@ describe('namespaceApi.listMinePage', () => {
       size: 25,
     })
   })
+
+  it('encodes namespace filters without issuing an unbounded request', async () => {
+    window.__SKILLHUB_RUNTIME_CONFIG__ = { apiBaseUrl: 'https://api.example.com' }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: 0,
+        msg: 'ok',
+        data: { items: [], total: 0, page: 1, size: 20 },
+        timestamp: '2026-05-07T00:00:00Z',
+        requestId: 'req-filtered',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await namespaceApi.listMinePage({
+      page: 1,
+      size: 20,
+      status: 'ACTIVE',
+      q: 'team ai',
+      slug: 'team-ai',
+      roles: ['OWNER', 'ADMIN'],
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.com/api/web/me/namespaces/page?page=1&size=20&status=ACTIVE&q=team+ai&slug=team-ai&roles=OWNER&roles=ADMIN',
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    )
+  })
 })
 
 describe('getDirectAuthRuntimeConfig', () => {

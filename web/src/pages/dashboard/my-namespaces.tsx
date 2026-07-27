@@ -160,7 +160,7 @@ export function MyNamespacesPage() {
   const canCreateNamespace = hasRole('SKILL_ADMIN') || hasRole('SUPER_ADMIN')
   const [page, setPage] = useState(0)
   const [pendingAction, setPendingAction] = useState<PendingNamespaceAction | null>(null)
-  const { data: namespacePage, isLoading } = useMyNamespacesPage(page, PAGE_SIZE)
+  const { data: namespacePage, isLoading } = useMyNamespacesPage({ page, size: PAGE_SIZE })
   const freezeMutation = useFreezeNamespace()
   const unfreezeMutation = useUnfreezeNamespace()
   const archiveMutation = useArchiveNamespace()

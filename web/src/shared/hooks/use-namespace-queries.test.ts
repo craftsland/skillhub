@@ -59,14 +59,42 @@ describe('use-namespace-queries exports', () => {
     }))
   })
 
-  it('passes page and size to the paged my namespaces query', async () => {
+  it('passes bounded filters to a single paged my namespaces query', async () => {
     const mod = await import('./use-namespace-queries')
 
-    mod.useMyNamespacesPage(3, 15)
+    mod.useMyNamespacesPage({
+      page: 3,
+      size: 15,
+      status: 'ACTIVE',
+      q: 'team',
+      slug: 'team-ai',
+      roles: ['OWNER', 'ADMIN'],
+    })
 
     expect(useQueryMock).toHaveBeenCalledWith(expect.objectContaining({
-      queryKey: ['namespaces', 'my', { page: 3, size: 15 }],
+      queryKey: ['namespaces', 'my', {
+        page: 3,
+        size: 15,
+        status: 'ACTIVE',
+        q: 'team',
+        slug: 'team-ai',
+        roles: ['OWNER', 'ADMIN'],
+      }],
     }))
+    const queryOptions = useQueryMock.mock.calls[useQueryMock.mock.calls.length - 1]?.[0]
+    listMinePageMock.mockResolvedValue({ items: [], total: 101, page: 3, size: 15 })
+
+    await queryOptions.queryFn()
+
+    expect(listMinePageMock).toHaveBeenCalledTimes(1)
+    expect(listMinePageMock).toHaveBeenCalledWith({
+      page: 3,
+      size: 15,
+      status: 'ACTIVE',
+      q: 'team',
+      slug: 'team-ai',
+      roles: ['OWNER', 'ADMIN'],
+    })
   })
 
   it('fetches every page for compatibility consumers instead of truncating after the first page', async () => {

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Namespace, NamespaceMember, ManagedNamespace, CreateNamespaceRequest, NamespaceCandidateUser, NamespaceRole, BatchMemberResponse, PagedResponse } from '@/api/types'
-import { namespaceApi } from '@/api/client'
+import { namespaceApi, type MyNamespacePageParams } from '@/api/client'
 import { replaceNamespaceMemberRole } from '@/shared/lib/namespace-member-cache'
 import { shouldEnableNamespaceMemberCandidates } from './skill-query-helpers'
 
@@ -25,8 +25,21 @@ async function getMyNamespaces(): Promise<ManagedNamespace[]> {
   return namespaces
 }
 
-async function getMyNamespacesPage(page = 0, size = MY_NAMESPACES_PAGE_SIZE): Promise<PagedResponse<ManagedNamespace>> {
-  return namespaceApi.listMinePage({ page, size })
+function normalizeMyNamespacePageParams(params: MyNamespacePageParams = {}): MyNamespacePageParams {
+  const q = params.q?.trim()
+  const slug = params.slug?.trim()
+  return {
+    page: params.page ?? 0,
+    size: params.size ?? MY_NAMESPACES_PAGE_SIZE,
+    ...(params.status ? { status: params.status } : {}),
+    ...(q ? { q } : {}),
+    ...(slug ? { slug } : {}),
+    ...(params.roles?.length ? { roles: [...params.roles] } : {}),
+  }
+}
+
+async function getMyNamespacesPage(params: MyNamespacePageParams): Promise<PagedResponse<ManagedNamespace>> {
+  return namespaceApi.listMinePage(params)
 }
 
 async function createNamespace(request: CreateNamespaceRequest): Promise<Namespace> {
@@ -80,10 +93,11 @@ export function useMyNamespaces(enabled = true) {
   })
 }
 
-export function useMyNamespacesPage(page = 0, size = MY_NAMESPACES_PAGE_SIZE, enabled = true) {
+export function useMyNamespacesPage(params: MyNamespacePageParams = {}, enabled = true) {
+  const normalizedParams = normalizeMyNamespacePageParams(params)
   return useQuery({
-    queryKey: ['namespaces', 'my', { page, size }],
-    queryFn: () => getMyNamespacesPage(page, size),
+    queryKey: ['namespaces', 'my', normalizedParams],
+    queryFn: () => getMyNamespacesPage(normalizedParams),
     enabled,
   })
 }
