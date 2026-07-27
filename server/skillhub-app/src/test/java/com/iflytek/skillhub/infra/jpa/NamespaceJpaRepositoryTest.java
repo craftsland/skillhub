@@ -66,6 +66,20 @@ class NamespaceJpaRepositoryTest {
                 .containsExactly("underscore-team");
     }
 
+    @Test
+    void search_acceptsNullQueryAlongsideOtherFilters() {
+        var page = repository.search(
+                NamespaceStatus.ACTIVE,
+                NamespaceType.TEAM,
+                null,
+                "percent-team",
+                PageRequest.of(0, 1)
+        );
+
+        assertThat(page.getContent()).extracting(Namespace::getSlug)
+                .containsExactly("percent-team");
+    }
+
     private Namespace persist(Namespace namespace) {
         entityManager.persist(namespace);
         return namespace;

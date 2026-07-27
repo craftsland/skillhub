@@ -32,8 +32,8 @@ public interface NamespaceJpaRepository
               AND (:type IS NULL OR n.type = :type)
               AND (
                 :query IS NULL
-                OR lower(n.slug) LIKE lower(concat('%', :query, '%')) ESCAPE '!'
-                OR lower(n.displayName) LIKE lower(concat('%', :query, '%')) ESCAPE '!'
+                OR lower(n.slug) LIKE lower(concat('%', cast(:query as string), '%')) ESCAPE '!'
+                OR lower(n.displayName) LIKE lower(concat('%', cast(:query as string), '%')) ESCAPE '!'
               )
               AND (:slug IS NULL OR n.slug = :slug)
             """)
@@ -52,8 +52,8 @@ public interface NamespaceJpaRepository
               AND (:type IS NULL OR n.type = :type)
               AND (
                 :query IS NULL
-                OR lower(n.slug) LIKE lower(concat('%', :query, '%')) ESCAPE '!'
-                OR lower(n.displayName) LIKE lower(concat('%', :query, '%')) ESCAPE '!'
+                OR lower(n.slug) LIKE lower(concat('%', cast(:query as string), '%')) ESCAPE '!'
+                OR lower(n.displayName) LIKE lower(concat('%', cast(:query as string), '%')) ESCAPE '!'
               )
               AND (:slug IS NULL OR n.slug = :slug)
             """)
