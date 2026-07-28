@@ -41,6 +41,12 @@ interface ReviewTaskSummary {
   version: string
 }
 
+interface SkillVersionSummary {
+  id: number
+  version: string
+  status: string
+}
+
 interface NamespaceCandidate {
   userId: string
   displayName: string
@@ -488,6 +494,40 @@ export class E2eTestDataBuilder {
     throw new Error(`Timed out waiting for pending review ${namespaceSlug}/${skillSlug}@${version}`)
   }
 
+  async waitForVersionStatus(
+    namespaceSlug: string,
+    skillSlug: string,
+    version: string,
+    expectedStatus: string,
+  ): Promise<number> {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      try {
+        const page = await parseEnvelope<{
+          items: SkillVersionSummary[]
+        }>(
+          await this.request.get(
+            `/api/web/skills/${encodeURIComponent(namespaceSlug)}/${encodeURIComponent(skillSlug)}/versions?page=0&size=100`,
+          ),
+        )
+
+        const matched = page.items.find((item) =>
+          item.version === version && item.status === expectedStatus,
+        )
+        if (matched) {
+          return matched.id
+        }
+      } catch {
+        // Security scanning and version projection can complete asynchronously.
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1_000))
+    }
+
+    throw new Error(
+      `Timed out waiting for ${namespaceSlug}/${skillSlug}@${version} to reach ${expectedStatus}`,
+    )
+  }
+
   async approveReview(reviewTaskId: number, comment = 'Approved by Playwright E2E'): Promise<void> {
     let lastError: unknown
     for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -510,6 +550,15 @@ export class E2eTestDataBuilder {
       }
     }
     throw lastError instanceof Error ? lastError : new Error('approveReview timed out')
+  }
+
+  async rejectReview(reviewTaskId: number, comment = 'Rejected by Playwright E2E'): Promise<void> {
+    await parseEnvelope<ReviewTaskSummary>(
+      await this.request.post(`/api/web/reviews/${reviewTaskId}/reject`, {
+        data: { comment },
+        headers: await csrfHeaders(this.page),
+      }),
+    )
   }
 
   async searchNamespaceMemberCandidates(slug: string, search: string): Promise<NamespaceCandidate[]> {
