@@ -116,7 +116,12 @@ public class PostgresSearchRebuildService implements SearchRebuildService {
             return;
         }
 
-        toDocument(skillOpt.get()).ifPresent(searchIndexService::index);
+        Optional<SkillSearchDocument> document = toDocument(skillOpt.get());
+        if (document.isPresent()) {
+            searchIndexService.index(document.get());
+        } else {
+            searchIndexService.remove(skillId);
+        }
     }
 
     private SearchIndexPayload buildSearchPayload(Skill skill) {
@@ -269,6 +274,9 @@ public class PostgresSearchRebuildService implements SearchRebuildService {
     }
 
     private Optional<SkillSearchDocument> toDocument(Skill skill) {
+        if (skill.getLatestVersionId() == null) {
+            return Optional.empty();
+        }
         Optional<Namespace> namespaceOpt = namespaceRepository.findById(skill.getNamespaceId());
         if (namespaceOpt.isEmpty()) {
             return Optional.empty();

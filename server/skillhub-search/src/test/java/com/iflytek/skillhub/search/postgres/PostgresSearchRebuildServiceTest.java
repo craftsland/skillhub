@@ -25,11 +25,37 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PostgresSearchRebuildServiceTest {
+
+    @Test
+    void rebuildBySkill_shouldRemoveDocumentWhenNoPublishedVersionExists() {
+        SkillRepository skillRepository = mock(SkillRepository.class);
+        NamespaceRepository namespaceRepository = mock(NamespaceRepository.class);
+        SkillVersionRepository skillVersionRepository = mock(SkillVersionRepository.class);
+        SearchIndexService searchIndexService = mock(SearchIndexService.class);
+
+        Skill skill = new Skill(7L, "pending-only", "owner-1", SkillVisibility.NAMESPACE_ONLY);
+        setField(skill, "id", 42L);
+        when(skillRepository.findById(42L)).thenReturn(Optional.of(skill));
+
+        PostgresSearchRebuildService service = newService(
+                skillRepository,
+                namespaceRepository,
+                skillVersionRepository,
+                searchIndexService
+        );
+
+        service.rebuildBySkill(42L);
+
+        verify(searchIndexService).remove(42L);
+        verify(searchIndexService, never()).index(any());
+    }
 
     @Test
     void rebuildBySkill_shouldIndexFrontmatterFieldsAndKeywordsWithoutBody() {
