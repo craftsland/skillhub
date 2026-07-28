@@ -15,6 +15,9 @@
 [![Java](https://img.shields.io/badge/java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![React](https://img.shields.io/badge/react-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 
+[![GitHub Stars](https://img.shields.io/github/stars/iflytek/skillhub?style=social)](https://github.com/iflytek/skillhub/stargazers)
+[![GitHub Watchers](https://img.shields.io/github/watchers/iflytek/skillhub?style=social)](https://github.com/iflytek/skillhub/watchers)
+
 </div>
 
 <div align="center">
@@ -34,6 +37,8 @@ governed place to share agent skills. Publish a skill package, push
 it to a namespace, and let others find it through search or
 install it via CLI. Built for on-premise deployment behind your
 firewall, with the same polish you'd expect from a public registry.
+
+> ⭐ If SkillHub fits your team, **star** the repo to help other teams find it, and **Watch → Custom → Releases** to get notified when a new version ships.
 
 ## Documentation
 
