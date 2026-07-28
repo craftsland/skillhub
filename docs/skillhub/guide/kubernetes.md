@@ -214,6 +214,12 @@ skillhub-storage-s3-secret-key: your-secret-key
   value: cn-shanghai
 ```
 
+### PostgreSQL 数据目录兼容性
+
+`with-infra` 会在启动时检查 PostgreSQL PVC 根目录：如果已存在 `PG_VERSION`，继续使用根目录中的旧集群；否则在 `pgdata/` 子目录初始化新集群，避免新 ext4 卷中的 `lost+found` 阻止 `initdb`。升级现有部署不需要移动数据库文件。
+
+回滚到不包含该检测逻辑的旧清单时，如果集群位于 `pgdata/`，必须保留当前启动命令，或显式设置 `PGDATA=/var/lib/postgresql/data/pgdata`。不要把正在运行的数据库目录手动移动到 PVC 根目录。
+
 ### 镜像说明
 
 | 组件 | 镜像 |
