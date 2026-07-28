@@ -8,10 +8,6 @@ import com.iflytek.skillhub.search.SearchIndexService;
 import com.iflytek.skillhub.search.SearchRebuildService;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Method;
-import java.util.Arrays;
-
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -40,18 +36,12 @@ class SearchIndexEventListenerTest {
     }
 
     @Test
-    void yankedVersionShouldTriggerSkillRebuild() throws Exception {
+    void yankedVersionShouldTriggerSkillRebuild() {
         SearchRebuildService searchRebuildService = mock(SearchRebuildService.class);
         SearchIndexService searchIndexService = mock(SearchIndexService.class);
         SearchIndexEventListener listener = new SearchIndexEventListener(searchRebuildService, searchIndexService);
 
-        Method handler = Arrays.stream(SearchIndexEventListener.class.getDeclaredMethods())
-                .filter(method -> Arrays.equals(method.getParameterTypes(), new Class<?>[]{SkillVersionYankedEvent.class}))
-                .findFirst()
-                .orElse(null);
-
-        assertThat(handler).isNotNull();
-        handler.invoke(listener, new SkillVersionYankedEvent(42L, 100L, "admin-1"));
+        listener.onSkillVersionYanked(new SkillVersionYankedEvent(42L, 100L, "admin-1"));
         verify(searchRebuildService).rebuildBySkill(42L);
     }
 }
