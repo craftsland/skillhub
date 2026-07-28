@@ -3,19 +3,6 @@ import { setEnglishLocale } from './helpers/auth-fixtures'
 import { loginWithCredentials, registerSession } from './helpers/session'
 import { E2eTestDataBuilder } from './helpers/test-data-builder'
 
-interface ReviewTaskSummary {
-  id: number
-}
-
-interface ReviewTaskPage {
-  items: ReviewTaskSummary[]
-}
-
-interface ApiEnvelope<T> {
-  code: number
-  data: T
-}
-
 function getOptionalEnv(name: string): string | undefined {
   const value = process.env[name]?.trim()
   return value ? value : undefined
@@ -87,13 +74,8 @@ test.describe('Rejected version replacement (Real API)', () => {
       expect(replacement.version).toBe(firstPublish.version)
       expect(replacementReviewId).not.toBe(rejectedReviewId)
 
-      const rejectedReviewsResponse = await adminPage.request.get(
-        '/api/web/reviews?status=REJECTED&page=0&size=100&sortDirection=DESC',
-      )
-      expect(rejectedReviewsResponse.ok()).toBe(true)
-      const rejectedReviews = await rejectedReviewsResponse.json() as ApiEnvelope<ReviewTaskPage>
-      expect(rejectedReviews.code).toBe(0)
-      expect(rejectedReviews.data.items.some((item) => item.id === rejectedReviewId)).toBe(false)
+      const replacedReviewResponse = await adminPage.request.get(`/api/web/reviews/${rejectedReviewId}`)
+      expect(replacedReviewResponse.status()).toBe(404)
     } finally {
       await adminBuilder.cleanup()
       await adminContext.close()
