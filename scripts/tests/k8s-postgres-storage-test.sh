@@ -40,7 +40,13 @@ fi
 wait_for_postgres() {
   local container="$1"
   for _ in $(seq 1 30); do
-    if docker exec "$container" pg_isready -U skillhub -d skillhub >/dev/null 2>&1; then
+    # docker-entrypoint.sh briefly starts a temporary PostgreSQL process while
+    # initializing a fresh cluster. Wait until PID 1 is the final server so a
+    # successful readiness probe cannot race with that temporary shutdown.
+    if docker exec "$container" sh -ec \
+      'test "$(cat /proc/1/comm)" = postgres' >/dev/null 2>&1 \
+      && docker exec "$container" psql -U skillhub -d skillhub -Atqc \
+        'SELECT 1' >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
