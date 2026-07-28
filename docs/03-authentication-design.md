@@ -377,7 +377,7 @@ API Token 仍保留，但定位从“CLI 唯一认证方式”调整为“平台
 - 用途：自动化脚本、兼容层调用、手工 Token 管理、后续系统集成
 - 存储：只存 SHA-256 哈希，明文只展示一次
 - 校验：从 `Authorization: Bearer <token>` 提取 → 哈希比对 → 加载关联用户 → 检查用户状态
-- 失败闭合：公共读接口只有在缺少 `Authorization` 头时才按匿名访问处理；只要出现 Bearer 凭证，空值、格式错误、未知、过期、已吊销、用户缺失或用户禁用均返回 401，不能回退为匿名访问
+- 失败闭合与身份优先级：共享认证过滤器只识别 Bearer scheme。有效 Bearer 覆盖已加载的 Web Session 身份；Bearer 为空、格式错误、未知、过期、已吊销、用户缺失或用户禁用时立即返回 401，即使存在有效 Session 也不得回退。缺少 `Authorization` 头或使用 Basic/其他非 Bearer scheme 时保留有效 Session；若无 Session，公共读接口按匿名访问，`whoami` 返回 401
 - 作用域：`skill:read`, `skill:publish`, `skill:delete`, `token:manage`
 - 拒绝原因：API Token 缺少作用域或不能访问某个接口时，403 响应返回本地化的安全原因和 `requestId`；其他授权失败仍返回通用信息，避免暴露内部异常
 
@@ -622,10 +622,15 @@ window.location.href = '/oauth2/authorization/github'
 
 ### 10.3 CLI API
 
-| 接口 | 所需凭证 | 额外判定 |
-|------|---------|---------|
-| `GET /api/v1/whoami` | 任意有效 Bearer Token | 无 |
-| `POST /api/v1/publish` | Bearer Token + `skill:publish` | 普通用户要求目标 namespace 成员；`SUPER_ADMIN` 可绕过 |
+| 接口 | 凭证规则 | 授权与错误语义 |
+|------|---------|---------------|
+| `GET /api/cli/v1/auth/whoami` | 有效 Web Session 或有效 Bearer Token | 无有效身份返回 401；坏 Bearer 即使存在 Session 也返回 401 |
+| `GET /api/cli/v1/skills/search` | Session 可用；无 Session 时可匿名；提供 Bearer 时必须有效 | 匿名仅返回公开可安装 skill；有效 Bearer 覆盖 Session；坏 Bearer 返回 401，不得降级 |
+| `GET /api/cli/v1/skills/{namespace}/{slug}/resolve` | Session 可用；无 Session 时可匿名读取公开资源；提供 Bearer 时必须有效 | 有效 Bearer 覆盖 Session；坏 Bearer 返回 401；有效身份无资源权限返回 403 |
+| `GET /api/cli/v1/skills/{namespace}/{slug}/download` | Session 可用；无 Session 时可匿名下载公开资源；提供 Bearer 时必须有效 | 有效 Bearer 覆盖 Session；坏 Bearer 返回 401；有效身份无资源权限返回 403 |
+| `GET /api/cli/v1/skills/{namespace}/{slug}/versions/{version}/download` | Session 可用；无 Session 时可匿名下载公开资源；提供 Bearer 时必须有效 | 有效 Bearer 覆盖 Session；坏 Bearer 返回 401；有效身份无资源权限返回 403 |
+
+Spring Security 先加载 Web Session 身份，共享 API token 过滤器随后只处理 Bearer scheme。有效 Bearer 会覆盖 Session，确保请求使用 token 的用户、角色与 scope；Bearer 为空、格式错误、未知、过期、已撤销、用户缺失或用户禁用时，过滤器清除当前身份并立即返回 401，不能回退到 Session 或匿名身份。完全缺少 `Authorization` 头或使用 Basic/其他非 Bearer scheme 时，过滤器不改变已有 Session；如果 Session 也不存在，公共读接口按匿名身份执行，而 `whoami` 返回 401。身份已验证但 token scope 或资源可见性不足时返回 403；服务端不向客户端区分 token 不存在、过期或已撤销。`whoami.email` 字段始终存在，但没有可用邮箱时值为 `null`。
 
 ### 10.4 Admin API
 
