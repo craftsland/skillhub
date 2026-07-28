@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
+import type { components } from '../../src/api/generated/schema'
 import { csrfHeaders } from './csrf'
 
 type CleanupTask = () => Promise<void>
@@ -32,20 +33,9 @@ export interface SeededReviewData {
   skill: SeededSkill
 }
 
-interface ReviewTaskSummary {
-  id: number
-  namespace: string
-  skillSlug: string
-  status: string
-  submittedBy: string
-  version: string
-}
-
-interface SkillVersionSummary {
-  id: number
-  version: string
-  status: string
-}
+type ReviewTaskResponse = components['schemas']['ReviewTaskResponse']
+type SkillVersionResponse = components['schemas']['SkillVersionResponse']
+type SkillVersionStatus = NonNullable<SkillVersionResponse['status']>
 
 interface NamespaceCandidate {
   userId: string
@@ -469,19 +459,17 @@ export class E2eTestDataBuilder {
   async waitForPendingReview(namespaceSlug: string, skillSlug: string, version: string): Promise<number> {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       try {
-        const page = await parseEnvelope<{
-          items: ReviewTaskSummary[]
-        }>(
+        const page = await parseEnvelope<components['schemas']['PageResponseReviewTaskResponse']>(
           await this.request.get('/api/web/reviews?status=PENDING&page=0&size=100&sortDirection=DESC'),
         )
 
-        const matched = page.items.find((item) =>
+        const matched = page.items?.find((item) =>
           item.namespace === namespaceSlug &&
           item.skillSlug === skillSlug &&
           item.version === version &&
           item.status === 'PENDING',
         )
-        if (matched) {
+        if (matched?.id != null) {
           return matched.id
         }
       } catch {
@@ -498,22 +486,20 @@ export class E2eTestDataBuilder {
     namespaceSlug: string,
     skillSlug: string,
     version: string,
-    expectedStatus: string,
+    expectedStatus: SkillVersionStatus,
   ): Promise<number> {
     for (let attempt = 0; attempt < 60; attempt += 1) {
       try {
-        const page = await parseEnvelope<{
-          items: SkillVersionSummary[]
-        }>(
+        const page = await parseEnvelope<components['schemas']['PageResponseSkillVersionResponse']>(
           await this.request.get(
             `/api/web/skills/${encodeURIComponent(namespaceSlug)}/${encodeURIComponent(skillSlug)}/versions?page=0&size=100`,
           ),
         )
 
-        const matched = page.items.find((item) =>
+        const matched = page.items?.find((item) =>
           item.version === version && item.status === expectedStatus,
         )
-        if (matched) {
+        if (matched?.id != null) {
           return matched.id
         }
       } catch {
@@ -553,7 +539,7 @@ export class E2eTestDataBuilder {
   }
 
   async rejectReview(reviewTaskId: number, comment = 'Rejected by Playwright E2E'): Promise<void> {
-    await parseEnvelope<ReviewTaskSummary>(
+    await parseEnvelope<ReviewTaskResponse>(
       await this.request.post(`/api/web/reviews/${reviewTaskId}/reject`, {
         data: { comment },
         headers: await csrfHeaders(this.page),
