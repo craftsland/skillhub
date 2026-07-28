@@ -442,6 +442,13 @@ namespace `my-space` plus skill slug `my-skill`.
 
 📖 **[Complete Hermes Agent Integration Guide →](./docs/hermes-integration-en.md)**
 
+### [HarnessClaw Engine](https://github.com/harnessclaw/harnessclaw-engine)
+
+[HarnessClaw Engine](https://github.com/harnessclaw/harnessclaw-engine) is a Go LLM programming assistant engine that exposes its capabilities over WebSocket. It loads skills from `SKILL.md` files with YAML frontmatter and parameter substitution, scanning each configured directory for `skill-name/SKILL.md` (default `~/.harnessclaw/workspace/skills/`, with earlier directories taking priority on name conflicts). Install a SkillHub package straight into that directory with the CLI's `--dir` option, no registry adapter required:
+
+```bash
+npx clawhub --dir ~/.harnessclaw/workspace/skills install my-skill
+```
 ### [AstronClaw](https://agent.xfyun.cn/astron-claw)
 
 [AstronClaw](https://agent.xfyun.cn/astron-claw) is a cloud AI assistant built on OpenClaw's core capabilities, providing 24/7 online service through enterprise platforms like WeChat Work, DingTalk, and Feishu. It features a built-in skill system with over 130 official skills. You can connect it to a self-hosted SkillHub registry to enable one-click skill installation, search repository, dialogue-based automatic installation, and even custom skills management within your organization.
