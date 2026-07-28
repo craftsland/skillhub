@@ -150,13 +150,9 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/providers"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data.length()").value(3))
-            .andExpect(jsonPath("$.data[*].id", hasItems("github", "gitee", "gitlab")))
-            .andExpect(jsonPath("$.data[*].authorizationUrl", hasItems(
-                "/oauth2/authorization/github",
-                "/oauth2/authorization/gitee",
-                "/oauth2/authorization/gitlab"
-            )))
+            .andExpect(jsonPath("$.data.length()").value(1))
+            .andExpect(jsonPath("$.data[*].id", hasItems("github")))
+            .andExpect(jsonPath("$.data[*].authorizationUrl", hasItems("/oauth2/authorization/github")))
             .andExpect(jsonPath("$.timestamp").isNotEmpty())
             .andExpect(jsonPath("$.requestId").isNotEmpty());
     }
@@ -167,8 +163,7 @@ class AuthControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
             .andExpect(jsonPath("$.data[*].authorizationUrl", hasItems(
-                "/oauth2/authorization/github?returnTo=%2Fdashboard%2Fpublish",
-                "/oauth2/authorization/gitee?returnTo=%2Fdashboard%2Fpublish"
+                "/oauth2/authorization/github?returnTo=%2Fdashboard%2Fpublish"
             )));
     }
 
@@ -177,7 +172,8 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/methods").param("returnTo", "/dashboard/publish"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data[*].id", hasItems("local-password", "oauth-github", "oauth-gitee")))
+            .andExpect(jsonPath("$.data.length()").value(2))
+            .andExpect(jsonPath("$.data[*].id", hasItems("local-password", "oauth-github")))
             .andExpect(jsonPath("$.data[?(@.id=='local-password')].methodType").value(hasItems("PASSWORD")))
             .andExpect(jsonPath("$.data[?(@.id=='oauth-github')].actionUrl")
                 .value(hasItems("/oauth2/authorization/github?returnTo=%2Fdashboard%2Fpublish")));

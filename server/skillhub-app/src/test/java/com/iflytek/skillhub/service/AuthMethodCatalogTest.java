@@ -17,6 +17,31 @@ import org.springframework.boot.autoconfigure.security.oauth2.client.OAuth2Clien
 class AuthMethodCatalogTest {
 
     @Test
+    void catalogsShouldHideEmptyAndPlaceholderOAuthProviders() {
+        OAuth2ClientProperties oauthProperties = new OAuth2ClientProperties();
+        oauthProperties.getRegistration().put("valid", registration("production-client", "Valid"));
+        oauthProperties.getRegistration().put("missing", registration(null, "Missing"));
+        oauthProperties.getRegistration().put("blank", registration("  ", "Blank"));
+        oauthProperties.getRegistration().put("placeholder", registration("PLACEHOLDER", "Placeholder"));
+        oauthProperties.getRegistration().put("local", registration("local-placeholder", "Local"));
+
+        AuthMethodCatalog catalog = new AuthMethodCatalog(
+            oauthProperties,
+            new DirectAuthProperties(),
+            new AuthSessionBootstrapProperties(),
+            List.of(),
+            List.of()
+        );
+
+        assertThat(catalog.listOAuthProviders(null))
+            .extracting(provider -> provider.id())
+            .containsExactly("valid");
+        assertThat(catalog.listMethods(null))
+            .extracting(method -> method.id())
+            .containsExactly("local-password", "oauth-valid");
+    }
+
+    @Test
     void listMethodsShouldUseProviderDisplayNamesForCompatibleAuthMethods() {
         OAuth2ClientProperties oauthProperties = new OAuth2ClientProperties();
         DirectAuthProperties directAuthProperties = new DirectAuthProperties();
@@ -121,5 +146,12 @@ class AuthMethodCatalogTest {
                 "direct-private-sso:private-sso",
                 "bootstrap-private-sso:private-sso"
             );
+    }
+
+    private static OAuth2ClientProperties.Registration registration(String clientId, String clientName) {
+        OAuth2ClientProperties.Registration registration = new OAuth2ClientProperties.Registration();
+        registration.setClientId(clientId);
+        registration.setClientName(clientName);
+        return registration;
     }
 }
