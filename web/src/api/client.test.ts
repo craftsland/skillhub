@@ -260,12 +260,13 @@ describe('namespaceApi.listMinePage', () => {
       type: 'TEAM',
       q: 'team ai',
       slug: 'team-ai',
+      sort: ['slug,desc'],
       roles: ['OWNER', 'ADMIN'],
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.example.com/api/web/me/namespaces/page?page=1&size=20&status=ACTIVE&type=TEAM&q=team+ai&slug=team-ai&roles=OWNER&roles=ADMIN',
+      'https://api.example.com/api/web/me/namespaces/page?page=1&size=20&sort=slug%2Cdesc&status=ACTIVE&type=TEAM&q=team+ai&slug=team-ai&roles=OWNER&roles=ADMIN',
       expect.objectContaining({ headers: expect.any(Headers) }),
     )
   })

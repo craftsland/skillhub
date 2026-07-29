@@ -16,6 +16,7 @@ function normalizeMyNamespacePageParams(params: MyNamespacePageParams = {}): MyN
     ...(params.type ? { type: params.type } : {}),
     ...(q ? { q } : {}),
     ...(slug ? { slug } : {}),
+    ...(params.sort?.length ? { sort: [...params.sort] } : {}),
     ...(params.roles?.length ? { roles: [...params.roles] } : {}),
   }
 }

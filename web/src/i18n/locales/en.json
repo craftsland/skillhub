@@ -493,6 +493,7 @@
   },
   "reviews": {
     "namespaceLoadError": "Failed to load namespace review access.",
+    "loadingNamespaceAccess": "Loading namespace review access...",
     "retryNamespaceLoad": "Retry",
     "title": "Review Center",
     "subtitle": "Manage platform review tasks",

@@ -262,7 +262,7 @@ export function ReviewsPage() {
               </Button>
             </div>
           ) : (
-            'Loading...'
+            t('reviews.loadingNamespaceAccess')
           )}
         </Card>
       </div>

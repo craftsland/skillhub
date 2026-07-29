@@ -48,15 +48,21 @@ import type {
 import { ApiError } from '@/shared/lib/api-error'
 import i18n from '@/i18n/config'
 
-export interface MyNamespacePageParams {
-  page?: number
-  size?: number
-  status?: 'ACTIVE' | 'FROZEN' | 'ARCHIVED'
-  type?: 'GLOBAL' | 'TEAM'
-  q?: string
-  slug?: string
-  roles?: Array<'OWNER' | 'ADMIN' | 'MEMBER'>
-}
+type OperationQuery<Operation> = Operation extends { parameters: { query?: infer Query } } ? NonNullable<Query> : never
+type OperationData<Operation> = Operation extends {
+  responses: {
+    200: {
+      content: {
+        '*/*': infer Envelope
+      }
+    }
+  }
+} ? Envelope extends { data?: infer Data } ? NonNullable<Data> : never : never
+
+type ListMyNamespacesPageOperation = paths['/api/web/me/namespaces/page']['get']
+
+export type MyNamespacePageParams = OperationQuery<ListMyNamespacesPageOperation>
+export type MyNamespacePageResponse = OperationData<ListMyNamespacesPageOperation> & PagedResponse<ManagedNamespace>
 
 /**
  * Front-end API foundation for generated OpenAPI calls and hand-written convenience wrappers.
@@ -653,10 +659,11 @@ export const namespaceApi = {
     return fetchJson<ManagedNamespace[]>(`${WEB_API_PREFIX}/me/namespaces`)
   },
 
-  async listMinePage(params: MyNamespacePageParams = {}): Promise<PagedResponse<ManagedNamespace>> {
+  async listMinePage(params: MyNamespacePageParams = {}): Promise<MyNamespacePageResponse> {
     const page = params.page ?? 0
     const size = params.size ?? 20
     const query = new URLSearchParams({ page: String(page), size: String(size) })
+    params.sort?.forEach((sort) => query.append('sort', sort))
     if (params.status) {
       query.set('status', params.status)
     }
@@ -670,7 +677,7 @@ export const namespaceApi = {
       query.set('slug', normalizeNamespaceSlug(params.slug))
     }
     params.roles?.forEach((role) => query.append('roles', role))
-    return fetchJson<PagedResponse<ManagedNamespace>>(`${WEB_API_PREFIX}/me/namespaces/page?${query.toString()}`)
+    return fetchJson<MyNamespacePageResponse>(`${WEB_API_PREFIX}/me/namespaces/page?${query.toString()}`)
   },
 
   async getDetail(slug: string): Promise<Namespace> {

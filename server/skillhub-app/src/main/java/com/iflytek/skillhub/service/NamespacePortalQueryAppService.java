@@ -297,7 +297,18 @@ public class NamespacePortalQueryAppService {
                 ? pageable.getPageSize()
                 : DEFAULT_MY_NAMESPACE_PAGE_SIZE;
         int size = Math.min(Math.max(requestedSize, 1), MAX_MY_NAMESPACE_PAGE_SIZE);
-        return PageRequest.of(page, size, Sort.by(NAMESPACE_SLUG_SORT).ascending());
+        return PageRequest.of(page, size, normalizeMyNamespacesSort(pageable));
+    }
+
+    private Sort normalizeMyNamespacesSort(Pageable pageable) {
+        if (pageable == null || pageable.getSort().isUnsorted()) {
+            return Sort.by(NAMESPACE_SLUG_SORT).ascending();
+        }
+        Sort.Order slugOrder = pageable.getSort().getOrderFor(NAMESPACE_SLUG_SORT);
+        if (slugOrder == null) {
+            return Sort.by(NAMESPACE_SLUG_SORT).ascending();
+        }
+        return Sort.by(new Sort.Order(slugOrder.getDirection(), NAMESPACE_SLUG_SORT));
     }
 
     private String normalizeFilter(String value) {

@@ -493,6 +493,7 @@
   },
   "reviews": {
     "namespaceLoadError": "无法加载命名空间审核权限。",
+    "loadingNamespaceAccess": "正在加载命名空间审核权限...",
     "retryNamespaceLoad": "重试",
     "title": "审核中心",
     "subtitle": "管理平台审核事务",

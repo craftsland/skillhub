@@ -57,6 +57,7 @@ describe('use-namespace-queries exports', () => {
       type: 'TEAM',
       q: 'team',
       slug: 'team-ai',
+      sort: ['slug,desc'],
       roles: ['OWNER', 'ADMIN'],
     })
 
@@ -68,6 +69,7 @@ describe('use-namespace-queries exports', () => {
         type: 'TEAM',
         q: 'team',
         slug: 'team-ai',
+        sort: ['slug,desc'],
         roles: ['OWNER', 'ADMIN'],
       }],
     }))
@@ -84,6 +86,7 @@ describe('use-namespace-queries exports', () => {
       type: 'TEAM',
       q: 'team',
       slug: 'team-ai',
+      sort: ['slug,desc'],
       roles: ['OWNER', 'ADMIN'],
     })
   })

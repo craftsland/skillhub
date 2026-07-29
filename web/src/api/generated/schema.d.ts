@@ -10051,8 +10051,16 @@ export interface operations {
     };
     listMyNamespacesPage: {
         parameters: {
-            query: {
-                pageable: components["schemas"]["Pageable"];
+            query?: {
+                /** @description Zero-based page index. */
+                page?: number;
+                /** @description Page size. Values above the namespace list limit are bounded by the backend. */
+                size?: number;
+                /**
+                 * @description Sort criteria in property,direction form. Only slug sorting is honored; defaults to slug,asc.
+                 * @example slug,asc
+                 */
+                sort?: string[];
                 status?: "ACTIVE" | "FROZEN" | "ARCHIVED";
                 type?: "GLOBAL" | "TEAM";
                 q?: string;
@@ -10078,8 +10086,16 @@ export interface operations {
     };
     listMyNamespacesPage_1: {
         parameters: {
-            query: {
-                pageable: components["schemas"]["Pageable"];
+            query?: {
+                /** @description Zero-based page index. */
+                page?: number;
+                /** @description Page size. Values above the namespace list limit are bounded by the backend. */
+                size?: number;
+                /**
+                 * @description Sort criteria in property,direction form. Only slug sorting is honored; defaults to slug,asc.
+                 * @example slug,asc
+                 */
+                sort?: string[];
                 status?: "ACTIVE" | "FROZEN" | "ARCHIVED";
                 type?: "GLOBAL" | "TEAM";
                 q?: string;
