@@ -257,12 +257,23 @@ redis:
 externalRedis:
   host: ""
   port: 6379
+  username: ""
   password: ""
+  tls:
+    enabled: false
+  connectTimeout: ""
+  timeout: ""
+  clientName: ""
   sentinel:
     enabled: false
     masterSet: mymaster
     nodes: []
+    username: ""
     password: ""
+  cluster:
+    enabled: false
+    nodes: []
+    maxRedirects: 5
 
 # ============================================================================
 # Server 配置

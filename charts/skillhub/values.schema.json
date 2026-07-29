@@ -210,15 +210,27 @@
     "externalRedis": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["host", "port", "password", "sentinel"],
+      "required": ["host", "port", "username", "password", "tls", "connectTimeout", "timeout", "clientName", "sentinel", "cluster"],
       "properties": {
         "host": { "type": "string", "pattern": "^$|^[A-Za-z0-9._-]+$" },
         "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "username": { "type": "string" },
         "password": { "type": "string" },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+        "connectTimeout": { "type": "string" },
+        "timeout": { "type": "string" },
+        "clientName": { "type": "string" },
         "sentinel": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["enabled", "masterSet", "nodes", "password"],
+          "required": ["enabled", "masterSet", "nodes", "username", "password"],
           "properties": {
             "enabled": { "type": "boolean" },
             "masterSet": { "type": "string", "minLength": 1 },
@@ -226,7 +238,21 @@
               "type": "array",
               "items": { "type": "string", "pattern": "^[^:]+:[0-9]+$" }
             },
+            "username": { "type": "string" },
             "password": { "type": "string" }
+          }
+        },
+        "cluster": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "nodes", "maxRedirects"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "nodes": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[^:]+:[0-9]+$" }
+            },
+            "maxRedirects": { "type": "integer", "minimum": 0 }
           }
         }
       }

@@ -94,6 +94,12 @@ jobs:
             args: >-
               --set redis.architecture=replication
               --set redis.sentinel.enabled=true
+          - name: external-redis-cluster
+            description: 外部 Redis Cluster
+            args: >-
+              --set redis.enabled=false
+              --set externalRedis.cluster.enabled=true
+              --set-json 'externalRedis.cluster.nodes=["redis-0.example.com:6379","redis-1.example.com:6379","redis-2.example.com:6379"]'
           - name: ingress-tls-certmanager
             description: Ingress + TLS + cert-manager
             args: >-

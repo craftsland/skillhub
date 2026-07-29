@@ -86,6 +86,70 @@ write_env "$invalid_forwarded_proto_env" "release-download-secret-32-bytes-minim
 printf '%s\n' "SKILLHUB_TRUST_FORWARDED_PROTO=yes" >>"$invalid_forwarded_proto_env"
 expect_fail "$invalid_forwarded_proto_env" "SKILLHUB_TRUST_FORWARDED_PROTO must be true or false"
 
+valid_redis_cluster_env="$tmp/valid-redis-cluster.env"
+write_env "$valid_redis_cluster_env" "release-download-secret-32-bytes-minimum"
+cat >>"$valid_redis_cluster_env" <<'EOF'
+SPRING_DATA_REDIS_CLUSTER_NODES=redis-a.example.com:6379,redis-b.example.com:6380
+SPRING_DATA_REDIS_CLUSTER_MAX_REDIRECTS=5
+SPRING_DATA_REDIS_SSL_ENABLED=true
+EOF
+"$SCRIPT" "$valid_redis_cluster_env" >/dev/null
+
+invalid_redis_cluster_node_env="$tmp/invalid-redis-cluster-node.env"
+write_env "$invalid_redis_cluster_node_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' "SPRING_DATA_REDIS_CLUSTER_NODES=redis-a.example.com" >>"$invalid_redis_cluster_node_env"
+expect_fail "$invalid_redis_cluster_node_env" "SPRING_DATA_REDIS_CLUSTER_NODES entries must use host:port"
+
+invalid_redis_cluster_port_env="$tmp/invalid-redis-cluster-port.env"
+write_env "$invalid_redis_cluster_port_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' "SPRING_DATA_REDIS_CLUSTER_NODES=redis-a.example.com:65536" >>"$invalid_redis_cluster_port_env"
+expect_fail "$invalid_redis_cluster_port_env" "SPRING_DATA_REDIS_CLUSTER_NODES port must be between 1 and 65535"
+
+invalid_redis_redirects_env="$tmp/invalid-redis-redirects.env"
+write_env "$invalid_redis_redirects_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' "SPRING_DATA_REDIS_CLUSTER_MAX_REDIRECTS=-1" >>"$invalid_redis_redirects_env"
+expect_fail "$invalid_redis_redirects_env" "SPRING_DATA_REDIS_CLUSTER_MAX_REDIRECTS must be a non-negative integer"
+
+invalid_redis_database_env="$tmp/invalid-redis-database.env"
+write_env "$invalid_redis_database_env" "release-download-secret-32-bytes-minimum"
+cat >>"$invalid_redis_database_env" <<'EOF'
+SPRING_DATA_REDIS_CLUSTER_NODES=redis-a.example.com:6379
+SPRING_DATA_REDIS_DATABASE=1
+EOF
+expect_fail "$invalid_redis_database_env" "SPRING_DATA_REDIS_DATABASE must be 0 when SPRING_DATA_REDIS_CLUSTER_NODES is set"
+
+valid_redis_sentinel_env="$tmp/valid-redis-sentinel.env"
+write_env "$valid_redis_sentinel_env" "release-download-secret-32-bytes-minimum"
+cat >>"$valid_redis_sentinel_env" <<'EOF'
+SPRING_DATA_REDIS_SENTINEL_MASTER=mymaster
+SPRING_DATA_REDIS_SENTINEL_NODES=sentinel-a.example.com:26379,sentinel-b.example.com:26379
+SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST=false
+EOF
+"$SCRIPT" "$valid_redis_sentinel_env" >/dev/null
+
+missing_redis_sentinel_nodes_env="$tmp/missing-redis-sentinel-nodes.env"
+write_env "$missing_redis_sentinel_nodes_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' "SPRING_DATA_REDIS_SENTINEL_MASTER=mymaster" >>"$missing_redis_sentinel_nodes_env"
+expect_fail "$missing_redis_sentinel_nodes_env" "SPRING_DATA_REDIS_SENTINEL_NODES is required when SPRING_DATA_REDIS_SENTINEL_MASTER is set"
+
+missing_redis_sentinel_master_env="$tmp/missing-redis-sentinel-master.env"
+write_env "$missing_redis_sentinel_master_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' "SPRING_DATA_REDIS_SENTINEL_NODES=sentinel-a.example.com:26379" >>"$missing_redis_sentinel_master_env"
+expect_fail "$missing_redis_sentinel_master_env" "SPRING_DATA_REDIS_SENTINEL_MASTER is required when SPRING_DATA_REDIS_SENTINEL_NODES is set"
+
+invalid_redis_sentinel_port_env="$tmp/invalid-redis-sentinel-port.env"
+write_env "$invalid_redis_sentinel_port_env" "release-download-secret-32-bytes-minimum"
+cat >>"$invalid_redis_sentinel_port_env" <<'EOF'
+SPRING_DATA_REDIS_SENTINEL_MASTER=mymaster
+SPRING_DATA_REDIS_SENTINEL_NODES=sentinel-a.example.com:70000
+EOF
+expect_fail "$invalid_redis_sentinel_port_env" "SPRING_DATA_REDIS_SENTINEL_NODES port must be between 1 and 65535"
+
+invalid_redis_sentinel_check_env="$tmp/invalid-redis-sentinel-check.env"
+write_env "$invalid_redis_sentinel_check_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' "SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST=yes" >>"$invalid_redis_sentinel_check_env"
+expect_fail "$invalid_redis_sentinel_check_env" "SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST must be true or false"
+
 draft_env="$tmp/draft.env"
 while IFS= read -r line || [[ -n "$line" ]]; do
   case "$line" in

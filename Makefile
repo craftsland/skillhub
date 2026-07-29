@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-backend-app build-cli build-frontend build-web check clean cli-install db-reset dev dev-all dev-all-down dev-all-reset dev-down dev-logs dev-server dev-server-restart dev-status dev-web docs-build docs-dev docs-preview generate-api help lint-cli lint-web namespace-smoke parallel-down parallel-init parallel-sync parallel-up pr publish-cli publish-cli-major publish-cli-minor staging staging-down staging-logs test test-backend test-backend-app test-cli test-e2e-frontend test-e2e-smoke-frontend test-frontend test-web typecheck-cli typecheck-web validate-release-config web-deps web-install web-install-ci
+.PHONY: build build-backend build-backend-app build-cli build-frontend build-web check clean cli-install db-reset dev dev-all dev-all-down dev-all-reset dev-down dev-logs dev-server dev-server-restart dev-status dev-web docs-build docs-dev docs-preview generate-api help lint-cli lint-web namespace-smoke parallel-down parallel-init parallel-sync parallel-up pr publish-cli publish-cli-major publish-cli-minor staging staging-down staging-logs test test-backend test-backend-app test-cli test-e2e-frontend test-e2e-smoke-frontend test-frontend test-redis-cluster test-web typecheck-cli typecheck-web validate-release-config web-deps web-install web-install-ci
 
 DEV_DIR := .dev
 DEV_SERVER_PID := $(DEV_DIR)/server.pid
@@ -394,3 +394,6 @@ docs-build: ## 构建文档站点
 
 docs-preview: ## 预览构建后的文档站点
 	cd docs/skillhub && npm run preview
+
+test-redis-cluster: ## 使用真实 Redis Cluster 验证 Spring Data、Session 和 Redisson Stream
+	./scripts/redis-cluster-integration-test.sh

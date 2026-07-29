@@ -56,11 +56,32 @@
 {{- if and (not .Values.postgresql.enabled) (not .Values.externalDatabase.host) -}}
 {{- fail "postgresql.enabled=false requires externalDatabase.host for dependency checks" -}}
 {{- end -}}
-{{- if and (not .Values.redis.enabled) (not .Values.externalRedis.sentinel.enabled) (not .Values.externalRedis.host) -}}
+{{- if and .Values.externalRedis.sentinel.enabled .Values.externalRedis.cluster.enabled -}}
+{{- fail "externalRedis.sentinel.enabled and externalRedis.cluster.enabled are mutually exclusive" -}}
+{{- end -}}
+{{- if and .Values.redis.enabled .Values.externalRedis.cluster.enabled -}}
+{{- fail "externalRedis.cluster.enabled=true requires redis.enabled=false" -}}
+{{- end -}}
+{{- if and (not .Values.redis.enabled) (not .Values.externalRedis.sentinel.enabled) (not .Values.externalRedis.cluster.enabled) (not .Values.externalRedis.host) -}}
 {{- fail "redis.enabled=false requires externalRedis.host" -}}
 {{- end -}}
 {{- if and (not .Values.redis.enabled) .Values.externalRedis.sentinel.enabled (not .Values.externalRedis.sentinel.nodes) -}}
 {{- fail "external Redis Sentinel requires at least one externalRedis.sentinel.nodes entry" -}}
+{{- end -}}
+{{- if and (not .Values.redis.enabled) .Values.externalRedis.cluster.enabled (not .Values.externalRedis.cluster.nodes) -}}
+{{- fail "external Redis Cluster requires at least one externalRedis.cluster.nodes entry" -}}
+{{- end -}}
+{{- if and (not .Values.redis.enabled) .Values.externalRedis.cluster.enabled -}}
+{{- range $node := .Values.externalRedis.cluster.nodes -}}
+{{- if not (regexMatch "^[A-Za-z0-9._-]+:[0-9]{1,5}$" $node) -}}
+{{- fail (printf "externalRedis.cluster.nodes entry must use host:port: %s" $node) -}}
+{{- end -}}
+{{- $parts := splitList ":" $node -}}
+{{- $port := last $parts | int -}}
+{{- if or (lt $port 1) (gt $port 65535) -}}
+{{- fail (printf "externalRedis.cluster.nodes port must be between 1 and 65535: %s" $node) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- if and .Values.s3.endpoint (not (regexMatch $absoluteHttpUrlPattern .Values.s3.endpoint)) -}}
 {{- fail "s3.endpoint must be an absolute HTTP(S) URL" -}}

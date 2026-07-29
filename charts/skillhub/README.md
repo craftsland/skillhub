@@ -294,6 +294,10 @@ Sentinel 地址。Chart **不负责数据库架构切换时的数据迁移**，�
 standalone → replication、Redis standalone/replication → Sentinel 等切换，必须由
 运维人员在 Chart 之外完成备份、恢复、PVC 复用或其他迁移方案。
 
+外部 Redis Cluster 由云服务或运维系统提供，Chart 只负责注入连接配置，不创建
+Cluster，也不将其计入上述内置架构运行时验证范围。应用侧应另行验证 Spring
+Data、Spring Session 与 Redisson Stream 链路。
+
 ### Redis Sentinel
 
 内置 Sentinel 使用 Bitnami Redis 的同一份密码同时保护 Redis 数据节点和
@@ -332,6 +336,48 @@ server:
     - name: SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST
       value: "false"
 ```
+
+### 外部 Redis Cluster
+
+Chart 不创建内置 Redis Cluster。生产环境的 Cluster 由云 Redis 或独立运维系统
+提供，SkillHub 通过标准 Spring Boot 配置连接。至少配置一个 seed 节点，且
+Cluster 通告的所有节点地址都必须能从 Server Pod 访问：
+
+```yaml
+redis:
+  enabled: false
+
+externalRedis:
+  username: skillhub
+  tls:
+    enabled: true
+  connectTimeout: 5s
+  timeout: 3s
+  clientName: skillhub-server
+  cluster:
+    enabled: true
+    nodes:
+      - redis-0.example.com:6379
+      - redis-1.example.com:6379
+      - redis-2.example.com:6379
+    maxRedirects: 5
+```
+
+Redis Cluster 只支持数据库 `0`。`maxRedirects` 交给 Spring Data/Lettuce 处理；
+Redisson 使用同一节点、ACL、TLS 与超时配置并自行处理 Cluster 路由。密码建议
+通过 `existingSecret` 的 `redis-password` 提供：
+
+```bash
+helm -n skillhub upgrade -i skillhub ./charts/skillhub \
+  -f values-production.yaml \
+  --set redis.enabled=false \
+  --set existingSecret=skillhub-production-secret \
+  --set externalRedis.cluster.enabled=true \
+  --set-json 'externalRedis.cluster.nodes=["redis-0.example.com:6379","redis-1.example.com:6379","redis-2.example.com:6379"]'
+```
+
+`externalRedis.sentinel.enabled` 与 `externalRedis.cluster.enabled` 互斥；内置
+`redis.enabled=true` 时也不能启用外部 Cluster。
 
 ### 存储配置
 

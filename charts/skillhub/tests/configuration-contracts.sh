@@ -123,16 +123,63 @@ render external-sentinel "$CHART_DIR" \
   --set postgresql.enabled=false \
   --set externalDatabase.host=db.example.com \
   --set redis.enabled=false \
+  --set externalRedis.username=redis-user \
   --set externalRedis.password=redis-password \
   --set externalRedis.sentinel.enabled=true \
+  --set externalRedis.sentinel.username=sentinel-user \
   --set externalRedis.sentinel.password=sentinel-password \
   --set-json 'externalRedis.sentinel.nodes=["sentinel-a:26379","sentinel-b:26379"]' \
   --show-only templates/server-deployment.yaml >"$TMP_DIR/external-sentinel.yaml"
 grep -Fq 'value: "sentinel-a"' "$TMP_DIR/external-sentinel.yaml"
 grep -Fq 'name: SPRING_DATA_REDIS_PASSWORD' "$TMP_DIR/external-sentinel.yaml"
 grep -Fq 'name: SPRING_DATA_REDIS_SENTINEL_PASSWORD' "$TMP_DIR/external-sentinel.yaml"
+grep -A1 -F 'name: SPRING_DATA_REDIS_USERNAME' "$TMP_DIR/external-sentinel.yaml" \
+  | grep -Fq 'value: "redis-user"'
+grep -A1 -F 'name: SPRING_DATA_REDIS_SENTINEL_USERNAME' "$TMP_DIR/external-sentinel.yaml" \
+  | grep -Fq 'value: "sentinel-user"'
 if grep -Fq 'name: SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST' "$TMP_DIR/external-sentinel.yaml"; then
   fail "external Sentinel must preserve Redisson address consistency checks by default"
+fi
+
+render external-cluster "$CHART_DIR" \
+  --set postgresql.enabled=false \
+  --set externalDatabase.host=db.example.com \
+  --set redis.enabled=false \
+  --set existingSecret=skillhub-production-secret \
+  --set externalRedis.username=skillhub \
+  --set externalRedis.tls.enabled=true \
+  --set externalRedis.connectTimeout=5s \
+  --set externalRedis.timeout=3s \
+  --set externalRedis.clientName=skillhub-server \
+  --set externalRedis.cluster.enabled=true \
+  --set externalRedis.cluster.maxRedirects=7 \
+  --set-json 'externalRedis.cluster.nodes=["redis-a.example.com:6379","redis-b.example.com:6380"]' \
+  --show-only templates/server-deployment.yaml >"$TMP_DIR/external-cluster.yaml"
+grep -A1 -F 'name: REDIS_HOST' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "redis-a.example.com"'
+grep -A1 -F 'name: REDIS_PORT' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "6379"'
+grep -A1 -F 'name: SPRING_DATA_REDIS_CLUSTER_NODES' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "redis-a.example.com:6379,redis-b.example.com:6380"'
+grep -A1 -F 'name: SPRING_DATA_REDIS_CLUSTER_MAX_REDIRECTS' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "7"'
+grep -A1 -F 'name: SPRING_DATA_REDIS_USERNAME' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "skillhub"'
+grep -A1 -F 'name: SPRING_DATA_REDIS_SSL_ENABLED' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "true"'
+grep -A1 -F 'name: SPRING_DATA_REDIS_CONNECT_TIMEOUT' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "5s"'
+grep -A1 -F 'name: SPRING_DATA_REDIS_TIMEOUT' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "3s"'
+grep -A1 -F 'name: SPRING_DATA_REDIS_CLIENT_NAME' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'value: "skillhub-server"'
+grep -A4 -F 'name: SPRING_DATA_REDIS_PASSWORD' "$TMP_DIR/external-cluster.yaml" \
+  | grep -Fq 'name: skillhub-production-secret'
+if grep -Fq 'name: SPRING_DATA_REDIS_HOST' "$TMP_DIR/external-cluster.yaml"; then
+  fail "external Redis Cluster must not render standalone host configuration"
+fi
+if grep -Fq 'name: SPRING_DATA_REDIS_SENTINEL_NODES' "$TMP_DIR/external-cluster.yaml"; then
+  fail "external Redis Cluster must not render Sentinel configuration"
 fi
 
 render special "$CHART_DIR" \
@@ -229,6 +276,26 @@ assert_rejected old-postgres-env --set-json 'postgresql.primary.extraEnv=[{"name
 assert_rejected old-sentinel-password --set redis.auth.sentinelPassword=unused
 assert_rejected old-sentinel-nodes --set redis.sentinel.nodes=unused
 assert_rejected old-sentinel-service-switch --set redis.sentinel.service.enabled=false
+assert_rejected internal-and-external-cluster \
+  --set externalRedis.cluster.enabled=true \
+  --set-json 'externalRedis.cluster.nodes=["redis-a.example.com:6379"]'
+assert_rejected sentinel-and-cluster \
+  --set redis.enabled=false \
+  --set externalRedis.sentinel.enabled=true \
+  --set externalRedis.cluster.enabled=true \
+  --set-json 'externalRedis.sentinel.nodes=["sentinel-a.example.com:26379"]' \
+  --set-json 'externalRedis.cluster.nodes=["redis-a.example.com:6379"]'
+assert_rejected cluster-without-nodes \
+  --set redis.enabled=false \
+  --set externalRedis.cluster.enabled=true
+assert_rejected cluster-invalid-node \
+  --set redis.enabled=false \
+  --set externalRedis.cluster.enabled=true \
+  --set-json 'externalRedis.cluster.nodes=["redis-a.example.com"]'
+assert_rejected cluster-invalid-port \
+  --set redis.enabled=false \
+  --set externalRedis.cluster.enabled=true \
+  --set-json 'externalRedis.cluster.nodes=["redis-a.example.com:65536"]'
 assert_rejected invalid-fullname --set fullnameOverride=INVALID_NAME
 assert_rejected old-ingress-host --set ingress.host=old.example.com
 assert_rejected old-ingress-tls-object --set ingress.tls.enabled=true

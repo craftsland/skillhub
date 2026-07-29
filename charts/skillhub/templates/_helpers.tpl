@@ -190,7 +190,12 @@ app.kubernetes.io/component: scanner
 {{- printf "%s-master" (include "skillhub.redis.fullname" .) -}}
 {{- end -}}
 {{- else -}}
+{{- if .Values.externalRedis.cluster.enabled -}}
+{{- $node := first .Values.externalRedis.cluster.nodes -}}
+{{- first (splitList ":" $node) -}}
+{{- else -}}
 {{- .Values.externalRedis.host -}}
+{{- end -}}
 {{- end -}}
 {{- end }}
 
@@ -203,7 +208,10 @@ app.kubernetes.io/component: scanner
 {{- print "6379" -}}
 {{- end -}}
 {{- else -}}
-{{- if .Values.externalRedis.sentinel.enabled -}}
+{{- if .Values.externalRedis.cluster.enabled -}}
+{{- $node := first .Values.externalRedis.cluster.nodes -}}
+{{- last (splitList ":" $node) -}}
+{{- else if .Values.externalRedis.sentinel.enabled -}}
 {{- $node := first .Values.externalRedis.sentinel.nodes -}}
 {{- last (splitList ":" $node) -}}
 {{- else -}}
@@ -245,7 +253,10 @@ app.kubernetes.io/component: scanner
 {{- if .Values.redis.enabled -}}
 {{- include "skillhub.redis.host" . -}}
 {{- else -}}
-{{- if .Values.externalRedis.sentinel.enabled -}}
+{{- if .Values.externalRedis.cluster.enabled -}}
+{{- $node := first .Values.externalRedis.cluster.nodes -}}
+{{- first (splitList ":" $node) -}}
+{{- else if .Values.externalRedis.sentinel.enabled -}}
 {{- $node := first .Values.externalRedis.sentinel.nodes -}}
 {{- first (splitList ":" $node) -}}
 {{- else -}}

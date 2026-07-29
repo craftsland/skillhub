@@ -109,6 +109,11 @@ spec:
               value: {{ .Values.externalRedis.sentinel.masterSet | default "mymaster" | quote }}
             - name: SPRING_DATA_REDIS_SENTINEL_NODES
               value: {{ join "," .Values.externalRedis.sentinel.nodes | quote }}
+            {{- else if and (not .Values.redis.enabled) .Values.externalRedis.cluster.enabled }}
+            - name: SPRING_DATA_REDIS_CLUSTER_NODES
+              value: {{ join "," .Values.externalRedis.cluster.nodes | quote }}
+            - name: SPRING_DATA_REDIS_CLUSTER_MAX_REDIRECTS
+              value: {{ .Values.externalRedis.cluster.maxRedirects | quote }}
             {{- else }}
             - name: SPRING_DATA_REDIS_HOST
               valueFrom:
@@ -120,6 +125,31 @@ spec:
                 configMapKeyRef:
                   name: {{ include "skillhub.fullname" . }}-config
                   key: redis-port
+            {{- end }}
+
+            {{- if and (not .Values.redis.enabled) .Values.externalRedis.username }}
+            - name: SPRING_DATA_REDIS_USERNAME
+              value: {{ .Values.externalRedis.username | quote }}
+            {{- end }}
+            {{- if and (not .Values.redis.enabled) .Values.externalRedis.tls.enabled }}
+            - name: SPRING_DATA_REDIS_SSL_ENABLED
+              value: "true"
+            {{- end }}
+            {{- if and (not .Values.redis.enabled) .Values.externalRedis.connectTimeout }}
+            - name: SPRING_DATA_REDIS_CONNECT_TIMEOUT
+              value: {{ .Values.externalRedis.connectTimeout | quote }}
+            {{- end }}
+            {{- if and (not .Values.redis.enabled) .Values.externalRedis.timeout }}
+            - name: SPRING_DATA_REDIS_TIMEOUT
+              value: {{ .Values.externalRedis.timeout | quote }}
+            {{- end }}
+            {{- if and (not .Values.redis.enabled) .Values.externalRedis.clientName }}
+            - name: SPRING_DATA_REDIS_CLIENT_NAME
+              value: {{ .Values.externalRedis.clientName | quote }}
+            {{- end }}
+            {{- if and (not .Values.redis.enabled) .Values.externalRedis.sentinel.enabled .Values.externalRedis.sentinel.username }}
+            - name: SPRING_DATA_REDIS_SENTINEL_USERNAME
+              value: {{ .Values.externalRedis.sentinel.username | quote }}
             {{- end }}
 
             {{- if or (and .Values.redis.enabled .Values.redis.sentinel.enabled) (and (not .Values.redis.enabled) .Values.externalRedis.sentinel.enabled) }}
@@ -145,7 +175,7 @@ spec:
                   key: redis-sentinel-password
                   {{- end }}
                   optional: true
-            {{- else if or .Values.redis.enabled .Values.externalRedis.password }}
+            {{- else if or .Values.redis.enabled .Values.externalRedis.password .Values.existingSecret }}
             - name: SPRING_DATA_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:

@@ -1,6 +1,7 @@
 package com.iflytek.skillhub.config;
 
 import org.junit.jupiter.api.Test;
+import org.redisson.config.ClusterServersConfig;
 import org.redisson.config.Config;
 import org.redisson.config.SentinelServersConfig;
 import org.redisson.config.SingleServerConfig;
@@ -123,6 +124,77 @@ class RedissonConfigTest {
     }
 
     @Test
+    void createConfig_appliesSentinelUsernameWhenSet() throws Exception {
+        RedisProperties properties = new RedisProperties();
+        RedisProperties.Sentinel sentinel = new RedisProperties.Sentinel();
+        sentinel.setMaster("mymaster");
+        sentinel.setNodes(List.of("redis-sentinel-1:26379"));
+        sentinel.setUsername("sentinel-user");
+        properties.setSentinel(sentinel);
+
+        Config config = RedissonConfig.createConfig(properties);
+        SentinelServersConfig sentinelConfig = sentinelConfig(config);
+
+        assertThat(sentinelConfig.getSentinelUsername()).isEqualTo("sentinel-user");
+    }
+
+    @Test
+    void createConfig_usesClusterServersWhenClusterNodesArePresent() throws Exception {
+        RedisProperties properties = new RedisProperties();
+        RedisProperties.Cluster cluster = new RedisProperties.Cluster();
+        cluster.setNodes(List.of("redis-cluster-1:6379", " redis-cluster-2:6380 "));
+        properties.setCluster(cluster);
+        properties.setUsername("skillhub");
+        properties.setPassword("secret");
+        properties.setClientName("skillhub-stream");
+        properties.setTimeout(Duration.ofSeconds(3));
+        properties.setConnectTimeout(Duration.ofSeconds(5));
+
+        Config config = RedissonConfig.createConfig(properties);
+        ClusterServersConfig clusterConfig = clusterConfig(config);
+
+        assertThat(config.isClusterConfig()).isTrue();
+        assertThat(clusterConfig.getNodeAddresses())
+                .containsExactly("redis://redis-cluster-1:6379", "redis://redis-cluster-2:6380");
+        assertThat(clusterConfig.getUsername()).isEqualTo("skillhub");
+        assertThat(clusterConfig.getPassword()).isEqualTo("secret");
+        assertThat(clusterConfig.getClientName()).isEqualTo("skillhub-stream");
+        assertThat(clusterConfig.getTimeout()).isEqualTo(3000);
+        assertThat(clusterConfig.getConnectTimeout()).isEqualTo(5000);
+    }
+
+    @Test
+    void createConfig_usesSecureSchemeForClusterAddressesWhenSslEnabled() throws Exception {
+        RedisProperties properties = new RedisProperties();
+        RedisProperties.Cluster cluster = new RedisProperties.Cluster();
+        cluster.setNodes(List.of("redis-cluster-1:6379"));
+        properties.setCluster(cluster);
+        properties.getSsl().setEnabled(true);
+
+        Config config = RedissonConfig.createConfig(properties);
+        ClusterServersConfig clusterConfig = clusterConfig(config);
+
+        assertThat(clusterConfig.getNodeAddresses()).containsExactly("rediss://redis-cluster-1:6379");
+    }
+
+    @Test
+    void createConfig_prefersSentinelWhenSentinelAndClusterAreBothConfigured() {
+        RedisProperties properties = new RedisProperties();
+        RedisProperties.Sentinel sentinel = new RedisProperties.Sentinel();
+        sentinel.setMaster("mymaster");
+        sentinel.setNodes(List.of("redis-sentinel-1:26379"));
+        properties.setSentinel(sentinel);
+        RedisProperties.Cluster cluster = new RedisProperties.Cluster();
+        cluster.setNodes(List.of("redis-cluster-1:6379"));
+        properties.setCluster(cluster);
+
+        Config config = RedissonConfig.createConfig(properties);
+
+        assertThat(config.isSentinelConfig()).isTrue();
+        assertThat(config.isClusterConfig()).isFalse();
+    }
+
+    @Test
     void createConfig_keepsSentinelMembershipCheckEnabledByDefault() throws Exception {
         RedisProperties properties = new RedisProperties();
         RedisProperties.Sentinel sentinel = new RedisProperties.Sentinel();
@@ -170,5 +242,11 @@ class RedissonConfigTest {
         Method method = Config.class.getDeclaredMethod("getSentinelServersConfig");
         method.setAccessible(true);
         return (SentinelServersConfig) method.invoke(config);
+    }
+
+    private ClusterServersConfig clusterConfig(Config config) throws Exception {
+        Method method = Config.class.getDeclaredMethod("getClusterServersConfig");
+        method.setAccessible(true);
+        return (ClusterServersConfig) method.invoke(config);
     }
 }
