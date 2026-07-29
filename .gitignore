@@ -84,5 +84,8 @@ docs/superpowers/
 # Local workspace metadata
 CLAUDE.md
 
+# Helm chart dependencies
+charts/skillhub/charts/*.tgz
+
 # Local config file
 .mcp.json

@@ -228,8 +228,10 @@ curl -fsSL https://imageless.oss-cn-beijing.aliyuncs.com/runtime.sh | sh -s -- u
 # 应用 Kubernetes 清单
 kubectl apply -f deploy/k8s/
 
-# 或使用 Helm（即将推出）
-helm install skillhub ./deploy/helm
+# 或使用 Helm Chart
+helm dependency build ./charts/skillhub
+helm upgrade --install skillhub ./charts/skillhub -n skillhub --create-namespace \
+  -f values-production.yaml
 ```
 
 ### 环境变量
@@ -319,7 +321,7 @@ SkillHub 采用清晰的分层架构：
 ### 基础设施
 - **容器化**：Docker & Docker Compose
 - **监控**：Prometheus + Grafana
-- **部署**：Kubernetes 清单
+- **部署**：Kubernetes 清单与 Helm Chart
 - **CI/CD**：GitHub Actions
 
 ## 路线图
@@ -332,7 +334,7 @@ SkillHub 采用清晰的分层架构：
 - [x] API 令牌管理
 - [x] 账户合并
 - [x] 国际化支持
-- [ ] Helm Chart 部署
+- [x] Helm Chart 部署
 - [ ] 高级搜索过滤器
 - [ ] 技能依赖管理
 - [ ] Webhook 集成

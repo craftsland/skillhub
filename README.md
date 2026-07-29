@@ -345,6 +345,20 @@ Basic Kubernetes manifests are available under [`deploy/k8s/`](./deploy/k8s):
 - `services.yaml`
 - `ingress.yaml`
 
+For a configurable deployment with bundled PostgreSQL and Redis dependencies,
+use the Helm chart under [`charts/skillhub/`](./charts/skillhub):
+
+```bash
+helm dependency build ./charts/skillhub
+helm upgrade --install skillhub ./charts/skillhub \
+  --namespace skillhub \
+  --create-namespace \
+  -f values-production.yaml
+```
+
+See the [Helm chart guide](./charts/skillhub/README.md) for required secrets,
+Ingress/TLS, external data services, storage migration, and upgrade constraints.
+
 Apply them after creating your own secret:
 
 ```bash
