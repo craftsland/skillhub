@@ -13,6 +13,9 @@ import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.namespace.NamespaceType;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersion;
+import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.infra.jpa.SkillSearchDocumentEntity;
 import com.iflytek.skillhub.infra.jpa.SkillSearchDocumentJpaRepository;
@@ -65,6 +68,9 @@ class LabelSearchSyncIntegrationTest {
     private SkillRepository skillRepository;
 
     @Autowired
+    private SkillVersionRepository skillVersionRepository;
+
+    @Autowired
     private LabelDefinitionRepository labelDefinitionRepository;
 
     @Autowired
@@ -106,7 +112,7 @@ class LabelSearchSyncIntegrationTest {
         skill.setCreatedBy(ownerId);
         skill.setUpdatedBy(ownerId);
         skill = skillRepository.save(skill);
-        skillRepository.flush();
+        publishLatestVersion(skill, ownerId);
 
         LabelDefinition label = labelDefinitionRepository.save(
                 new LabelDefinition(labelSlug, LabelType.RECOMMENDED, true, 0, ownerId));
@@ -243,7 +249,7 @@ class LabelSearchSyncIntegrationTest {
         skill.setCreatedBy(ownerId);
         skill.setUpdatedBy(ownerId);
         skill = skillRepository.save(skill);
-        skillRepository.flush();
+        publishLatestVersion(skill, ownerId);
 
         LabelDefinition label = labelDefinitionRepository.save(
                 new LabelDefinition(labelSlug, LabelType.RECOMMENDED, true, 0, ownerId));
@@ -255,6 +261,18 @@ class LabelSearchSyncIntegrationTest {
                 namespace.getSlug(), skill.getSlug(), skill.getId(),
                 labelSlug, labelDisplayName, ownerId,
                 Map.of(namespace.getId(), NamespaceRole.OWNER));
+    }
+
+    private void publishLatestVersion(Skill skill, String ownerId) {
+        SkillVersion version = new SkillVersion(skill.getId(), "1.0.0", ownerId);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setPublishedAt(Instant.now());
+        version = skillVersionRepository.save(version);
+
+        skill.setLatestVersionId(version.getId());
+        skillRepository.save(skill);
+        skillVersionRepository.flush();
+        skillRepository.flush();
     }
 
     private record Fixture(
