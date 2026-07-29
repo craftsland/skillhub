@@ -39,6 +39,7 @@ class ApiAccessDeniedHandlerTest {
         ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
         messageSource.setBasename("messages");
         messageSource.setDefaultEncoding("UTF-8");
+        messageSource.setFallbackToSystemLocale(false);
         ApiResponseFactory responseFactory = new ApiResponseFactory(
                 messageSource,
                 Clock.fixed(Instant.parse("2026-07-28T00:00:00Z"), ZoneOffset.UTC)
