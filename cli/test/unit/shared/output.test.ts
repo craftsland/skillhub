@@ -26,6 +26,18 @@ describe('renderError', () => {
       'Next: check network or pass --registry'
     ].join('\n'))
   })
+
+  test('renders a server request ID for human-readable errors', () => {
+    const error = new CliError('token has been revoked', 2, {
+      registry: 'https://registry.example.com',
+      requestId: 'req-403'
+    })
+    expect(renderError(error, false)).toBe([
+      'Error: token has been revoked',
+      'Context: registry https://registry.example.com',
+      'Request ID: req-403'
+    ].join('\n'))
+  })
 })
 
 describe('printResult', () => {

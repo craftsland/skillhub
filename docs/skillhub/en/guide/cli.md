@@ -125,15 +125,24 @@ Output format: `namespace/slug  version  summary`
 
 ## Install Skills
 
+Install coordinates accept a bare slug (resolved to `global` by default) and
+three equivalent explicit namespace forms. When an explicit coordinate and
+`--namespace` are both present, they must match.
+
 ```bash
 # Install to auto-detected Agent directory
 skillhub install pdf-parser
+
+# Equivalent namespace coordinates
+skillhub install team/my-skill
+skillhub install @team/my-skill
+skillhub install team--my-skill
 
 # Choose install scope explicitly
 skillhub install pdf-parser --scope user
 skillhub install pdf-parser --scope project --agent codex
 
-# Specify namespace (default: global)
+# Specify a namespace for a bare slug
 skillhub install pdf-parser --namespace myspace
 
 # Specify version
@@ -238,8 +247,16 @@ skillhub list --json
 ### Remove Skills
 
 ```bash
-# Remove all local installation targets
+# A bare slug removes same-named local installations across namespaces
 skillhub remove pdf-parser
+
+# An explicit namespaced coordinate removes only that namespace
+skillhub remove myspace/pdf-parser
+skillhub remove @myspace/pdf-parser
+skillhub remove myspace--pdf-parser
+
+# Equivalent precise local removal with an explicit namespace
+skillhub remove pdf-parser --namespace myspace
 
 # Remove only specific Agent's installation
 skillhub remove pdf-parser --agent codex
@@ -472,12 +489,18 @@ Search published skills.
 ### install
 
 ```bash
-skillhub install <slug> [options]
+skillhub install <coordinate> [options]
 ```
+
+`<coordinate>` accepts a bare slug (`my-skill`, resolved as `global/my-skill`)
+or any of the equivalent explicit namespace forms: `team/my-skill`,
+`@team/my-skill`, and `team--my-skill`. Use `--namespace team` to select a
+non-global namespace for a bare slug. An explicit coordinate may be combined
+with the same `--namespace`; a conflicting value is rejected as a usage error.
 
 Options:
 - `--scope <user|project>` — Install scope (omit for interactive prompt in TTY, or fall back to existing detection in non-TTY)
-- `--namespace <slug>` — Namespace (default: `global`)
+- `--namespace <slug>` — Namespace for a bare slug
 - `--version <v>` — Version (default: latest)
 - `--agent <profile>` — Agent profile (repeatable)
 - `--dir <path>` — Custom installation directory (mutually exclusive with `--scope` and `--agent`)
@@ -501,7 +524,7 @@ Options:
 ### remove
 
 ```bash
-skillhub remove <slug> [options]
+skillhub remove <coordinate> [options]
 ```
 
 Options:
@@ -509,10 +532,15 @@ Options:
 - `--all` — Remove all targets
 - `--remote` — Remove remote skill
 - `--hard` — Skip remote deletion confirmation
-- `--namespace <slug>` — Namespace for remote deletion
+- `--namespace <slug>` — Namespace for local or remote deletion
 - `--registry <url>` — Registry URL
 - `--token <token>` — API token
 - `--json` — JSON output
+
+An explicit namespaced coordinate (`team/my-skill`, `@team/my-skill`, or
+`team--my-skill`) or `--namespace team` removes local installations only from
+that namespace. For compatibility, a bare slug removes same-named local
+installations across all namespaces in the current registry.
 
 ### doctor
 
