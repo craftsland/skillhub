@@ -12,6 +12,8 @@ import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.dto.PageResponse;
 import com.iflytek.skillhub.exception.UnauthorizedException;
 import com.iflytek.skillhub.service.AdminUserAppService;
+import com.iflytek.skillhub.service.AuditRequestContext;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -60,26 +62,57 @@ public class UserManagementController extends BaseApiController {
     @PreAuthorize("hasAnyRole('USER_ADMIN', 'SUPER_ADMIN')")
     public ApiResponse<AdminUserMutationResponse> updateUserStatus(
             @PathVariable String userId,
-            @Valid @RequestBody AdminUserStatusUpdateRequest request) {
-        return ok("response.success.updated", adminUserAppService.updateUserStatus(userId, request.status()));
+            @AuthenticationPrincipal PlatformPrincipal principal,
+            @Valid @RequestBody AdminUserStatusUpdateRequest request,
+            HttpServletRequest httpRequest) {
+        return ok("response.success.updated",
+                adminUserAppService.updateUserStatus(
+                        userId,
+                        request.status(),
+                        principal.userId(),
+                        AuditRequestContext.from(httpRequest)));
     }
 
     @PostMapping("/{userId}/approve")
     @PreAuthorize("hasAnyRole('USER_ADMIN', 'SUPER_ADMIN')")
-    public ApiResponse<AdminUserMutationResponse> approveUser(@PathVariable String userId) {
-        return ok("response.success.updated", adminUserAppService.updateUserStatus(userId, "ACTIVE"));
+    public ApiResponse<AdminUserMutationResponse> approveUser(
+            @PathVariable String userId,
+            @AuthenticationPrincipal PlatformPrincipal principal,
+            HttpServletRequest httpRequest) {
+        return ok("response.success.updated",
+                adminUserAppService.updateUserStatus(
+                        userId,
+                        "ACTIVE",
+                        principal.userId(),
+                        AuditRequestContext.from(httpRequest)));
     }
 
     @PostMapping("/{userId}/disable")
     @PreAuthorize("hasAnyRole('USER_ADMIN', 'SUPER_ADMIN')")
-    public ApiResponse<AdminUserMutationResponse> disableUser(@PathVariable String userId) {
-        return ok("response.success.updated", adminUserAppService.updateUserStatus(userId, "DISABLED"));
+    public ApiResponse<AdminUserMutationResponse> disableUser(
+            @PathVariable String userId,
+            @AuthenticationPrincipal PlatformPrincipal principal,
+            HttpServletRequest httpRequest) {
+        return ok("response.success.updated",
+                adminUserAppService.updateUserStatus(
+                        userId,
+                        "DISABLED",
+                        principal.userId(),
+                        AuditRequestContext.from(httpRequest)));
     }
 
     @PostMapping("/{userId}/enable")
     @PreAuthorize("hasAnyRole('USER_ADMIN', 'SUPER_ADMIN')")
-    public ApiResponse<AdminUserMutationResponse> enableUser(@PathVariable String userId) {
-        return ok("response.success.updated", adminUserAppService.updateUserStatus(userId, "ACTIVE"));
+    public ApiResponse<AdminUserMutationResponse> enableUser(
+            @PathVariable String userId,
+            @AuthenticationPrincipal PlatformPrincipal principal,
+            HttpServletRequest httpRequest) {
+        return ok("response.success.updated",
+                adminUserAppService.updateUserStatus(
+                        userId,
+                        "ACTIVE",
+                        principal.userId(),
+                        AuditRequestContext.from(httpRequest)));
     }
 
     @PostMapping("/{userId}/password-reset")

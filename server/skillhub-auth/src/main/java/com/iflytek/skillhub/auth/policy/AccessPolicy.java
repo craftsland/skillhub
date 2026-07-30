@@ -1,7 +1,9 @@
 package com.iflytek.skillhub.auth.policy;
 
 /**
- * Policy contract for deciding whether externally authenticated users may enter the platform.
+ * Login-policy contract evaluated for both new and returning external
+ * identities. It does not decide whether a new account is auto-provisioned or
+ * requires approval.
  */
 public interface AccessPolicy {
     AccessDecision evaluate(IdentityAccessContext context);

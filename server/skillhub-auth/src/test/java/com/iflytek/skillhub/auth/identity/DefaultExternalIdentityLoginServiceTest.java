@@ -3,16 +3,13 @@ package com.iflytek.skillhub.auth.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.iflytek.skillhub.auth.policy.AccessDecision;
-import com.iflytek.skillhub.auth.policy.AccessPolicy;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
-import com.iflytek.skillhub.domain.user.UserStatus;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
@@ -21,7 +18,6 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
-import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 
 class DefaultExternalIdentityLoginServiceTest {
@@ -29,145 +25,104 @@ class DefaultExternalIdentityLoginServiceTest {
     private final ProviderDescriptor descriptor = descriptor();
     private TrustedProviderDescriptorSource descriptorSource;
     private ProviderAuthorityLockService authorityLockService;
-    private AccessPolicy accessPolicy;
     private IdentityResolutionTransaction resolutionTransaction;
+    private IdentityLoginMetrics metrics;
+    private IdentitySecurityAuditWriter securityAuditWriter;
     private DefaultExternalIdentityLoginService service;
 
     @BeforeEach
     void setUp() {
-        descriptorSource = mock(TrustedProviderDescriptorSource.class);
-        authorityLockService = mock(ProviderAuthorityLockService.class);
-        accessPolicy = mock(AccessPolicy.class);
-        resolutionTransaction = mock(IdentityResolutionTransaction.class);
+        descriptorSource =
+                mock(TrustedProviderDescriptorSource.class);
+        authorityLockService =
+                mock(ProviderAuthorityLockService.class);
+        resolutionTransaction =
+                mock(IdentityResolutionTransaction.class);
+        metrics = mock(IdentityLoginMetrics.class);
+        securityAuditWriter =
+                mock(IdentitySecurityAuditWriter.class);
         service = new DefaultExternalIdentityLoginService(
                 descriptorSource,
                 authorityLockService,
                 new IdentityAssertionFactory(),
-                accessPolicy,
-                resolutionTransaction);
+                resolutionTransaction,
+                metrics,
+                securityAuditWriter);
     }
 
     @Test
-    void resolvesTrustedProviderBeforeAuthorityAssertionPolicyAndTransaction() {
+    void resolvesTrustedProviderBeforeAuthorityAssertionAndTransaction() {
         ResolvedProviderHandle handle =
                 new DefaultResolvedProviderHandle("github");
         ProviderAuthenticationResult result = result();
         IdentityLoginContext context = IdentityLoginContext.empty();
-        PlatformPrincipal principal = new PlatformPrincipal(
-                "usr_1",
-                "alice",
-                "alice@example.com",
-                null,
-                "github",
-                Set.of("USER"));
-        IdentityLoginOutcome expected =
-                new IdentityLoginOutcome.Authenticated(
-                        principal,
-                        false,
-                        false);
+        IdentityLoginOutcome expected = authenticated();
         when(descriptorSource.require(handle)).thenReturn(descriptor);
-        when(accessPolicy.evaluate(any())).thenReturn(AccessDecision.ALLOW);
         when(resolutionTransaction.resolve(
                 any(IdentityAssertion.class),
-                org.mockito.ArgumentMatchers.eq(UserStatus.ACTIVE),
-                org.mockito.ArgumentMatchers.eq("github_user_id")))
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                org.mockito.ArgumentMatchers.eq(context)))
                 .thenReturn(expected);
 
         IdentityLoginOutcome outcome =
                 service.authenticate(handle, result, context);
 
         assertThat(outcome).isSameAs(expected);
-        ArgumentCaptor<com.iflytek.skillhub.auth.policy.IdentityAccessContext>
-                accessContext = ArgumentCaptor.forClass(
-                        com.iflytek.skillhub.auth.policy.IdentityAccessContext.class);
-        verify(accessPolicy).evaluate(accessContext.capture());
-        assertThat(accessContext.getValue().requestContext())
-                .isSameAs(context);
         InOrder order = inOrder(
                 descriptorSource,
                 authorityLockService,
-                accessPolicy,
-                resolutionTransaction);
+                resolutionTransaction,
+                metrics);
         order.verify(descriptorSource).require(handle);
-        order.verify(authorityLockService).requirePinnedAuthority(descriptor);
-        order.verify(accessPolicy).evaluate(any());
+        order.verify(authorityLockService)
+                .requirePinnedAuthority(descriptor);
         order.verify(resolutionTransaction).resolve(
                 any(IdentityAssertion.class),
-                org.mockito.ArgumentMatchers.eq(UserStatus.ACTIVE),
-                org.mockito.ArgumentMatchers.eq("github_user_id"));
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                org.mockito.ArgumentMatchers.eq(context));
+        order.verify(metrics).recordOutcome(
+                "github",
+                "oauth2-github",
+                expected);
     }
 
     @Test
-    void pendingPolicyUsesCompatibilityPendingProvisioningMode() {
+    void recordsPendingOutcomeWithoutReinterpretingIt() {
         ResolvedProviderHandle handle =
                 new DefaultResolvedProviderHandle("github");
-        when(descriptorSource.require(handle)).thenReturn(descriptor);
-        when(accessPolicy.evaluate(any()))
-                .thenReturn(AccessDecision.PENDING_APPROVAL);
         IdentityLoginOutcome pending =
-                new IdentityLoginOutcome.PendingApproval("ACCOUNT_PENDING");
+                new IdentityLoginOutcome.PendingApproval(
+                        "ACCOUNT_PENDING");
+        when(descriptorSource.require(handle)).thenReturn(descriptor);
         when(resolutionTransaction.resolve(
                 any(IdentityAssertion.class),
-                org.mockito.ArgumentMatchers.eq(UserStatus.PENDING),
-                org.mockito.ArgumentMatchers.eq("github_user_id")))
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                any(IdentityLoginContext.class)))
                 .thenReturn(pending);
 
-        IdentityLoginOutcome outcome =
-                service.authenticate(
-                        handle,
-                        result(),
-                        IdentityLoginContext.empty());
-
-        assertThat(outcome).isSameAs(pending);
-    }
-
-    @Test
-    void deniedPolicyNeverReachesProvisioningTransaction() {
-        ResolvedProviderHandle handle =
-                new DefaultResolvedProviderHandle("github");
-        when(descriptorSource.require(handle)).thenReturn(descriptor);
-        when(accessPolicy.evaluate(any())).thenReturn(AccessDecision.DENY);
-
-        assertThatThrownBy(() -> service.authenticate(
+        IdentityLoginOutcome outcome = service.authenticate(
                 handle,
                 result(),
-                IdentityLoginContext.empty()))
-                .isInstanceOf(IdentityCoreException.class)
-                .extracting("reasonCode")
-                .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
+                IdentityLoginContext.empty());
 
-        verify(resolutionTransaction, never()).resolve(
-                any(),
-                any(),
-                any());
+        assertThat(outcome).isSameAs(pending);
+        verify(metrics).recordOutcome(
+                "github",
+                "oauth2-github",
+                pending);
     }
 
     @Test
     void retriesConcurrentFirstLoginInANewResolutionTransaction() {
         ResolvedProviderHandle handle =
                 new DefaultResolvedProviderHandle("github");
-        PlatformPrincipal principal = new PlatformPrincipal(
-                "usr_1",
-                "alice",
-                "alice@example.com",
-                null,
-                "github",
-                Set.of("USER"));
-        IdentityLoginOutcome expected =
-                new IdentityLoginOutcome.Authenticated(
-                        principal,
-                        false,
-                        false);
+        IdentityLoginOutcome expected = authenticated();
         when(descriptorSource.require(handle))
                 .thenReturn(descriptor);
-        when(accessPolicy.evaluate(any()))
-                .thenReturn(AccessDecision.ALLOW);
         when(resolutionTransaction.resolve(
                 any(IdentityAssertion.class),
-                org.mockito.ArgumentMatchers.eq(
-                        UserStatus.ACTIVE),
-                org.mockito.ArgumentMatchers.eq(
-                        "github_user_id")))
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                any(IdentityLoginContext.class)))
                 .thenThrow(uniqueViolation())
                 .thenReturn(expected);
 
@@ -180,26 +135,24 @@ class DefaultExternalIdentityLoginServiceTest {
         verify(resolutionTransaction,
                 org.mockito.Mockito.times(2)).resolve(
                         any(IdentityAssertion.class),
-                        org.mockito.ArgumentMatchers.eq(
-                                UserStatus.ACTIVE),
-                        org.mockito.ArgumentMatchers.eq(
-                                "github_user_id"));
+                        org.mockito.ArgumentMatchers.eq(descriptor),
+                        any(IdentityLoginContext.class));
+        verify(metrics).recordOutcome(
+                "github",
+                "oauth2-github",
+                expected);
     }
 
     @Test
-    void repeatedUniqueConflictFailsClosed() {
+    void repeatedUniqueConflictFailsClosedAndRecordsReason() {
         ResolvedProviderHandle handle =
                 new DefaultResolvedProviderHandle("github");
         when(descriptorSource.require(handle))
                 .thenReturn(descriptor);
-        when(accessPolicy.evaluate(any()))
-                .thenReturn(AccessDecision.ALLOW);
         when(resolutionTransaction.resolve(
                 any(IdentityAssertion.class),
-                org.mockito.ArgumentMatchers.eq(
-                        UserStatus.ACTIVE),
-                org.mockito.ArgumentMatchers.eq(
-                        "github_user_id")))
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                any(IdentityLoginContext.class)))
                 .thenThrow(uniqueViolation(), uniqueViolation());
 
         assertThatThrownBy(() -> service.authenticate(
@@ -211,13 +164,46 @@ class DefaultExternalIdentityLoginServiceTest {
                 .isEqualTo(
                         IdentityFailureCode
                                 .IDENTITY_IDENTIFIER_CONFLICT);
-        verify(resolutionTransaction,
-                org.mockito.Mockito.times(2)).resolve(
-                        any(IdentityAssertion.class),
-                        org.mockito.ArgumentMatchers.eq(
-                                UserStatus.ACTIVE),
-                        org.mockito.ArgumentMatchers.eq(
-                                "github_user_id"));
+        verify(metrics).recordFailure(
+                "github",
+                "oauth2-github",
+                IdentityFailureCode.IDENTITY_IDENTIFIER_CONFLICT);
+        verify(securityAuditWriter).recordDenied(
+                "github",
+                "oauth2-github",
+                IdentityFailureCode.IDENTITY_IDENTIFIER_CONFLICT,
+                IdentityLoginContext.empty());
+    }
+
+    @Test
+    void auditFailureDoesNotReplaceIdentityDenial() {
+        ResolvedProviderHandle handle =
+                new DefaultResolvedProviderHandle("github");
+        IdentityLoginContext context =
+                IdentityLoginContext.empty();
+        when(descriptorSource.require(handle))
+                .thenReturn(descriptor);
+        when(resolutionTransaction.resolve(
+                any(IdentityAssertion.class),
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                org.mockito.ArgumentMatchers.eq(context)))
+                .thenThrow(new IdentityCoreException(
+                        IdentityFailureCode.ACCESS_DENIED));
+        doThrow(new IllegalStateException("audit unavailable"))
+                .when(securityAuditWriter)
+                .recordDenied(
+                        "github",
+                        "oauth2-github",
+                        IdentityFailureCode.ACCESS_DENIED,
+                        context);
+
+        assertThatThrownBy(() -> service.authenticate(
+                handle,
+                result(),
+                context))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
     }
 
     @Test
@@ -232,14 +218,10 @@ class DefaultExternalIdentityLoginServiceTest {
                                 "23514"));
         when(descriptorSource.require(handle))
                 .thenReturn(descriptor);
-        when(accessPolicy.evaluate(any()))
-                .thenReturn(AccessDecision.ALLOW);
         when(resolutionTransaction.resolve(
                 any(IdentityAssertion.class),
-                org.mockito.ArgumentMatchers.eq(
-                        UserStatus.ACTIVE),
-                org.mockito.ArgumentMatchers.eq(
-                        "github_user_id")))
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                any(IdentityLoginContext.class)))
                 .thenThrow(checkViolation);
 
         assertThatThrownBy(() -> service.authenticate(
@@ -249,10 +231,25 @@ class DefaultExternalIdentityLoginServiceTest {
                 .isSameAs(checkViolation);
         verify(resolutionTransaction).resolve(
                 any(IdentityAssertion.class),
-                org.mockito.ArgumentMatchers.eq(
-                        UserStatus.ACTIVE),
-                org.mockito.ArgumentMatchers.eq(
-                        "github_user_id"));
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                any(IdentityLoginContext.class));
+        verify(metrics).recordSystemError(
+                "github",
+                "oauth2-github");
+    }
+
+    private static IdentityLoginOutcome authenticated() {
+        PlatformPrincipal principal = new PlatformPrincipal(
+                "usr_1",
+                "alice",
+                "alice@example.com",
+                null,
+                "github",
+                Set.of("USER"));
+        return new IdentityLoginOutcome.Authenticated(
+                principal,
+                false,
+                false);
     }
 
     private static DataIntegrityViolationException uniqueViolation() {
@@ -265,7 +262,9 @@ class DefaultExternalIdentityLoginServiceTest {
 
     private static ProviderAuthenticationResult result() {
         return new ProviderAuthenticationResult(
-                new SubjectCandidate("github_user_id", "123456"),
+                new SubjectCandidate(
+                        "github_user_id",
+                        "123456"),
                 List.of(),
                 Map.of(
                         "login",

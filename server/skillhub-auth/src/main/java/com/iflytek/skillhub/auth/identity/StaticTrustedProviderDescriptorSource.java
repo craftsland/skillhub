@@ -35,24 +35,40 @@ class StaticTrustedProviderDescriptorSource
 
     private final Map<String, ProviderDescriptor> descriptors;
     private final Map<String, ClientRegistration> trustedRegistrations;
+    private final IdentityProviderPolicyProperties policyProperties;
 
     @Autowired
     StaticTrustedProviderDescriptorSource(
             OAuth2ClientProperties properties,
             ClientRegistrationRepository registrationRepository,
-            List<OAuthClaimsExtractor> extractors) {
+            List<OAuthClaimsExtractor> extractors,
+            IdentityProviderPolicyProperties policyProperties) {
         this(
                 properties,
                 registrationRepository,
                 extractors.stream()
                         .map(OAuthClaimsExtractor::getProvider)
-                        .collect(Collectors.toUnmodifiableSet()));
+                        .collect(Collectors.toUnmodifiableSet()),
+                policyProperties);
     }
 
     StaticTrustedProviderDescriptorSource(
             OAuth2ClientProperties properties,
             ClientRegistrationRepository registrationRepository,
             Set<String> extractorCodes) {
+        this(
+                properties,
+                registrationRepository,
+                extractorCodes,
+                new IdentityProviderPolicyProperties());
+    }
+
+    StaticTrustedProviderDescriptorSource(
+            OAuth2ClientProperties properties,
+            ClientRegistrationRepository registrationRepository,
+            Set<String> extractorCodes,
+            IdentityProviderPolicyProperties policyProperties) {
+        this.policyProperties = policyProperties;
         Map<String, ProviderDescriptor> resolvedDescriptors =
                 new LinkedHashMap<>();
         Map<String, ClientRegistration> resolvedRegistrations =
@@ -239,6 +255,8 @@ class StaticTrustedProviderDescriptorSource
                         || configuredDisplayName.isBlank()
                         ? providerCode
                         : configuredDisplayName;
+        IdentityProviderPolicyProperties.ProviderIdentityPolicy policy =
+                policyProperties.resolve(providerCode);
         return new ProviderDescriptor(
                 providerCode,
                 protocol,
@@ -250,7 +268,9 @@ class StaticTrustedProviderDescriptorSource
                 displayNameAttributes,
                 emailAttributes,
                 avatarAttributes,
-                EmailAssurance.VERIFIED);
+                EmailAssurance.VERIFIED,
+                policy.provisioningMode(),
+                policy.profileSyncPolicy());
     }
 
     private void validatePublicGithubEndpoints(

@@ -46,17 +46,25 @@ docker run -d \
   postgres:16-alpine >/dev/null
 
 log "waiting for PostgreSQL readiness"
+postgres_ready="false"
 for _ in $(seq 1 60); do
-  if docker exec "${POSTGRES_CONTAINER}" \
+  pid_one_comm="$(
+    docker exec "${POSTGRES_CONTAINER}" \
+      cat /proc/1/comm 2>/dev/null || true
+  )"
+  if [[ "${pid_one_comm}" == "postgres" ]] \
+    && docker exec "${POSTGRES_CONTAINER}" \
       pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
       >/dev/null 2>&1; then
+    postgres_ready="true"
     break
   fi
   sleep 1
 done
-docker exec "${POSTGRES_CONTAINER}" \
-  pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
-  >/dev/null
+if [[ "${postgres_ready}" != "true" ]]; then
+  log "PostgreSQL did not become ready after entrypoint initialization"
+  exit 1
+fi
 log "PostgreSQL is ready"
 
 run_test() {
@@ -120,10 +128,7 @@ run_test() {
 }
 
 run_test IdentityBindingV2MigrationPostgresTest
-run_test \
-  "IdentityBindingV2PostgresIntegrationTest#upgradesMixedVersionWriteAndPreservesLegacyReadColumn+concurrentFirstLoginConvergesOnOneBinding" \
-  45
 run_test IdentityBindingV2ContractPostgresTest 46
-run_test \
-  "IdentityBindingV2PostgresIntegrationTest#concurrentFirstLoginConvergesAfterContractGate" \
-  46
+run_test UserProfileFieldSourceMigrationPostgresTest
+run_test IdentityBindingV2PostgresIntegrationTest 47
+run_test IdentityProfileProvisioningPostgresIntegrationTest 47

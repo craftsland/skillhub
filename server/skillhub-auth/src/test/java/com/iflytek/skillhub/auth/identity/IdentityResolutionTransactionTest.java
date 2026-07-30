@@ -15,6 +15,11 @@ import com.iflytek.skillhub.auth.entity.IdentityBindingSubjectStatus;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.repository.IdentityBindingRepository;
 import com.iflytek.skillhub.auth.repository.IdentityBindingSubjectRepository;
+import com.iflytek.skillhub.auth.policy.AccessDecision;
+import com.iflytek.skillhub.auth.policy.AccessPolicy;
+import com.iflytek.skillhub.auth.policy.IdentityAccessContext;
+import com.iflytek.skillhub.auth.policy.IdentityAccessKind;
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
@@ -41,6 +46,10 @@ class IdentityResolutionTransactionTest {
     private GlobalNamespaceMembershipService membershipService;
     private AccountLoginGuard accountLoginGuard;
     private PlatformPrincipalFactory principalFactory;
+    private AccessPolicy accessPolicy;
+    private ProvisioningPolicy provisioningPolicy;
+    private ProfileSynchronizationService profileSyncService;
+    private AuditLogService auditLogService;
     private IdentityResolutionTransaction transaction;
 
     @BeforeEach
@@ -53,13 +62,22 @@ class IdentityResolutionTransactionTest {
                 mock(GlobalNamespaceMembershipService.class);
         accountLoginGuard = new AccountLoginGuard();
         principalFactory = mock(PlatformPrincipalFactory.class);
+        accessPolicy = mock(AccessPolicy.class);
+        provisioningPolicy = mock(ProvisioningPolicy.class);
+        profileSyncService =
+                mock(ProfileSynchronizationService.class);
+        auditLogService = mock(AuditLogService.class);
         transaction = new IdentityResolutionTransaction(
                 bindingRepository,
                 subjectRepository,
                 userRepository,
                 membershipService,
                 accountLoginGuard,
-                principalFactory);
+                principalFactory,
+                accessPolicy,
+                provisioningPolicy,
+                profileSyncService,
+                auditLogService);
         when(subjectRepository.findMatchingSubjects(any(), any()))
                 .thenReturn(List.of());
         when(bindingRepository.findByProviderCodeAndSubject(
@@ -67,6 +85,12 @@ class IdentityResolutionTransactionTest {
                 any())).thenReturn(Optional.empty());
         when(userRepository.save(any(UserAccount.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(accessPolicy.evaluate(any()))
+                .thenReturn(AccessDecision.ALLOW);
+        when(provisioningPolicy.evaluate(any()))
+                .thenAnswer(invocation -> invocation
+                        .<ProvisioningPolicyContext>getArgument(0)
+                        .configuredMode());
         when(bindingRepository.save(any(IdentityBinding.class)))
                 .thenAnswer(invocation -> {
                     IdentityBinding binding =
@@ -100,8 +124,12 @@ class IdentityResolutionTransactionTest {
 
         IdentityLoginOutcome outcome = transaction.resolve(
                 assertion,
-                UserStatus.ACTIVE,
-                "legacy_id");
+                descriptor(
+                        "provider",
+                        "stable_id",
+                        "legacy_id",
+                        ProvisioningMode.AUTO),
+                IdentityLoginContext.empty());
 
         assertThat(outcome).isEqualTo(
                 new IdentityLoginOutcome.Authenticated(
@@ -147,6 +175,126 @@ class IdentityResolutionTransactionTest {
     }
 
     @Test
+    void approvalProvisioningCreatesOnePendingAccountWithoutMembership() {
+        IdentityLoginOutcome outcome = transaction.resolve(
+                githubAssertion(Set.of()),
+                githubDescriptor(ProvisioningMode.APPROVAL),
+                IdentityLoginContext.empty());
+
+        assertThat(outcome).isEqualTo(
+                new IdentityLoginOutcome.PendingApproval(
+                        "ACCOUNT_PENDING"));
+        ArgumentCaptor<UserAccount> userCaptor =
+                ArgumentCaptor.forClass(UserAccount.class);
+        verify(userRepository, org.mockito.Mockito.atLeastOnce())
+                .save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getStatus())
+                .isEqualTo(UserStatus.PENDING);
+        verify(membershipService, never()).ensureMember(any());
+        verify(profileSyncService).synchronize(
+                any(UserAccount.class),
+                any(IdentityAssertion.class),
+                any(ProviderDescriptor.class),
+                org.mockito.ArgumentMatchers.eq(true));
+    }
+
+    @Test
+    void existingBindingOnlyRejectsUnknownIdentityWithoutWriting() {
+        assertThatThrownBy(() -> transaction.resolve(
+                githubAssertion(Set.of()),
+                githubDescriptor(
+                        ProvisioningMode.EXISTING_BINDING_ONLY),
+                IdentityLoginContext.empty()))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
+
+        verify(userRepository, never()).save(any());
+        verify(bindingRepository, never())
+                .save(any(IdentityBinding.class));
+        verify(profileSyncService, never()).synchronize(
+                any(),
+                any(),
+                any(),
+                org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    void verifiedEmailCollisionReturnsOnlyStableLinkReason() {
+        when(userRepository.existsByEmailIgnoreCase(
+                "alice@example.com"))
+                .thenReturn(true);
+
+        IdentityLoginOutcome outcome = transaction.resolve(
+                githubAssertion(Set.of()),
+                githubDescriptor(ProvisioningMode.AUTO),
+                new IdentityLoginContext(
+                        "request-1",
+                        "127.0.0.1",
+                        "test"));
+
+        assertThat(outcome).isEqualTo(
+                new IdentityLoginOutcome.LinkRequired(
+                        "EMAIL_COLLISION"));
+        verify(userRepository, never()).save(any());
+        verify(bindingRepository, never())
+                .save(any(IdentityBinding.class));
+        verify(auditLogService).record(
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(
+                        "IDENTITY_EMAIL_COLLISION"),
+                org.mockito.ArgumentMatchers.eq(
+                        "IDENTITY_BINDING"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq("request-1"),
+                org.mockito.ArgumentMatchers.eq("127.0.0.1"),
+                org.mockito.ArgumentMatchers.eq("test"),
+                org.mockito.ArgumentMatchers.eq(
+                        "{\"providerCode\":\"github\",\"result\":\"link_required\"}"));
+    }
+
+    @Test
+    void loginPolicyReceivesNewIdentityContextBeforeProvisioning() {
+        when(principalFactory.create(
+                any(UserAccount.class),
+                org.mockito.ArgumentMatchers.eq("github")))
+                .thenReturn(principal("provisioned"));
+
+        transaction.resolve(
+                githubAssertion(Set.of()),
+                githubDescriptor(ProvisioningMode.AUTO),
+                IdentityLoginContext.empty());
+
+        ArgumentCaptor<IdentityAccessContext> context =
+                ArgumentCaptor.forClass(
+                        IdentityAccessContext.class);
+        verify(accessPolicy).evaluate(context.capture());
+        assertThat(context.getValue().accessKind())
+                .isEqualTo(IdentityAccessKind.NEW_IDENTITY);
+        assertThat(context.getValue().existingAccountStatus())
+                .isEmpty();
+    }
+
+    @Test
+    void deniedLoginPolicyDoesNotProvisionUnknownIdentity() {
+        when(accessPolicy.evaluate(any()))
+                .thenReturn(AccessDecision.DENY);
+
+        assertThatThrownBy(() -> transaction.resolve(
+                githubAssertion(Set.of()),
+                githubDescriptor(ProvisioningMode.AUTO),
+                IdentityLoginContext.empty()))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
+
+        verify(provisioningPolicy, never()).evaluate(any());
+        verify(userRepository, never()).save(any());
+        verify(bindingRepository, never())
+                .save(any(IdentityBinding.class));
+    }
+
+    @Test
     void upgradesLegacyPrimaryInOneTransaction() {
         IdentityBinding binding = binding(
                 1L,
@@ -172,15 +320,15 @@ class IdentityResolutionTransactionTest {
                 1L,
                 IdentityBindingSubjectStatus.ACTIVE))
                 .thenReturn(List.of(legacy));
-        when(userRepository.findById("usr_1"))
+        when(userRepository.findByIdForUpdate("usr_1"))
                 .thenReturn(Optional.of(user));
         when(principalFactory.create(user, "github"))
                 .thenReturn(principal("usr_1"));
 
         transaction.resolve(
                 githubAssertion(Set.of()),
-                UserStatus.ACTIVE,
-                "github_user_id");
+                githubDescriptor(ProvisioningMode.AUTO),
+                IdentityLoginContext.empty());
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<IdentityBindingSubject>> subjectsCaptor =
@@ -201,6 +349,16 @@ class IdentityResolutionTransactionTest {
                                 "github_user_id",
                                 "123456",
                                 true));
+        ArgumentCaptor<IdentityAccessContext> accessContext =
+                ArgumentCaptor.forClass(
+                        IdentityAccessContext.class);
+        verify(accessPolicy).evaluate(accessContext.capture());
+        assertThat(accessContext.getValue().accessKind())
+                .isEqualTo(
+                        IdentityAccessKind.RETURNING_IDENTITY);
+        assertThat(accessContext.getValue()
+                .existingAccountStatus())
+                .contains(UserStatus.ACTIVE);
     }
 
     @Test
@@ -248,15 +406,19 @@ class IdentityResolutionTransactionTest {
                 IdentityBindingSubjectStatus.ACTIVE))
                 .thenReturn(List.of(alias, stable));
         UserAccount user = user("usr_1", UserStatus.ACTIVE, false);
-        when(userRepository.findById("usr_1"))
+        when(userRepository.findByIdForUpdate("usr_1"))
                 .thenReturn(Optional.of(user));
         when(principalFactory.create(user, "provider"))
                 .thenReturn(principal("usr_1"));
 
         transaction.resolve(
                 assertion,
-                UserStatus.ACTIVE,
-                "legacy_id");
+                descriptor(
+                        "provider",
+                        "stable_id",
+                        "legacy_id",
+                        ProvisioningMode.AUTO),
+                IdentityLoginContext.empty());
 
         assertThat(alias.isPrimary()).isFalse();
         assertThat(stable.isPrimary()).isTrue();
@@ -291,8 +453,12 @@ class IdentityResolutionTransactionTest {
 
         assertThatThrownBy(() -> transaction.resolve(
                 assertion,
-                UserStatus.ACTIVE,
-                "legacy_id"))
+                descriptor(
+                        "provider",
+                        "stable_id",
+                        "legacy_id",
+                        ProvisioningMode.AUTO),
+                IdentityLoginContext.empty()))
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(
@@ -324,8 +490,8 @@ class IdentityResolutionTransactionTest {
 
         assertThatThrownBy(() -> transaction.resolve(
                 githubAssertion(Set.of()),
-                UserStatus.ACTIVE,
-                "github_user_id"))
+                githubDescriptor(ProvisioningMode.AUTO),
+                IdentityLoginContext.empty()))
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
@@ -352,13 +518,13 @@ class IdentityResolutionTransactionTest {
                 1L,
                 IdentityBindingSubjectStatus.ACTIVE))
                 .thenReturn(List.of());
-        when(userRepository.findById("usr_1"))
+        when(userRepository.findByIdForUpdate("usr_1"))
                 .thenReturn(Optional.of(user));
 
         IdentityLoginOutcome outcome = transaction.resolve(
                 githubAssertion(Set.of()),
-                UserStatus.ACTIVE,
-                "github_user_id");
+                githubDescriptor(ProvisioningMode.AUTO),
+                IdentityLoginContext.empty());
 
         assertThat(outcome).isEqualTo(
                 new IdentityLoginOutcome.PendingApproval(
@@ -368,6 +534,58 @@ class IdentityResolutionTransactionTest {
                 .isEqualTo("original@example.com");
         verify(userRepository, never()).save(user);
         verify(subjectRepository).saveAll(any());
+        ArgumentCaptor<IdentityAccessContext> accessContext =
+                ArgumentCaptor.forClass(
+                        IdentityAccessContext.class);
+        verify(accessPolicy).evaluate(accessContext.capture());
+        assertThat(accessContext.getValue().accessKind())
+                .isEqualTo(
+                        IdentityAccessKind.RETURNING_IDENTITY);
+        assertThat(accessContext.getValue()
+                .existingAccountStatus())
+                .contains(UserStatus.PENDING);
+    }
+
+    @Test
+    void deniedLoginPolicyDoesNotMutatePendingBinding() {
+        IdentityBinding binding = binding(
+                1L,
+                "usr_1",
+                "github",
+                "123456");
+        UserAccount user = user("usr_1", UserStatus.PENDING, false);
+        when(bindingRepository.findByProviderCodeAndSubject(
+                "github",
+                "123456")).thenReturn(Optional.of(binding));
+        when(bindingRepository.findByIdAndStatusForUpdate(
+                1L,
+                IdentityBindingStatus.ACTIVE))
+                .thenReturn(Optional.of(binding));
+        when(userRepository.findByIdForUpdate("usr_1"))
+                .thenReturn(Optional.of(user));
+        when(accessPolicy.evaluate(any()))
+                .thenReturn(AccessDecision.DENY);
+
+        assertThatThrownBy(() -> transaction.resolve(
+                githubAssertion(Set.of()),
+                githubDescriptor(ProvisioningMode.APPROVAL),
+                IdentityLoginContext.empty()))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
+
+        verify(subjectRepository, never())
+                .demoteActivePrimary(any(), any());
+        verify(bindingRepository, never()).save(any());
+        verify(auditLogService, never()).record(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any());
     }
 
     @Test
@@ -403,13 +621,13 @@ class IdentityResolutionTransactionTest {
                 1L,
                 IdentityBindingStatus.ACTIVE))
                 .thenReturn(Optional.of(binding));
-        when(userRepository.findById("usr_blocked"))
+        when(userRepository.findByIdForUpdate("usr_blocked"))
                 .thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> transaction.resolve(
                 githubAssertion(Set.of()),
-                UserStatus.ACTIVE,
-                "github_user_id"))
+                githubDescriptor(ProvisioningMode.AUTO),
+                IdentityLoginContext.empty()))
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(expectedCode);
@@ -448,6 +666,40 @@ class IdentityResolutionTransactionTest {
                 profile(),
                 Map.of(),
                 evidence("oidc"));
+    }
+
+    private static ProviderDescriptor githubDescriptor(
+            ProvisioningMode mode) {
+        return descriptor(
+                "github",
+                "github_user_id",
+                "github_user_id",
+                mode);
+    }
+
+    private static ProviderDescriptor descriptor(
+            String providerCode,
+            String primaryType,
+            String legacyType,
+            ProvisioningMode mode) {
+        Map<String, SubjectCanonicalizer> canonicalizers =
+                new java.util.LinkedHashMap<>();
+        canonicalizers.put(primaryType, SubjectCanonicalizer.EXACT);
+        canonicalizers.put(legacyType, SubjectCanonicalizer.EXACT);
+        return new ProviderDescriptor(
+                providerCode,
+                "oidc",
+                "https://id.example.com",
+                providerCode,
+                primaryType,
+                legacyType,
+                canonicalizers,
+                List.of("login"),
+                List.of("email"),
+                List.of("avatar_url"),
+                EmailAssurance.VERIFIED,
+                mode,
+                ProfileSyncPolicy.defaults());
     }
 
     private static ExternalProfile profile() {

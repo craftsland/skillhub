@@ -115,6 +115,22 @@ class FlywayMigrationGuardrailTest {
                 .contains("Binding V2 contract preflight failed");
     }
 
+    @Test
+    void profileFieldSourceMigration_mustBackfillLegacyValues()
+            throws IOException {
+        String migration = Files.readString(
+                migrationPath(
+                        "V47__user_profile_field_source.sql"));
+
+        assertThat(migration)
+                .contains("LEGACY_LOCAL")
+                .contains("'displayName'")
+                .contains("'email'")
+                .contains("'avatarUrl'")
+                .contains(
+                        "chk_user_profile_field_provider_source");
+    }
+
     private List<Path> migrationFiles() throws IOException {
         Path root = repoRoot()
                 .resolve("server")

@@ -24,13 +24,19 @@ class ProfileReviewServiceTest {
     @Mock
     private UserAccountRepository userAccountRepository;
     @Mock
+    private UserProfileFieldSourceService fieldSourceService;
+    @Mock
     private AuditLogService auditLogService;
 
     private ProfileReviewService service;
 
     @BeforeEach
     void setUp() {
-        service = new ProfileReviewService(changeRequestRepository, userAccountRepository, auditLogService);
+        service = new ProfileReviewService(
+                changeRequestRepository,
+                userAccountRepository,
+                fieldSourceService,
+                auditLogService);
     }
 
     private ProfileChangeRequest pendingRequest(String userId) {
@@ -56,7 +62,7 @@ class ProfileReviewServiceTest {
         var user = new UserAccount("user-1", "OldName", "u@example.com", null);
 
         when(changeRequestRepository.findById(1L)).thenReturn(Optional.of(request));
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
 
         var result = service.approve(1L, "admin-1", "req-1", "127.0.0.1", "TestAgent");
 
@@ -65,6 +71,10 @@ class ProfileReviewServiceTest {
         assertNotNull(result.getReviewedAt());
         assertEquals("NewName", user.getDisplayName());
         verify(userAccountRepository).save(user);
+        verify(fieldSourceService).markUserProvided(
+                "user-1",
+                java.util.List.of(
+                        UserProfileFieldName.DISPLAY_NAME));
         verify(changeRequestRepository).save(request);
         verify(auditLogService).record(eq("admin-1"), eq("PROFILE_REVIEW_APPROVE"),
                 eq("PROFILE_CHANGE_REQUEST"), eq(1L), any(), any(), any(), any());
@@ -116,7 +126,7 @@ class ProfileReviewServiceTest {
     void approve_userNotFound_throwsNotFoundException() {
         var request = pendingRequest("deleted-user");
         when(changeRequestRepository.findById(1L)).thenReturn(Optional.of(request));
-        when(userAccountRepository.findById("deleted-user")).thenReturn(Optional.empty());
+        when(userAccountRepository.findByIdForUpdate("deleted-user")).thenReturn(Optional.empty());
 
         assertThrows(DomainNotFoundException.class,
                 () -> service.approve(1L, "admin-1", "req-1", "127.0.0.1", "TestAgent"));

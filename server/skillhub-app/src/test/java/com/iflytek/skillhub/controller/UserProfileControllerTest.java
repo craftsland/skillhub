@@ -10,6 +10,7 @@ import com.iflytek.skillhub.domain.user.ProfileChangeRequestRepository;
 import com.iflytek.skillhub.domain.user.ProfileChangeStatus;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
+import com.iflytek.skillhub.domain.user.UserProfileFieldSourceService;
 import com.iflytek.skillhub.security.AuthFailureThrottleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,6 +84,9 @@ class UserProfileControllerTest {
 
     @MockBean
     private AuditLogService auditLogService;
+
+    @MockBean
+    private UserProfileFieldSourceService fieldSourceService;
     // -- Helper --
 
     private PlatformPrincipal testPrincipal() {
@@ -121,7 +125,8 @@ class UserProfileControllerTest {
         var principal = testPrincipal();
         var user = new UserAccount("user-1", "OldName", "user@example.com", "https://example.com/avatar.png");
 
-        given(userAccountRepository.findById("user-1")).willReturn(Optional.of(user));
+        given(userAccountRepository.findByIdForUpdate("user-1"))
+                .willReturn(Optional.of(user));
         given(namespaceMemberRepository.findByUserId("user-1")).willReturn(List.of());
         given(userRoleBindingRepository.findByUserId("user-1")).willReturn(List.of());
 
@@ -140,7 +145,8 @@ class UserProfileControllerTest {
         var principal = testPrincipal();
         var user = new UserAccount("user-1", "OldName", "user@example.com", "https://example.com/avatar.png");
 
-        given(userAccountRepository.findById("user-1")).willReturn(Optional.of(user));
+        given(userAccountRepository.findByIdForUpdate("user-1"))
+                .willReturn(Optional.of(user));
         given(namespaceMemberRepository.findByUserId("user-1")).willReturn(List.of());
         given(userRoleBindingRepository.findByUserId("user-1")).willReturn(List.of());
 

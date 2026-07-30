@@ -84,7 +84,7 @@ class IdentityBindingV2PostgresIntegrationTest {
     }
 
     @Test
-    void upgradesMixedVersionWriteAndPreservesLegacyReadColumn() {
+    void authenticatesPreparedMixedVersionBindingAndPreservesLegacyReadColumn() {
         IdentityLoginOutcome outcome = authenticate(
                 IdentityBindingV2MigrationPostgresTest
                         .MIXED_VERSION_SUBJECT);

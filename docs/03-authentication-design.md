@@ -34,8 +34,8 @@
               │ IdentityAssertion
               ▼
 ┌─────────────────────────────┐
-│  Layer 3: Policy + Mapping  │  准入策略 + identity_binding
-│                             │  兼容建号与资料同步
+│  Layer 3: Policy + Mapping  │  Login / Provisioning Policy
+│                             │  Binding V2 + 字段来源与资料同步
 └─────────────┬───────────────┘
               │ PlatformPrincipal
               ▼
@@ -66,20 +66,21 @@ public record IdentityAccessContext(
     String subject,
     Optional<String> email,
     EmailAssurance emailAssurance,
-    IdentityLoginContext requestContext
+    IdentityLoginContext requestContext,
+    IdentityAccessKind accessKind,
+    Optional<UserStatus> existingAccountStatus
 ) {}
 
 public enum AccessDecision {
-    ALLOW,              // 准入，继续创建/绑定平台用户
-    DENY,               // 拒绝，不建立 Session，重定向到拒绝页
-    PENDING_APPROVAL    // 等待管理员审批，不建立业务 Session
+    ALLOW,              // 本次登录准入
+    DENY                // 拒绝，不建立 Session，重定向到拒绝页
 }
 ```
 
 ### 2.1 一期支持的策略（通过配置切换）
 
 ```yaml
-astron:
+skillhub:
   access-policy:
     mode: EMAIL_DOMAIN   # OPEN / PROVIDER_ALLOWLIST / EMAIL_DOMAIN / SUBJECT_WHITELIST
     allowed-providers:
@@ -99,12 +100,63 @@ astron:
 ### 2.2 准入失败处理
 
 - `DENY`：抛出 `OAuth2AccessDeniedException`，由 `failureHandler` 重定向到 `/access-denied` 页面。不创建用户，不建立 Session。
-- `PENDING_APPROVAL`：首次登录创建 `user_account`（status=`PENDING`），但不建立业务 Session。抛出 `AccountPendingException`，由 `failureHandler` 重定向到 `/pending-approval` 页面（纯静态提示页，无需登录态）。管理员在后台审批时，系统在同一事务内把状态变为 `ACTIVE` 并补齐 `@global` 的 `MEMBER` membership；任一步失败都回滚。后续登录以已绑定账号的持久化状态为准：`ACTIVE` 正常建立 Session，`PENDING` 继续等待，`DISABLED` 拒绝登录；准入策略持续返回 `PENDING_APPROVAL` 不会覆盖已完成的管理员审批。
 
 安全边界：PENDING / DISABLED / MERGED 用户和 system account 绝不会通过交互式登录获得
 业务 Session。外部身份命中这些账号时，在更新用户资料或加载角色前直接拒绝。
 
-### 2.3 扩展性
+### 2.3 首次建号策略（Provisioning Policy）
+
+Login Policy 每次登录执行；Provisioning Policy 只在外部身份尚未绑定时执行。二者不能
+再通过 `AccessDecision` 混合表达。
+
+| 模式 | 未绑定身份的行为 |
+|------|------------------|
+| `AUTO` | 创建 `ACTIVE` Account、Binding、typed Subjects 和 `@global MEMBER` |
+| `APPROVAL` | 创建 `PENDING` Account、Binding 和 typed Subjects，不建立 Session |
+| `EXISTING_BINDING_ONLY` | 不创建任何记录，返回 `ACCESS_DENIED` |
+
+`APPROVAL` 下，相同身份重复登录继续命中原 Binding 并返回 `ACCOUNT_PENDING`，不会重复
+建号。管理员批准时在同一事务把账号改为 `ACTIVE` 并补齐 `@global MEMBER`；拒绝时改为
+`DISABLED` 并保留 Binding，防止反复创建 PENDING 账号。
+
+配置是受信 descriptor 的一部分，按 Provider Instance 生效：
+
+```yaml
+skillhub:
+  auth:
+    identity:
+      providers:
+        corp-oidc:
+          provisioning-mode: APPROVAL
+          profile-sync:
+            display-name: PRESERVE_LOCAL
+            email: FILL_IF_EMPTY
+            avatar-url: INITIAL_ONLY
+```
+
+### 2.4 资料同步策略
+
+`user_profile_field_source` 记录 `displayName`、`email`、`avatarUrl` 当前值来自 Provider、
+用户、管理员还是历史本地数据。升级迁移把已有非空值标记为 `LEGACY_LOCAL`，避免升级后
+第一次外部登录覆盖历史资料。
+
+每个字段支持 `NEVER`、`INITIAL_ONLY`、`FILL_IF_EMPTY`、`PRESERVE_LOCAL` 和
+`PROVIDER_AUTHORITATIVE`。默认 displayName/avatarUrl 使用 `PRESERVE_LOCAL`，email 使用
+`FILL_IF_EMPTY`，且 email 只有 `VERIFIED` / `AUTHORITATIVE` 才能写入。显式设置
+`PROVIDER_AUTHORITATIVE` 后，登录 Provider 可以覆盖本地值；这项例外必须配置在具体
+Provider 和具体字段上。
+
+### 2.5 Email 碰撞
+
+未绑定身份携带可信 email，而平台已有相同 email 时，核心只返回
+`LinkRequired("EMAIL_COLLISION")`：
+
+- 不按 email 自动绑定账号；
+- 不返回目标 userId、账号资料或可直接完成绑定的 token；
+- 不创建 Account、Binding 或 Subject；
+- PR 5 的显式 Identity Link 完成前只展示安全提示和已有账号登录入口。
+
+### 2.6 扩展性
 
 后续新增 OAuth Provider（Google、GitLab、微信）时，准入策略与 Provider 无关，统一在 AccessPolicy 层判定，不需要重做入驻逻辑。
 
@@ -137,15 +189,17 @@ CustomOAuth2UserService / CustomOidcUserService:
   ② 服务端路由解析 ResolvedProviderHandle
   ③ 统一身份核心读取受信 descriptor，执行 Authority pin/复核
   ④ Assertion Factory 固定 provider/authority/subject/属性映射
-  ⑤ AccessPolicy.evaluate(IdentityAccessContext) → 准入判定
+  ⑤ 解析全部 Subject，锁定已有 Binding / Account
+  ⑥ Account Guard + AccessPolicy.evaluate(IdentityAccessContext)
   │
   ├── DENY → 抛出 OAuth2AccessDeniedException → failureHandler 重定向 /access-denied（不建立 Session）
-  ├── PENDING_APPROVAL → 创建 PENDING 用户 → 抛出 AccountPendingException → failureHandler 重定向 /pending-approval（不建立 Session）
   └── ALLOW ↓
   │
-  ⑥ 查询 identity_binding 是否已绑定
-  ├── 已绑定 → 加载平台用户，检查用户状态（DISABLED → 抛异常），同步最新头像/昵称
-  └── 未绑定 → 创建 user_account(ACTIVE) + identity_binding
+  ⑦ 已绑定 → 按字段来源和 Profile Sync Policy 同步允许字段
+  └── 未绑定 → Provisioning Policy + email collision 检查
+      ├── AUTO → 创建 ACTIVE Account + Binding + Subjects + membership
+      ├── APPROVAL → 创建 PENDING Account + Binding + Subjects
+      └── EXISTING_BINDING_ONLY → 拒绝且不写入
     │
     ▼
 AuthenticationSuccessHandler:
@@ -162,9 +216,10 @@ OIDC 登录沿用同一条业务链路，但由 Spring Security 的 `oidcUserSer
 - 协议证据：只包含 `oidc`、认证时间和认证方法，不包含 token 或原始响应
 - Provider code、issuer Authority 和最终属性映射由服务端受信 descriptor 固定
 
-现有 `identity_binding(provider_code, subject)` 继续保存历史和新登录绑定，不改变
-Subject 值。新增的 `identity_provider_state` 只保存 Provider code、protocol、
-canonical Authority、SHA-256 fingerprint 和状态，不保存 client secret 或 token。
+`identity_binding(provider_code, subject)` 保留兼容 primary 值，
+`identity_binding_subject` 保存 typed primary/alias，并通过数据库约束保证一个 ACTIVE
+Binding 恰有一个 ACTIVE primary。`identity_provider_state` 只保存 Provider code、
+protocol、canonical Authority、SHA-256 fingerprint 和状态，不保存 client secret 或 token。
 同一 registration id 切换 issuer 时进入粘性的 `AUTHORITY_MISMATCH`，不展示登录方式，
 也不接受回调；恢复旧 Authority 后仍需显式恢复操作。
 
@@ -340,15 +395,18 @@ Principal、Session、token、ticket、Cookie 或原始响应。核心内部按�
 Trusted descriptor
   → Authority Lock
   → IdentityAssertionFactory
-  → AccessPolicy
-  → identity_binding / 兼容建号
+  → Binding / Subject resolution
   → AccountLoginGuard
+  → AccessPolicy
+  → ProvisioningPolicy / email collision
+  → ProfileSyncPolicy
   → PlatformPrincipalFactory
   → IdentityLoginOutcome
 ```
 
 只有 `IdentityLoginOutcome.Authenticated` 可以到达既有 `PlatformSessionService`。当前
-`identity_binding` 和 `PlatformPrincipal` 结构保持不变，以支持老版本升级和回滚。
+`PlatformPrincipal` 结构保持不变；Binding V2 和 profile source 使用 additive migration
+及兼容列支持升级和回滚。
 
 ### 4.1 多 Provider 账号合并策略
 

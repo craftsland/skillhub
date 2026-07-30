@@ -86,6 +86,41 @@ class OAuthLoginFlowServiceTest {
     }
 
     @Test
+    void linkRequiredOutcomeExposesOnlyGenericOAuthFailure() {
+        TrustedProviderRouteResolver resolver =
+                mock(TrustedProviderRouteResolver.class);
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(),
+                        resolver,
+                        identityLoginService);
+        when(identityLoginService.authenticate(any(), any(), any()))
+                .thenReturn(new IdentityLoginOutcome.LinkRequired(
+                        "EMAIL_COLLISION"));
+
+        assertThatThrownBy(() ->
+                service.authenticate(
+                        registration(),
+                        result(),
+                        context()))
+                .isInstanceOfSatisfying(
+                        OAuth2AuthenticationException.class,
+                        exception -> {
+                            assertThat(exception.getError()
+                                    .getErrorCode())
+                                    .isEqualTo("link_required");
+                            assertThat(exception.getError()
+                                    .getDescription())
+                                    .isEqualTo(
+                                            "Additional account verification is required")
+                                    .doesNotContain(
+                                            "EMAIL_COLLISION");
+                        });
+    }
+
+    @Test
     void authorityMismatchIsMappedToStableOAuthFailure() {
         TrustedProviderRouteResolver resolver =
                 mock(TrustedProviderRouteResolver.class);

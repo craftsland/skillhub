@@ -44,6 +44,9 @@ class UserProfileServiceTest {
     private ProfileFieldPolicyConfig fieldPolicyConfig;
 
     @Mock
+    private UserProfileFieldSourceService fieldSourceService;
+
+    @Mock
     private AuditLogService auditLogService;
 
     @Mock
@@ -84,7 +87,7 @@ class UserProfileServiceTest {
     @Test
     void updateProfile_noModeration_shouldApplyImmediately() {
         var user = testUser();
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(moderationConfig.machineReview()).thenReturn(false);
         stubFieldPolicies(false);
 
@@ -97,6 +100,9 @@ class UserProfileServiceTest {
         // user_account should be updated
         assertEquals("NewName", user.getDisplayName());
         verify(userAccountRepository).save(user);
+        verify(fieldSourceService).markUserProvided(
+                "user-1",
+                List.of(UserProfileFieldName.DISPLAY_NAME));
 
         // Change request should be saved as APPROVED
         var captor = ArgumentCaptor.forClass(ProfileChangeRequest.class);
@@ -113,7 +119,7 @@ class UserProfileServiceTest {
     @Test
     void updateProfile_sameValue_shouldSucceed() {
         var user = testUser();
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(moderationConfig.machineReview()).thenReturn(false);
         stubFieldPolicies(false);
 
@@ -129,7 +135,7 @@ class UserProfileServiceTest {
     @Test
     void updateProfile_humanReviewEnabled_shouldCreatePendingRequest() {
         var user = testUser();
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(moderationConfig.machineReview()).thenReturn(false);
         when(moderationConfig.humanReview()).thenReturn(true);
         stubFieldPolicies(true);
@@ -145,6 +151,8 @@ class UserProfileServiceTest {
         // user_account should NOT be updated
         assertEquals("OldName", user.getDisplayName());
         verify(userAccountRepository, never()).save(any());
+        verify(fieldSourceService, never())
+                .markUserProvided(any(), any());
 
         // Change request should be saved as PENDING
         var captor = ArgumentCaptor.forClass(ProfileChangeRequest.class);
@@ -159,7 +167,7 @@ class UserProfileServiceTest {
     @Test
     void updateProfile_humanReviewEnabled_shouldPublishProfileReviewSubmittedEvent() {
         var user = testUser();
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(moderationConfig.machineReview()).thenReturn(false);
         when(moderationConfig.humanReview()).thenReturn(true);
         stubFieldPolicies(true);
@@ -190,7 +198,7 @@ class UserProfileServiceTest {
         var oldRequest = new ProfileChangeRequest("user-1", "{\"displayName\":\"PendingName\"}",
                 "{\"displayName\":\"OldName\"}", ProfileChangeStatus.PENDING, "SKIPPED", null);
 
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(moderationConfig.machineReview()).thenReturn(false);
         when(moderationConfig.humanReview()).thenReturn(true);
         stubFieldPolicies(true);
@@ -212,7 +220,7 @@ class UserProfileServiceTest {
     @Test
     void updateProfile_machinePassAndHumanReview_shouldCreatePendingWithPassResult() {
         var user = testUser();
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(moderationConfig.machineReview()).thenReturn(true);
         when(moderationConfig.humanReview()).thenReturn(true);
         when(moderationService.moderate("user-1", displayNameChange("NewName")))
@@ -236,7 +244,7 @@ class UserProfileServiceTest {
     @Test
     void updateProfile_machineRejected_shouldThrowAndSaveRejection() {
         var user = testUser();
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(moderationConfig.machineReview()).thenReturn(true);
         when(moderationService.moderate("user-1", displayNameChange("BadWord")))
                 .thenReturn(ModerationResult.rejected("Contains sensitive content"));
@@ -261,7 +269,7 @@ class UserProfileServiceTest {
 
     @Test
     void updateProfile_userNotFound_shouldThrow() {
-        when(userAccountRepository.findById("nonexistent")).thenReturn(Optional.empty());
+        when(userAccountRepository.findByIdForUpdate("nonexistent")).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () ->
                 userProfileService.updateProfile(

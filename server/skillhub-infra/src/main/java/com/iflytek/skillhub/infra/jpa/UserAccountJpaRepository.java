@@ -13,10 +13,24 @@ import org.springframework.stereotype.Repository;
 
 /**
  * JPA-backed user-account repository that provides filtered admin search over account records.
+ * The native {@code FOR UPDATE} query keeps row-lock behavior portable
+ * between PostgreSQL and the test suite's H2 PostgreSQL compatibility mode.
  */
 @Repository
 public interface UserAccountJpaRepository
         extends JpaRepository<UserAccount, String>, JpaSpecificationExecutor<UserAccount>, UserAccountRepository {
+
+    @Override
+    @Query(
+            value = """
+                    SELECT *
+                    FROM user_account
+                    WHERE id = :id
+                    FOR UPDATE
+                    """,
+            nativeQuery = true)
+    java.util.Optional<UserAccount> findByIdForUpdate(
+            @Param("id") String id);
 
     @Override
     @Query("""

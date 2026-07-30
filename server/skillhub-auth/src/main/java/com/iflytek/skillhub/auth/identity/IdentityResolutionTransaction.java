@@ -6,6 +6,11 @@ import com.iflytek.skillhub.auth.entity.IdentityBindingSubject;
 import com.iflytek.skillhub.auth.entity.IdentityBindingSubjectStatus;
 import com.iflytek.skillhub.auth.repository.IdentityBindingRepository;
 import com.iflytek.skillhub.auth.repository.IdentityBindingSubjectRepository;
+import com.iflytek.skillhub.auth.policy.AccessDecision;
+import com.iflytek.skillhub.auth.policy.AccessPolicy;
+import com.iflytek.skillhub.auth.policy.IdentityAccessContext;
+import com.iflytek.skillhub.auth.policy.IdentityAccessKind;
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
@@ -33,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 class IdentityResolutionTransaction {
 
     private static final String ACCOUNT_PENDING = "ACCOUNT_PENDING";
+    private static final String EMAIL_COLLISION = "EMAIL_COLLISION";
     private static final String LEGACY_SUBJECT_TYPE = "legacy_subject";
 
     private final IdentityBindingRepository bindingRepository;
@@ -41,6 +47,10 @@ class IdentityResolutionTransaction {
     private final GlobalNamespaceMembershipService membershipService;
     private final AccountLoginGuard accountLoginGuard;
     private final PlatformPrincipalFactory principalFactory;
+    private final AccessPolicy accessPolicy;
+    private final ProvisioningPolicy provisioningPolicy;
+    private final ProfileSynchronizationService profileSyncService;
+    private final AuditLogService auditLogService;
 
     IdentityResolutionTransaction(
             IdentityBindingRepository bindingRepository,
@@ -48,29 +58,50 @@ class IdentityResolutionTransaction {
             UserAccountRepository userRepository,
             GlobalNamespaceMembershipService membershipService,
             AccountLoginGuard accountLoginGuard,
-            PlatformPrincipalFactory principalFactory) {
+            PlatformPrincipalFactory principalFactory,
+            AccessPolicy accessPolicy,
+            ProvisioningPolicy provisioningPolicy,
+            ProfileSynchronizationService profileSyncService,
+            AuditLogService auditLogService) {
         this.bindingRepository = bindingRepository;
         this.subjectRepository = subjectRepository;
         this.userRepository = userRepository;
         this.membershipService = membershipService;
         this.accountLoginGuard = accountLoginGuard;
         this.principalFactory = principalFactory;
+        this.accessPolicy = accessPolicy;
+        this.provisioningPolicy = provisioningPolicy;
+        this.profileSyncService = profileSyncService;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional
     public IdentityLoginOutcome resolve(
             IdentityAssertion assertion,
-            UserStatus initialStatus,
-            String legacyPrimarySubjectType) {
+            ProviderDescriptor descriptor,
+            IdentityLoginContext context) {
         ExternalSubject legacySubject =
-                assertion.requireUniqueSubject(legacyPrimarySubjectType);
+                assertion.requireUniqueSubject(
+                        descriptor.legacyPrimarySubjectType());
         MatchResolution initialMatches =
                 resolveMatches(assertion, legacySubject);
         if (initialMatches.bindingId() == null) {
+            requireAccessAllowed(
+                    assertion,
+                    context,
+                    IdentityAccessKind.NEW_IDENTITY,
+                    Optional.empty());
+            ProvisioningMode mode = provisioningPolicy.evaluate(
+                    new ProvisioningPolicyContext(
+                            assertion.provider(),
+                            descriptor.provisioningMode(),
+                            context));
             return createAccount(
                     assertion,
                     legacySubject,
-                    initialStatus);
+                    descriptor,
+                    mode,
+                    context);
         }
 
         IdentityBinding binding = bindingRepository
@@ -87,7 +118,9 @@ class IdentityResolutionTransaction {
                 assertion,
                 legacySubject,
                 binding,
-                lockedMatches.revokedAliases());
+                lockedMatches.revokedAliases(),
+                descriptor,
+                context);
     }
 
     private MatchResolution resolveMatches(
@@ -175,14 +208,17 @@ class IdentityResolutionTransaction {
             IdentityAssertion assertion,
             ExternalSubject legacySubject,
             IdentityBinding binding,
-            Set<ExternalSubject> revokedAliases) {
+            Set<ExternalSubject> revokedAliases,
+            ProviderDescriptor descriptor,
+            IdentityLoginContext context) {
         if (!binding.getProviderCode().equals(
                 assertion.provider().providerCode())
                 || !binding.getSubject().equals(legacySubject.value())) {
             throw identifierConflict();
         }
 
-        UserAccount user = userRepository.findById(binding.getUserId())
+        UserAccount user = userRepository
+                .findByIdForUpdate(binding.getUserId())
                 .orElseThrow(() -> new IllegalStateException(
                         "User not found for identity binding"));
         AccountLoginDecision decision =
@@ -190,6 +226,30 @@ class IdentityResolutionTransaction {
         if (decision != AccountLoginDecision.ALLOWED
                 && decision != AccountLoginDecision.PENDING) {
             requireAllowed(decision);
+        }
+
+        requireAccessAllowed(
+                assertion,
+                context,
+                IdentityAccessKind.RETURNING_IDENTITY,
+                Optional.of(user.getStatus()));
+        if (decision == AccountLoginDecision.PENDING) {
+            reconcileSubjects(
+                    binding,
+                    assertion,
+                    revokedAliases);
+            binding.recordAuthentication(
+                    assertion.evidence().authenticatedAt());
+            bindingRepository.save(binding);
+            recordAudit(
+                    user.getId(),
+                    "IDENTITY_LOGIN_PENDING",
+                    binding.getId(),
+                    assertion.provider().providerCode(),
+                    "pending",
+                    context);
+            return new IdentityLoginOutcome.PendingApproval(
+                    ACCOUNT_PENDING);
         }
 
         reconcileSubjects(
@@ -200,16 +260,22 @@ class IdentityResolutionTransaction {
                 assertion.evidence().authenticatedAt());
         bindingRepository.save(binding);
 
-        if (decision == AccountLoginDecision.PENDING) {
-            return new IdentityLoginOutcome.PendingApproval(
-                    ACCOUNT_PENDING);
-        }
-
-        synchronizeCompatibilityProfile(user, assertion.profile());
+        profileSyncService.synchronize(
+                user,
+                assertion,
+                descriptor,
+                false);
         user = userRepository.save(user);
         binding.recordSynchronization(
                 assertion.evidence().authenticatedAt());
         bindingRepository.save(binding);
+        recordAudit(
+                user.getId(),
+                "IDENTITY_LOGIN_SUCCEEDED",
+                binding.getId(),
+                assertion.provider().providerCode(),
+                "authenticated",
+                context);
         return new IdentityLoginOutcome.Authenticated(
                 principalFactory.create(
                         user,
@@ -304,16 +370,45 @@ class IdentityResolutionTransaction {
     private IdentityLoginOutcome createAccount(
             IdentityAssertion assertion,
             ExternalSubject legacySubject,
-            UserStatus initialStatus) {
-        ExternalProfile profile = assertion.profile();
+            ProviderDescriptor descriptor,
+            ProvisioningMode mode,
+            IdentityLoginContext context) {
+        if (mode == ProvisioningMode.EXISTING_BINDING_ONLY) {
+            throw accessDenied();
+        }
+
+        Optional<String> email = trustedEmail(assertion.profile());
+        if (email.filter(userRepository::existsByEmailIgnoreCase)
+                .isPresent()) {
+            recordAudit(
+                    null,
+                    "IDENTITY_EMAIL_COLLISION",
+                    null,
+                    assertion.provider().providerCode(),
+                    "link_required",
+                    context);
+            return new IdentityLoginOutcome.LinkRequired(
+                    EMAIL_COLLISION);
+        }
+
+        UserStatus initialStatus =
+                mode == ProvisioningMode.APPROVAL
+                        ? UserStatus.PENDING
+                        : UserStatus.ACTIVE;
+        String userId = "usr_" + UUID.randomUUID();
         UserAccount user = new UserAccount(
-                "usr_" + UUID.randomUUID(),
-                profile.displayName(),
-                trustedEmail(profile).orElse(null),
-                profile.avatarUrl()
-                        .map(Object::toString)
-                        .orElse(null));
+                userId,
+                userId,
+                null,
+                null);
         user.setStatus(initialStatus);
+        user = userRepository.save(user);
+
+        profileSyncService.synchronize(
+                user,
+                assertion,
+                descriptor,
+                true);
         user = userRepository.save(user);
 
         if (initialStatus == UserStatus.ACTIVE) {
@@ -323,7 +418,7 @@ class IdentityResolutionTransaction {
                 user.getId(),
                 assertion.provider().providerCode(),
                 legacySubject.value(),
-                profile.displayName());
+                assertion.profile().displayName());
         binding.recordAuthentication(
                 assertion.evidence().authenticatedAt());
         IdentityBinding savedBinding =
@@ -348,6 +443,13 @@ class IdentityResolutionTransaction {
         subjectRepository.saveAll(subjects);
 
         if (initialStatus == UserStatus.PENDING) {
+            recordAudit(
+                    user.getId(),
+                    "IDENTITY_PROVISIONING_PENDING",
+                    savedBinding.getId(),
+                    assertion.provider().providerCode(),
+                    "pending",
+                    context);
             return new IdentityLoginOutcome.PendingApproval(
                     ACCOUNT_PENDING);
         }
@@ -355,6 +457,13 @@ class IdentityResolutionTransaction {
         savedBinding.recordSynchronization(
                 assertion.evidence().authenticatedAt());
         bindingRepository.save(savedBinding);
+        recordAudit(
+                user.getId(),
+                "IDENTITY_ACCOUNT_PROVISIONED",
+                savedBinding.getId(),
+                assertion.provider().providerCode(),
+                "authenticated",
+                context);
         return new IdentityLoginOutcome.Authenticated(
                 principalFactory.create(
                         user,
@@ -383,21 +492,57 @@ class IdentityResolutionTransaction {
                 subject.getSubjectValue());
     }
 
-    private void synchronizeCompatibilityProfile(
-            UserAccount user,
-            ExternalProfile profile) {
-        user.setDisplayName(profile.displayName());
-        trustedEmail(profile).ifPresent(user::setEmail);
-        profile.avatarUrl()
-                .map(Object::toString)
-                .ifPresent(user::setAvatarUrl);
-    }
-
     private Optional<String> trustedEmail(ExternalProfile profile) {
         return profile.email()
                 .filter(claim -> claim.assurance()
                         .isVerifiedOrAuthoritative())
                 .map(EmailClaim::value);
+    }
+
+    private void requireAccessAllowed(
+            IdentityAssertion assertion,
+            IdentityLoginContext context,
+            IdentityAccessKind accessKind,
+            Optional<UserStatus> accountStatus) {
+        AccessDecision decision = accessPolicy.evaluate(
+                new IdentityAccessContext(
+                        assertion.provider().providerCode(),
+                        assertion.primarySubject().type(),
+                        assertion.primarySubject().value(),
+                        assertion.profile().email()
+                                .map(EmailClaim::value),
+                        assertion.profile().email()
+                                .map(EmailClaim::assurance)
+                                .orElse(
+                                        EmailAssurance.UNVERIFIED),
+                        context,
+                        accessKind,
+                        accountStatus));
+        if (decision == AccessDecision.DENY) {
+            throw accessDenied();
+        }
+    }
+
+    private void recordAudit(
+            String actorUserId,
+            String action,
+            Long bindingId,
+            String providerCode,
+            String result,
+            IdentityLoginContext context) {
+        auditLogService.record(
+                actorUserId,
+                action,
+                "IDENTITY_BINDING",
+                bindingId,
+                context.requestId(),
+                context.clientIp(),
+                context.userAgent(),
+                "{\"providerCode\":\""
+                        + providerCode
+                        + "\",\"result\":\""
+                        + result
+                        + "\"}");
     }
 
     private void requireAllowed(AccountLoginDecision decision) {
