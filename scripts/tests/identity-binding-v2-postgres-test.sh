@@ -48,7 +48,7 @@ run_test() {
   flyway_target="${2:-}"
   java_version=""
   if command -v java >/dev/null 2>&1; then
-    java_version="$(java -version 2>&1 | head -n 1)"
+    java_version="$(java -version 2>&1)"
   fi
   if [[ "${java_version}" == *'"21.'* ]]; then
     host_port="$(docker port "${POSTGRES_CONTAINER}" 5432/tcp \
