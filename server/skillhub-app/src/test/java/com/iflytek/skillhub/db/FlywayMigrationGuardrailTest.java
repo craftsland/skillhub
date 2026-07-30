@@ -102,6 +102,19 @@ class FlywayMigrationGuardrailTest {
         assertThat(migration).contains("bad_namespace.slug <> 'global'");
     }
 
+    @Test
+    void identityBindingContractGate_mustRemainDeferred() throws IOException {
+        String migration = Files.readString(
+                migrationPath(
+                        "V46__identity_binding_v2_contract_gate.sql"));
+
+        assertThat(migration)
+                .contains("CREATE CONSTRAINT TRIGGER")
+                .contains("DEFERRABLE INITIALLY DEFERRED")
+                .contains("chk_identity_binding_active_primary")
+                .contains("Binding V2 contract preflight failed");
+    }
+
     private List<Path> migrationFiles() throws IOException {
         Path root = repoRoot()
                 .resolve("server")
