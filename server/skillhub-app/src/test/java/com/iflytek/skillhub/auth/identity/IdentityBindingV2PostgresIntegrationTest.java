@@ -32,6 +32,8 @@ class IdentityBindingV2PostgresIntegrationTest {
 
     private static final String CONCURRENT_SUBJECT =
             "900000000003";
+    private static final String CONTRACT_CONCURRENT_SUBJECT =
+            "900000000004";
 
     @Autowired
     private ExternalIdentityLoginService loginService;
@@ -72,6 +74,13 @@ class IdentityBindingV2PostgresIntegrationTest {
         registry.add(
                 "spring.flyway.enabled",
                 () -> "true");
+        String flywayTarget = System.getenv(
+                "IDENTITY_BINDING_V2_FLYWAY_TARGET");
+        if (flywayTarget != null && !flywayTarget.isBlank()) {
+            registry.add(
+                    "spring.flyway.target",
+                    () -> flywayTarget);
+        }
     }
 
     @Test
@@ -155,9 +164,20 @@ class IdentityBindingV2PostgresIntegrationTest {
 
     @Test
     void concurrentFirstLoginConvergesOnOneBinding() throws Exception {
+        assertConcurrentFirstLogin(CONCURRENT_SUBJECT);
+    }
+
+    @Test
+    void concurrentFirstLoginConvergesAfterContractGate()
+            throws Exception {
+        assertConcurrentFirstLogin(CONTRACT_CONCURRENT_SUBJECT);
+    }
+
+    private void assertConcurrentFirstLogin(String subject)
+            throws Exception {
         ResolvedProviderHandle provider = githubProvider();
         ProviderAuthenticationResult result =
-                providerResult(CONCURRENT_SUBJECT);
+                providerResult(subject);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<IdentityLoginOutcome>> futures =
                 new ArrayList<>();
@@ -200,7 +220,7 @@ class IdentityBindingV2PostgresIntegrationTest {
                   AND status = 'ACTIVE'
                 """,
                 Long.class,
-                CONCURRENT_SUBJECT)).isEqualTo(1L);
+                subject)).isEqualTo(1L);
         assertThat(jdbcTemplate.queryForObject(
                 """
                 SELECT COUNT(*)
@@ -212,7 +232,7 @@ class IdentityBindingV2PostgresIntegrationTest {
                   AND is_primary = TRUE
                 """,
                 Long.class,
-                CONCURRENT_SUBJECT)).isEqualTo(1L);
+                subject)).isEqualTo(1L);
     }
 
     private IdentityLoginOutcome authenticate(String subject) {

@@ -87,6 +87,7 @@ class IdentityBindingV2MigrationPostgresTest {
         Flyway.configure()
                 .dataSource(url, username, password)
                 .locations("classpath:db/migration")
+                .target(MigrationVersion.fromVersion("45"))
                 .load()
                 .migrate();
 

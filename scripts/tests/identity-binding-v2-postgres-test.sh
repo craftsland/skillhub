@@ -45,6 +45,7 @@ docker exec "${POSTGRES_CONTAINER}" \
 
 run_test() {
   test_class="$1"
+  flyway_target="${2:-}"
   java_version=""
   if command -v java >/dev/null 2>&1; then
     java_version="$(java -version 2>&1 | head -n 1)"
@@ -57,6 +58,7 @@ run_test() {
       IDENTITY_BINDING_V2_POSTGRES_URL="jdbc:postgresql://127.0.0.1:${host_port}/${POSTGRES_DB}" \
       IDENTITY_BINDING_V2_POSTGRES_USERNAME="${POSTGRES_USER}" \
       IDENTITY_BINDING_V2_POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+      IDENTITY_BINDING_V2_FLYWAY_TARGET="${flyway_target}" \
       MAVEN_OPTS="-Xmx2g -XX:MaxMetaspaceSize=512m" \
         ./mvnw \
           -pl skillhub-app \
@@ -81,6 +83,7 @@ run_test() {
     -e "IDENTITY_BINDING_V2_POSTGRES_URL=jdbc:postgresql://${POSTGRES_CONTAINER}:5432/${POSTGRES_DB}" \
     -e "IDENTITY_BINDING_V2_POSTGRES_USERNAME=${POSTGRES_USER}" \
     -e "IDENTITY_BINDING_V2_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+    -e "IDENTITY_BINDING_V2_FLYWAY_TARGET=${flyway_target}" \
     -v "${REPO_ROOT}:/workspace" \
     -v "${MAVEN_CACHE_DIR}:/tmp/skillhub-maven-home/.m2" \
     -w /workspace/server \
@@ -95,4 +98,10 @@ run_test() {
 }
 
 run_test IdentityBindingV2MigrationPostgresTest
-run_test IdentityBindingV2PostgresIntegrationTest
+run_test \
+  "IdentityBindingV2PostgresIntegrationTest#upgradesMixedVersionWriteAndPreservesLegacyReadColumn+concurrentFirstLoginConvergesOnOneBinding" \
+  45
+run_test IdentityBindingV2ContractPostgresTest 46
+run_test \
+  "IdentityBindingV2PostgresIntegrationTest#concurrentFirstLoginConvergesAfterContractGate" \
+  46
