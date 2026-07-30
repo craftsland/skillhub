@@ -19,6 +19,12 @@
 
 </div>
 
+<div align="center">
+
+<a href="https://trendshift.io/repositories/24384?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-24384" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/24384" alt="iflytek%2Fskillhub | Trendshift" width="250" height="55"/></a>&nbsp;&nbsp;<a href="https://aaif.io/" target="_blank" rel="noopener noreferrer"><img src="https://cdn.sanity.io/images/4o10fa7h/production/16dd7d8270b673d376cadca831ab3d5ea003bb89-838x203.svg" alt="AAIF Associate Member" height="55"/></a>
+
+</div>
+
 ---
 
 <div align="center">
