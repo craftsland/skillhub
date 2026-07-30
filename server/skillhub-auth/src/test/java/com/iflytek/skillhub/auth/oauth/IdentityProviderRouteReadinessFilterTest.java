@@ -18,6 +18,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
 class IdentityProviderRouteReadinessFilterTest {
 
@@ -32,8 +33,7 @@ class IdentityProviderRouteReadinessFilterTest {
                 ClientRegistrationRepository.class);
         readinessService = mock(
                 IdentityProviderReadinessService.class);
-        registration = mock(ClientRegistration.class);
-        when(registration.getRegistrationId()).thenReturn("github");
+        registration = registration();
         when(registrationRepository.findByRegistrationId("github"))
                 .thenReturn(registration);
         filter = new IdentityProviderRouteReadinessFilter(
@@ -131,5 +131,23 @@ class IdentityProviderRouteReadinessFilterTest {
                 new MockHttpServletRequest("GET", uri);
         request.setServletPath(uri);
         return request;
+    }
+
+    private static ClientRegistration registration() {
+        return ClientRegistration.withRegistrationId("github")
+                .clientId("client")
+                .clientSecret("secret")
+                .authorizationGrantType(
+                        AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri(
+                        "{baseUrl}/login/oauth2/code/{registrationId}")
+                .authorizationUri(
+                        "https://github.com/login/oauth/authorize")
+                .tokenUri(
+                        "https://github.com/login/oauth/access_token")
+                .userInfoUri("https://api.github.com/user")
+                .userNameAttributeName("id")
+                .clientName("GitHub")
+                .build();
     }
 }

@@ -9,6 +9,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
 class DefaultIdentityProviderReadinessServiceTest {
 
@@ -20,7 +21,7 @@ class DefaultIdentityProviderReadinessServiceTest {
                 mock(TrustedProviderDescriptorSource.class);
         ProviderAuthorityLockService authorityLockService =
                 mock(ProviderAuthorityLockService.class);
-        ClientRegistration registration = mock(ClientRegistration.class);
+        ClientRegistration registration = registration();
         ResolvedProviderHandle handle =
                 new DefaultResolvedProviderHandle("github");
         ProviderDescriptor descriptor = descriptor();
@@ -57,5 +58,23 @@ class DefaultIdentityProviderReadinessServiceTest {
                 List.of("email"),
                 List.of("avatar_url"),
                 EmailAssurance.VERIFIED);
+    }
+
+    private static ClientRegistration registration() {
+        return ClientRegistration.withRegistrationId("github")
+                .clientId("client")
+                .clientSecret("secret")
+                .authorizationGrantType(
+                        AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri(
+                        "{baseUrl}/login/oauth2/code/{registrationId}")
+                .authorizationUri(
+                        "https://github.com/login/oauth/authorize")
+                .tokenUri(
+                        "https://github.com/login/oauth/access_token")
+                .userInfoUri("https://api.github.com/user")
+                .userNameAttributeName("id")
+                .clientName("GitHub")
+                .build();
     }
 }
