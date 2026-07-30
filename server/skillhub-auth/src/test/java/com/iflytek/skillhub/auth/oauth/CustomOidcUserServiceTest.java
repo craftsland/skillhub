@@ -13,6 +13,7 @@ import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
+import com.iflytek.skillhub.auth.identity.ResolvedProviderHandleTestFixture;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import java.time.Instant;
 import java.util.List;
@@ -64,7 +65,7 @@ class CustomOidcUserServiceTest {
                 "okta",
                 Set.of("USER", "SUPER_ADMIN"));
         ResolvedProviderHandle provider =
-                mock(ResolvedProviderHandle.class);
+                ResolvedProviderHandleTestFixture.handle("okta");
         when(loginFlowService.requireReadyProvider(
                 request.getClientRegistration()))
                 .thenReturn(provider);
@@ -230,7 +231,7 @@ class CustomOidcUserServiceTest {
                 "email_verified", false,
                 "preferred_username", "unverified-user"));
         ResolvedProviderHandle provider =
-                mock(ResolvedProviderHandle.class);
+                ResolvedProviderHandleTestFixture.handle("okta");
         when(loginFlowService.requireReadyProvider(
                 request.getClientRegistration()))
                 .thenReturn(provider);

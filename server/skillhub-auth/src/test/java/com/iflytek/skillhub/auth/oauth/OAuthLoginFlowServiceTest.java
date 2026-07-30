@@ -20,6 +20,7 @@ import com.iflytek.skillhub.auth.identity.IdentityLoginOutcome;
 import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
+import com.iflytek.skillhub.auth.identity.ResolvedProviderHandleTestFixture;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import com.iflytek.skillhub.auth.identity.TrustedProviderRouteResolver;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
@@ -54,7 +55,7 @@ class OAuthLoginFlowServiceTest {
         OAuth2UserRequest request = mock(OAuth2UserRequest.class);
         OAuth2User upstreamUser = mock(OAuth2User.class);
         ResolvedProviderHandle provider =
-                mock(ResolvedProviderHandle.class);
+                ResolvedProviderHandleTestFixture.handle("github");
         ClientRegistration registration = registration();
         when(request.getClientRegistration()).thenReturn(registration);
         when(resolver.resolve(registration)).thenReturn(provider);
