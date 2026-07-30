@@ -1,10 +1,12 @@
 package com.iflytek.skillhub.auth.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -17,15 +19,22 @@ class ReconciledIdentityProviderCatalogTest {
 
     private TrustedProviderDescriptorSource descriptorSource;
     private ProviderAuthorityLockService authorityLockService;
+    private IdentityBindingPreflightService bindingPreflightService;
     private ReconciledIdentityProviderCatalog catalog;
 
     @BeforeEach
     void setUp() {
         descriptorSource = mock(TrustedProviderDescriptorSource.class);
         authorityLockService = mock(ProviderAuthorityLockService.class);
+        bindingPreflightService = mock(
+                IdentityBindingPreflightService.class);
+        when(bindingPreflightService
+                .findProvidersWithoutTrustedDescriptor(anyList()))
+                .thenReturn(List.of());
         catalog = new ReconciledIdentityProviderCatalog(
                 descriptorSource,
-                authorityLockService);
+                authorityLockService,
+                bindingPreflightService);
     }
 
     @Test
@@ -36,6 +45,10 @@ class ReconciledIdentityProviderCatalogTest {
         when(authorityLockService.isReady(github)).thenReturn(true);
 
         catalog.reconcile();
+
+        verify(bindingPreflightService)
+                .findProvidersWithoutTrustedDescriptor(
+                        List.of(github));
 
         assertThat(catalog.listReadyProviders())
                 .containsExactly(new IdentityProviderLoginMethod(
@@ -111,8 +124,10 @@ class ReconciledIdentityProviderCatalogTest {
                 "https://" + providerCode + ".example",
                 displayName,
                 "oidc_sub",
-                Set.of("oidc_sub"),
-                SubjectCanonicalizer.EXACT,
+                "oidc_sub",
+                java.util.Map.of(
+                        "oidc_sub",
+                        SubjectCanonicalizer.EXACT),
                 List.of("name"),
                 List.of("email"),
                 List.of("picture"),

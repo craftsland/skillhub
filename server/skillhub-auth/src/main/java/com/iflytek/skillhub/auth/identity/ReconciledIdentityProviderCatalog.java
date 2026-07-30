@@ -25,14 +25,17 @@ class ReconciledIdentityProviderCatalog
 
     private final TrustedProviderDescriptorSource descriptorSource;
     private final ProviderAuthorityLockService authorityLockService;
+    private final IdentityBindingPreflightService bindingPreflightService;
     private final AtomicReference<List<ProviderDescriptor>>
             configuredProviders = new AtomicReference<>(List.of());
 
     ReconciledIdentityProviderCatalog(
             TrustedProviderDescriptorSource descriptorSource,
-            ProviderAuthorityLockService authorityLockService) {
+            ProviderAuthorityLockService authorityLockService,
+            IdentityBindingPreflightService bindingPreflightService) {
         this.descriptorSource = descriptorSource;
         this.authorityLockService = authorityLockService;
+        this.bindingPreflightService = bindingPreflightService;
     }
 
     @Override
@@ -53,6 +56,7 @@ class ReconciledIdentityProviderCatalog
             return;
         }
         configuredProviders.set(descriptors);
+        reportUnconfiguredBindingProviders(descriptors);
         for (ProviderDescriptor descriptor : descriptors) {
             try {
                 authorityLockService.requirePinnedAuthority(descriptor);
@@ -67,6 +71,23 @@ class ReconciledIdentityProviderCatalog
                         descriptor.providerCode(),
                         exception);
             }
+        }
+    }
+
+    private void reportUnconfiguredBindingProviders(
+            List<ProviderDescriptor> descriptors) {
+        try {
+            List<String> unconfiguredProviders = bindingPreflightService
+                    .findProvidersWithoutTrustedDescriptor(descriptors);
+            if (!unconfiguredProviders.isEmpty()) {
+                log.error(
+                        "Identity binding preflight found provider codes without a trusted descriptor: {}",
+                        unconfiguredProviders);
+            }
+        } catch (RuntimeException exception) {
+            log.error(
+                    "Identity binding provider preflight failed",
+                    exception);
         }
     }
 

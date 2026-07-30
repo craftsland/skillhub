@@ -4,7 +4,9 @@ import com.iflytek.skillhub.auth.policy.AccessDecision;
 import com.iflytek.skillhub.auth.policy.AccessPolicy;
 import com.iflytek.skillhub.auth.policy.IdentityAccessContext;
 import com.iflytek.skillhub.domain.user.UserStatus;
+import java.sql.SQLException;
 import java.util.Objects;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -54,7 +56,47 @@ class DefaultExternalIdentityLoginService
                 decision == AccessDecision.PENDING_APPROVAL
                         ? UserStatus.PENDING
                         : UserStatus.ACTIVE;
-        return resolutionTransaction.resolve(assertion, initialStatus);
+        try {
+            return resolutionTransaction.resolve(
+                    assertion,
+                    initialStatus,
+                    descriptor.legacyPrimarySubjectType());
+        } catch (DataIntegrityViolationException firstConflict) {
+            if (!isUniqueConstraintViolation(firstConflict)) {
+                throw firstConflict;
+            }
+            try {
+                return resolutionTransaction.resolve(
+                        assertion,
+                        initialStatus,
+                        descriptor.legacyPrimarySubjectType());
+            } catch (DataIntegrityViolationException repeatedConflict) {
+                if (!isUniqueConstraintViolation(repeatedConflict)) {
+                    repeatedConflict.addSuppressed(firstConflict);
+                    throw repeatedConflict;
+                }
+                repeatedConflict.addSuppressed(firstConflict);
+                throw new IdentityCoreException(
+                        IdentityFailureCode.IDENTITY_IDENTIFIER_CONFLICT,
+                        repeatedConflict);
+            }
+        }
+    }
+
+    private boolean isUniqueConstraintViolation(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof SQLException sqlException
+                    && "23505".equals(sqlException.getSQLState())) {
+                return true;
+            }
+            Throwable cause = current.getCause();
+            if (cause == current) {
+                break;
+            }
+            current = cause;
+        }
+        return false;
     }
 
     private IdentityAccessContext toAccessContext(

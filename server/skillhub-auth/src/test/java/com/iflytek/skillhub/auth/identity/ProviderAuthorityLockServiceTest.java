@@ -36,8 +36,10 @@ class ProviderAuthorityLockServiceTest {
                 "https://github.com",
                 "GitHub",
                 "github_user_id",
-                java.util.Set.of("github_user_id"),
-                SubjectCanonicalizer.DECIMAL,
+                "github_user_id",
+                java.util.Map.of(
+                        "github_user_id",
+                        SubjectCanonicalizer.DECIMAL),
                 java.util.List.of("login"),
                 java.util.List.of("email"),
                 java.util.List.of("avatar_url"),

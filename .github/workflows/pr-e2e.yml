@@ -62,6 +62,9 @@ jobs:
       - name: Ensure Maven wrapper is executable
         run: chmod +x server/mvnw
 
+      - name: Verify Binding V2 migration and concurrency on PostgreSQL
+        run: bash scripts/tests/identity-binding-v2-postgres-test.sh
+
       - name: Start full dev stack
         run: make dev-all
 

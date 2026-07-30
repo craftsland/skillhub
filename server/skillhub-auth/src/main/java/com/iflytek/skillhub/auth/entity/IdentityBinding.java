@@ -8,6 +8,8 @@ import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -40,6 +42,25 @@ public class IdentityBinding {
     @Column(name = "extra_json", columnDefinition = "jsonb")
     private String extraJson;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private IdentityBindingStatus status = IdentityBindingStatus.ACTIVE;
+
+    @Column(name = "last_authenticated_at")
+    private Instant lastAuthenticatedAt;
+
+    @Column(name = "last_synchronized_at")
+    private Instant lastSynchronizedAt;
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
+    @Column(name = "revoked_by", length = 128)
+    private String revokedBy;
+
+    @Column(name = "revocation_reason", length = 256)
+    private String revocationReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -53,6 +74,7 @@ public class IdentityBinding {
         this.providerCode = providerCode;
         this.subject = subject;
         this.loginName = loginName;
+        this.status = IdentityBindingStatus.ACTIVE;
     }
 
     @PrePersist
@@ -77,6 +99,28 @@ public class IdentityBinding {
     public void setLoginName(String loginName) { this.loginName = loginName; }
     public String getExtraJson() { return extraJson; }
     public void setExtraJson(String extraJson) { this.extraJson = extraJson; }
+    public IdentityBindingStatus getStatus() { return status; }
+    public Instant getLastAuthenticatedAt() { return lastAuthenticatedAt; }
+    public Instant getLastSynchronizedAt() { return lastSynchronizedAt; }
+    public Instant getRevokedAt() { return revokedAt; }
+    public String getRevokedBy() { return revokedBy; }
+    public String getRevocationReason() { return revocationReason; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    public void recordAuthentication(Instant authenticatedAt) {
+        if (authenticatedAt != null
+                && (lastAuthenticatedAt == null
+                || authenticatedAt.isAfter(lastAuthenticatedAt))) {
+            lastAuthenticatedAt = authenticatedAt;
+        }
+    }
+
+    public void recordSynchronization(Instant synchronizedAt) {
+        if (synchronizedAt != null
+                && (lastSynchronizedAt == null
+                || synchronizedAt.isAfter(lastSynchronizedAt))) {
+            lastSynchronizedAt = synchronizedAt;
+        }
+    }
 }

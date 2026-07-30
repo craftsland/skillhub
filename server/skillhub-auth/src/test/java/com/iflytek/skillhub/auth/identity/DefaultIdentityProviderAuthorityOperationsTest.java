@@ -108,8 +108,10 @@ class DefaultIdentityProviderAuthorityOperationsTest {
                 "https://github.com",
                 "GitHub",
                 "github_user_id",
-                Set.of("github_user_id"),
-                SubjectCanonicalizer.DECIMAL,
+                "github_user_id",
+                java.util.Map.of(
+                        "github_user_id",
+                        SubjectCanonicalizer.DECIMAL),
                 List.of("login"),
                 List.of("email"),
                 List.of("avatar_url"),
