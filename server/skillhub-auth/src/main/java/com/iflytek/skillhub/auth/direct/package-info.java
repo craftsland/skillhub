@@ -1,5 +1,5 @@
 /**
- * Pluggable direct-login abstractions used by local or enterprise login
- * experiences that bypass OAuth browser redirects.
+ * Deprecated compatibility names for direct authentication. New adapters live
+ * in {@code com.iflytek.skillhub.auth.provider}.
  */
 package com.iflytek.skillhub.auth.direct;

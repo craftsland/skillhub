@@ -21,10 +21,11 @@ class StaticTrustedProviderDescriptorSourceTest {
                 Set.of("github"),
                 github);
 
-        ResolvedProviderHandle handle = source.resolve(github);
-        ProviderDescriptor descriptor = source.require(handle);
+        String providerCode =
+                source.resolveBrowserProviderCode(github);
+        ProviderDescriptor descriptor = descriptor(source, providerCode);
 
-        assertThat(handle.providerCode()).isEqualTo("github");
+        assertThat(providerCode).isEqualTo("github");
         assertThat(descriptor.protocol()).isEqualTo("oauth2-github");
         assertThat(descriptor.canonicalAuthority())
                 .isEqualTo("https://github.com");
@@ -63,8 +64,7 @@ class StaticTrustedProviderDescriptorSourceTest {
                         Set.of("github"),
                         policies);
 
-        ProviderDescriptor descriptor =
-                source.require(source.resolve(github));
+        ProviderDescriptor descriptor = descriptor(source, "github");
 
         assertThat(descriptor.provisioningMode())
                 .isEqualTo(ProvisioningMode.APPROVAL);
@@ -83,7 +83,8 @@ class StaticTrustedProviderDescriptorSourceTest {
                 Set.of("github"),
                 trustedGithub);
 
-        assertThatThrownBy(() -> source.resolve(github()))
+        assertThatThrownBy(
+                () -> source.resolveBrowserProviderCode(github()))
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(IdentityFailureCode.PROVIDER_DISABLED);
@@ -98,8 +99,7 @@ class StaticTrustedProviderDescriptorSourceTest {
                 Set.of("gitlab"),
                 gitlab);
 
-        ProviderDescriptor descriptor =
-                source.require(source.resolve(gitlab));
+        ProviderDescriptor descriptor = descriptor(source, "gitlab");
 
         assertThat(descriptor.protocol()).isEqualTo("oauth2-gitlab");
         assertThat(descriptor.canonicalAuthority())
@@ -119,7 +119,7 @@ class StaticTrustedProviderDescriptorSourceTest {
                 oidc);
 
         ProviderDescriptor descriptor =
-                source.require(source.resolve(oidc));
+                descriptor(source, "corp-oidc");
 
         assertThat(descriptor.protocol()).isEqualTo("oidc");
         assertThat(descriptor.canonicalAuthority())
@@ -146,12 +146,14 @@ class StaticTrustedProviderDescriptorSourceTest {
                 github,
                 unsupported);
 
-        assertThat(source.enabledDescriptors()).isEmpty();
-        assertThatThrownBy(() -> source.resolve(github))
+        assertThat(source.configuredDescriptors()).isEmpty();
+        assertThatThrownBy(
+                () -> source.resolveBrowserProviderCode(github))
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(IdentityFailureCode.PROVIDER_DISABLED);
-        assertThatThrownBy(() -> source.resolve(unsupported))
+        assertThatThrownBy(
+                () -> source.resolveBrowserProviderCode(unsupported))
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(IdentityFailureCode.PROVIDER_DISABLED);
@@ -167,8 +169,9 @@ class StaticTrustedProviderDescriptorSourceTest {
                 Set.of("custom"),
                 ambiguous);
 
-        assertThat(source.enabledDescriptors()).isEmpty();
-        assertThatThrownBy(() -> source.resolve(ambiguous))
+        assertThat(source.configuredDescriptors()).isEmpty();
+        assertThatThrownBy(
+                () -> source.resolveBrowserProviderCode(ambiguous))
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(IdentityFailureCode.PROVIDER_DISABLED);
@@ -184,6 +187,16 @@ class StaticTrustedProviderDescriptorSourceTest {
                 properties,
                 new InMemoryClientRegistrationRepository(clientRegistrations),
                 extractorCodes);
+    }
+
+    private static ProviderDescriptor descriptor(
+            StaticTrustedProviderDescriptorSource source,
+            String providerCode) {
+        return source.configuredDescriptors().stream()
+                .filter(candidate -> candidate.providerCode()
+                        .equals(providerCode))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static OAuth2ClientProperties.Registration properties(

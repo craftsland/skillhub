@@ -6,11 +6,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
-import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
+import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
+import com.iflytek.skillhub.auth.identity.ResolvedProviderHandleTestFixture;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import java.time.Instant;
 import java.util.List;
@@ -61,10 +64,15 @@ class CustomOidcUserServiceTest {
                 "https://idp.example/avatar.png",
                 "okta",
                 Set.of("USER", "SUPER_ADMIN"));
+        ResolvedProviderHandle provider =
+                ResolvedProviderHandleTestFixture.handle("okta");
+        when(loginFlowService.requireReadyProvider(
+                request.getClientRegistration()))
+                .thenReturn(provider);
         when(delegate.loadUser(request)).thenReturn(upstreamUser);
         when(contextResolver.current()).thenReturn(loginContext);
         when(loginFlowService.authenticate(
-                eq(request.getClientRegistration()),
+                eq(provider),
                 any(ProviderAuthenticationResult.class),
                 eq(loginContext)))
                 .thenReturn(platformPrincipal);
@@ -75,7 +83,7 @@ class CustomOidcUserServiceTest {
                 ArgumentCaptor.forClass(
                         ProviderAuthenticationResult.class);
         verify(loginFlowService).authenticate(
-                eq(request.getClientRegistration()),
+                eq(provider),
                 resultCaptor.capture(),
                 eq(loginContext));
         ProviderAuthenticationResult result = resultCaptor.getValue();
@@ -99,6 +107,30 @@ class CustomOidcUserServiceTest {
         assertThat(loadedUser.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
                 .contains("ROLE_USER", "ROLE_SUPER_ADMIN");
+    }
+
+    @Test
+    void unavailableRouteCannotInvokeOidcUpstream() {
+        OAuthLoginFlowService loginFlowService =
+                mock(OAuthLoginFlowService.class);
+        OAuth2UserService<OidcUserRequest, OidcUser> delegate = mock();
+        OAuthIdentityLoginContextResolver contextResolver = mock();
+        CustomOidcUserService service =
+                new CustomOidcUserService(
+                        loginFlowService,
+                        delegate,
+                        contextResolver);
+        OidcUserRequest request = oidcRequest();
+        when(loginFlowService.requireReadyProvider(
+                request.getClientRegistration()))
+                .thenThrow(new OAuth2AuthenticationException(
+                        new org.springframework.security.oauth2.core.OAuth2Error(
+                                "provider_disabled")));
+
+        assertThatThrownBy(() -> service.loadUser(request))
+                .isInstanceOf(OAuth2AuthenticationException.class);
+
+        verifyNoInteractions(delegate, contextResolver);
     }
 
     @Test
@@ -198,6 +230,11 @@ class CustomOidcUserServiceTest {
                 "email", "user@company.com",
                 "email_verified", false,
                 "preferred_username", "unverified-user"));
+        ResolvedProviderHandle provider =
+                ResolvedProviderHandleTestFixture.handle("okta");
+        when(loginFlowService.requireReadyProvider(
+                request.getClientRegistration()))
+                .thenReturn(provider);
         when(delegate.loadUser(request)).thenReturn(upstreamUser);
         when(contextResolver.current()).thenReturn(loginContext);
 
@@ -205,7 +242,7 @@ class CustomOidcUserServiceTest {
                 ArgumentCaptor.forClass(
                         ProviderAuthenticationResult.class);
         when(loginFlowService.authenticate(
-                eq(request.getClientRegistration()),
+                eq(provider),
                 resultCaptor.capture(),
                 eq(loginContext)))
                 .thenThrow(new OAuth2AuthenticationException(

@@ -1,15 +1,26 @@
 package com.iflytek.skillhub.auth.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.iflytek.skillhub.auth.provider.CredentialAuthenticationAdapter;
+import com.iflytek.skillhub.auth.provider.CredentialAuthenticationRequest;
+import com.iflytek.skillhub.auth.provider.PassiveAuthenticationAdapter;
+import com.iflytek.skillhub.auth.provider.PassiveAuthenticationRequest;
+import com.iflytek.skillhub.auth.provider.ProviderInstanceDefinition;
+import com.iflytek.skillhub.auth.provider.SubjectNormalization;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,14 +28,15 @@ import org.mockito.InOrder;
 
 class ReconciledIdentityProviderCatalogTest {
 
-    private TrustedProviderDescriptorSource descriptorSource;
+    private ConfiguredProviderDescriptorSource descriptorSource;
     private ProviderAuthorityLockService authorityLockService;
     private IdentityBindingPreflightService bindingPreflightService;
     private ReconciledIdentityProviderCatalog catalog;
 
     @BeforeEach
     void setUp() {
-        descriptorSource = mock(TrustedProviderDescriptorSource.class);
+        descriptorSource = mock(
+                ConfiguredProviderDescriptorSource.class);
         authorityLockService = mock(ProviderAuthorityLockService.class);
         bindingPreflightService = mock(
                 IdentityBindingPreflightService.class);
@@ -34,13 +46,16 @@ class ReconciledIdentityProviderCatalogTest {
         catalog = new ReconciledIdentityProviderCatalog(
                 descriptorSource,
                 authorityLockService,
-                bindingPreflightService);
+                bindingPreflightService,
+                new IdentityProviderPolicyProperties(),
+                List.of(),
+                List.of());
     }
 
     @Test
     void publishesProviderOnlyAfterPinAndPersistedStateReread() {
         ProviderDescriptor github = descriptor("github", "GitHub");
-        when(descriptorSource.enabledDescriptors())
+        when(descriptorSource.configuredDescriptors())
                 .thenReturn(List.of(github));
         when(authorityLockService.isReady(github)).thenReturn(true);
 
@@ -64,7 +79,7 @@ class ReconciledIdentityProviderCatalogTest {
     void hidesProvidersWhosePinOrPersistedStateCheckFails() {
         ProviderDescriptor github = descriptor("github", "GitHub");
         ProviderDescriptor gitlab = descriptor("gitlab", "GitLab");
-        when(descriptorSource.enabledDescriptors())
+        when(descriptorSource.configuredDescriptors())
                 .thenReturn(List.of(github, gitlab));
         doThrow(new IdentityCoreException(
                 IdentityFailureCode.PROVIDER_AUTHORITY_MISMATCH))
@@ -81,7 +96,7 @@ class ReconciledIdentityProviderCatalogTest {
     @Test
     void persistedStateReadFailureCannotExposePreviouslyReadyProvider() {
         ProviderDescriptor github = descriptor("github", "GitHub");
-        when(descriptorSource.enabledDescriptors())
+        when(descriptorSource.configuredDescriptors())
                 .thenReturn(List.of(github));
         when(authorityLockService.isReady(github)).thenReturn(true);
         catalog.reconcile();
@@ -102,7 +117,7 @@ class ReconciledIdentityProviderCatalogTest {
     @Test
     void reflectsSameAuthorityRecoveryWithoutApplicationRestart() {
         ProviderDescriptor github = descriptor("github", "GitHub");
-        when(descriptorSource.enabledDescriptors())
+        when(descriptorSource.configuredDescriptors())
                 .thenReturn(List.of(github));
         when(authorityLockService.isReady(github))
                 .thenReturn(false, true);
@@ -113,6 +128,166 @@ class ReconciledIdentityProviderCatalogTest {
                 .containsExactly(new IdentityProviderLoginMethod(
                         "github",
                         "GitHub"));
+    }
+
+    @Test
+    void projectsCredentialAndPassiveCapabilitiesFromOneProvider() {
+        CredentialAuthenticationAdapter credential =
+                new CredentialAuthenticationAdapter() {
+                    @Override
+                    public ProviderInstanceDefinition provider() {
+                        return definition(
+                                "private-sso",
+                                "https://sso.example");
+                    }
+
+                    @Override
+                    public ProviderAuthenticationResult authenticate(
+                            CredentialAuthenticationRequest request) {
+                        throw new UnsupportedOperationException(
+                                "not called");
+                    }
+                };
+        PassiveAuthenticationAdapter passive =
+                new PassiveAuthenticationAdapter() {
+                    @Override
+                    public ProviderInstanceDefinition provider() {
+                        return definition(
+                                "private-sso",
+                                "https://sso.example");
+                    }
+
+                    @Override
+                    public Optional<ProviderAuthenticationResult> authenticate(
+                            PassiveAuthenticationRequest request) {
+                        throw new UnsupportedOperationException(
+                                "not called");
+                    }
+                };
+        when(descriptorSource.configuredDescriptors())
+                .thenReturn(List.of());
+        when(authorityLockService.isReady(any()))
+                .thenReturn(true);
+        catalog = new ReconciledIdentityProviderCatalog(
+                descriptorSource,
+                authorityLockService,
+                bindingPreflightService,
+                new IdentityProviderPolicyProperties(),
+                List.of(credential),
+                List.of(passive));
+
+        catalog.reconcile();
+
+        assertThat(catalog.listReadyLoginMethods())
+                .containsExactly(
+                        new IdentityProviderLoginMethod(
+                                "private-sso",
+                                "Private SSO",
+                                IdentityProviderLoginMethodType
+                                        .DIRECT_PASSWORD),
+                        new IdentityProviderLoginMethod(
+                                "private-sso",
+                                "Private SSO",
+                                IdentityProviderLoginMethodType
+                                        .SESSION_BOOTSTRAP));
+        assertThat(catalog.requireCredentialRoute("private-sso")
+                .adapter()).isSameAs(credential);
+        assertThat(catalog.requirePassiveRoute("private-sso")
+                .adapter()).isSameAs(passive);
+    }
+
+    @Test
+    void disabledAdapterIsNotRoutableOrInvoked() {
+        CredentialAuthenticationAdapter adapter =
+                mock(CredentialAuthenticationAdapter.class);
+        ProviderInstanceDefinition disabled = new ProviderInstanceDefinition(
+                "disabled",
+                "ldap",
+                "ldap://directory.example",
+                "Disabled Directory",
+                "ldap_entry_uuid",
+                "ldap_entry_uuid",
+                Map.of(
+                        "ldap_entry_uuid",
+                        SubjectNormalization.EXACT),
+                List.of("displayName"),
+                List.of("mail"),
+                List.of(),
+                EmailAssurance.VERIFIED,
+                false);
+        when(adapter.provider()).thenReturn(disabled);
+        when(descriptorSource.configuredDescriptors())
+                .thenReturn(List.of());
+        catalog = new ReconciledIdentityProviderCatalog(
+                descriptorSource,
+                authorityLockService,
+                bindingPreflightService,
+                new IdentityProviderPolicyProperties(),
+                List.of(adapter),
+                List.of());
+
+        catalog.reconcile();
+
+        assertThat(catalog.listReadyLoginMethods()).isEmpty();
+        assertThatThrownBy(
+                () -> catalog.requireCredentialRoute("disabled"))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.PROVIDER_DISABLED);
+        verify(adapter, never()).authenticate(any());
+    }
+
+    @Test
+    void conflictingTrustedDefinitionsFailClosed() {
+        CredentialAuthenticationAdapter credential =
+                mock(CredentialAuthenticationAdapter.class);
+        PassiveAuthenticationAdapter passive =
+                mock(PassiveAuthenticationAdapter.class);
+        when(credential.provider()).thenReturn(definition(
+                "private-sso",
+                "https://one.example"));
+        when(passive.provider()).thenReturn(definition(
+                "private-sso",
+                "https://two.example"));
+        when(descriptorSource.configuredDescriptors())
+                .thenReturn(List.of());
+        catalog = new ReconciledIdentityProviderCatalog(
+                descriptorSource,
+                authorityLockService,
+                bindingPreflightService,
+                new IdentityProviderPolicyProperties(),
+                List.of(credential),
+                List.of(passive));
+
+        catalog.reconcile();
+
+        assertThat(catalog.listReadyLoginMethods()).isEmpty();
+        assertThat(catalog.enabledDescriptors()).isEmpty();
+        verify(credential, never()).authenticate(any());
+        verify(passive, never()).authenticate(any());
+    }
+
+    @Test
+    void misconfiguredAdapterCannotBecomeRoutable() {
+        CredentialAuthenticationAdapter adapter =
+                mock(CredentialAuthenticationAdapter.class);
+        when(adapter.provider()).thenThrow(
+                new IllegalArgumentException(
+                        "invalid trusted configuration"));
+        when(descriptorSource.configuredDescriptors())
+                .thenReturn(List.of());
+        catalog = new ReconciledIdentityProviderCatalog(
+                descriptorSource,
+                authorityLockService,
+                bindingPreflightService,
+                new IdentityProviderPolicyProperties(),
+                List.of(adapter),
+                List.of());
+
+        catalog.reconcile();
+
+        assertThat(catalog.listReadyLoginMethods()).isEmpty();
+        verify(adapter, never()).authenticate(any());
     }
 
     private static ProviderDescriptor descriptor(
@@ -131,6 +306,25 @@ class ReconciledIdentityProviderCatalogTest {
                 List.of("name"),
                 List.of("email"),
                 List.of("picture"),
+                EmailAssurance.VERIFIED);
+    }
+
+    private static ProviderInstanceDefinition definition(
+            String providerCode,
+            String authority) {
+        return new ProviderInstanceDefinition(
+                providerCode,
+                "private-sso",
+                authority,
+                "Private SSO",
+                "private_subject",
+                "private_subject",
+                Map.of(
+                        "private_subject",
+                        SubjectNormalization.EXACT),
+                List.of("display_name"),
+                List.of("email"),
+                List.of("avatar_url"),
                 EmailAssurance.VERIFIED);
     }
 }

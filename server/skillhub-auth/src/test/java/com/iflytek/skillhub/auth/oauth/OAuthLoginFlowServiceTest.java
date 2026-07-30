@@ -3,8 +3,13 @@ package com.iflytek.skillhub.auth.oauth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.iflytek.skillhub.auth.identity.ExternalIdentityLoginService;
@@ -14,6 +19,8 @@ import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.IdentityLoginOutcome;
 import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
+import com.iflytek.skillhub.auth.identity.ResolvedProviderHandleTestFixture;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import com.iflytek.skillhub.auth.identity.TrustedProviderRouteResolver;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
@@ -23,13 +30,104 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 
 class OAuthLoginFlowServiceTest {
+
+    @Test
+    void resolvesReadyRouteBeforeOAuthUpstreamAndAdapterCalls() {
+        OAuthClaimsExtractor extractor = mock(OAuthClaimsExtractor.class);
+        when(extractor.getProvider()).thenReturn("github");
+        TrustedProviderRouteResolver resolver =
+                mock(TrustedProviderRouteResolver.class);
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate =
+                mock();
+        OAuth2UserRequest request = mock(OAuth2UserRequest.class);
+        OAuth2User upstreamUser = mock(OAuth2User.class);
+        ResolvedProviderHandle provider =
+                ResolvedProviderHandleTestFixture.handle("github");
+        ClientRegistration registration = registration();
+        when(request.getClientRegistration()).thenReturn(registration);
+        when(resolver.resolve(registration)).thenReturn(provider);
+        when(delegate.loadUser(request)).thenReturn(upstreamUser);
+        when(extractor.authenticate(any())).thenReturn(result());
+        when(identityLoginService.authenticate(
+                eq(provider),
+                any(),
+                eq(context())))
+                .thenReturn(new IdentityLoginOutcome.Authenticated(
+                        principal(),
+                        false,
+                        false));
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(extractor),
+                        resolver,
+                        identityLoginService,
+                        delegate);
+        clearInvocations(extractor);
+
+        service.loadLoginContext(request, context());
+
+        InOrder order = inOrder(
+                resolver,
+                delegate,
+                extractor,
+                identityLoginService);
+        order.verify(resolver).resolve(registration);
+        order.verify(delegate).loadUser(request);
+        order.verify(extractor).authenticate(any());
+        order.verify(identityLoginService).authenticate(
+                eq(provider),
+                any(),
+                eq(context()));
+    }
+
+    @Test
+    void unavailableRouteCannotInvokeOAuthUpstreamOrAdapter() {
+        OAuthClaimsExtractor extractor = mock(OAuthClaimsExtractor.class);
+        when(extractor.getProvider()).thenReturn("github");
+        TrustedProviderRouteResolver resolver =
+                mock(TrustedProviderRouteResolver.class);
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate =
+                mock();
+        OAuth2UserRequest request = mock(OAuth2UserRequest.class);
+        ClientRegistration registration = registration();
+        when(request.getClientRegistration()).thenReturn(registration);
+        when(resolver.resolve(registration)).thenThrow(
+                new IdentityCoreException(
+                        IdentityFailureCode.PROVIDER_DISABLED));
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(extractor),
+                        resolver,
+                        identityLoginService,
+                        delegate);
+        clearInvocations(extractor);
+
+        assertThatThrownBy(() ->
+                service.loadLoginContext(request, context()))
+                .isInstanceOfSatisfying(
+                        OAuth2AuthenticationException.class,
+                        exception -> assertThat(
+                                exception.getError().getErrorCode())
+                                .isEqualTo("provider_disabled"));
+
+        verifyNoInteractions(delegate, identityLoginService);
+        verify(extractor, never()).authenticate(any());
+    }
 
     @Test
     void authenticateReturnsPrincipalOnlyForAuthenticatedOutcome() {

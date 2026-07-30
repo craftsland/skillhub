@@ -2,10 +2,11 @@
 
 > 外部身份架构说明：LDAP、DingTalk、CAS、SAML、可信代理及其他新外部身份接入，
 > 以 [统一身份联邦设计](./21-unified-identity-federation-design.md) 为准。GitHub、
-> GitLab 和标准 OIDC 已迁入统一身份核心；`DirectAuthProvider` 和
-> `PassiveSessionAuthenticator` 仍是兼容扩展点，不是新 Provider 的目标契约。新
-> Provider 只能返回协议验证结果，由统一核心归一化为内部 `IdentityAssertion`，不得
-> 直接返回 `PlatformPrincipal`。
+> GitLab 和标准 OIDC 已迁入统一身份核心；Credential、Passive 和 Browser Adapter
+> 已由 Provider Registry 统一发现和路由。旧名称 `DirectAuthProvider` 和
+> `PassiveSessionAuthenticator` 仅是待删除的源码迁移别名，已经不能返回
+> `PlatformPrincipal`。新 Provider 只能返回协议验证结果，由统一核心归一化为内部
+> `IdentityAssertion`。
 
 ## 0. 身份标识约束
 
@@ -249,21 +250,29 @@ protocol、canonical Authority、SHA-256 fingerprint 和状态，不保存 clien
 
 - 接口：`POST /api/v1/auth/session/bootstrap`
 - 用途：前端在同域场景下显式触发一次“读取外部会话并尝试换取 skillhub Session”的流程
-- 默认状态：关闭，开源版不提供任何 `PassiveSessionAuthenticator` 实现
+- 默认状态：关闭，开源版不提供任何 `PassiveAuthenticationAdapter` 实现
 - 安全边界：默认不做全局自动登录 filter，避免匿名访问时隐式建会话、放大 CSRF 和审计复杂度
 
 扩展接口如下：
 
 ```java
-public interface PassiveSessionAuthenticator {
-    String providerCode();
-    Optional<PlatformPrincipal> authenticate(HttpServletRequest request);
+public interface PassiveAuthenticationAdapter {
+    ProviderInstanceDefinition provider();
+    Optional<ProviderAuthenticationResult> authenticate(
+        PassiveAuthenticationRequest request
+    );
 }
 ```
 
 约束如下：
 
-- `authenticate()` 只负责验证外部被动会话并返回平台登录所需主体
+- Registry 先确认 Provider `READY`，再调用 `authenticate()`
+- App 层把 Servlet 请求转换成不可变 `PassiveAuthenticationRequest`；Adapter 不能访问
+  `HttpSession`、Servlet API 或 `SecurityContext`
+- `authenticate()` 只负责验证外部被动会话并返回非敏感协议事实
+- 统一身份核心负责账号、Binding、审批和 `PlatformPrincipal`
+- 断言存在但无效、重放或上游不可用时，Adapter 抛出只含稳定失败码的
+  `ProviderAuthenticationException`
 - 是否允许启用该入口由 `skillhub.auth.session-bootstrap.enabled` 控制，默认 `false`
 - 未启用时接口返回 `403`
 - 启用但 provider 不受支持时返回 `400`
@@ -275,9 +284,11 @@ public interface PassiveSessionAuthenticator {
 为兼容未来“前端收集用户名密码，后端调用企业 SSO / RPC 校验”的私有部署模式，开源版增加默认关闭的直连认证抽象：
 
 ```java
-public interface DirectAuthProvider {
-    String providerCode();
-    PlatformPrincipal authenticate(DirectAuthRequest request);
+public interface CredentialAuthenticationAdapter {
+    ProviderInstanceDefinition provider();
+    ProviderAuthenticationResult authenticate(
+        CredentialAuthenticationRequest request
+    );
 }
 ```
 
@@ -290,7 +301,10 @@ public interface DirectAuthProvider {
 - 开源版默认关闭，由 `skillhub.auth.direct.enabled` 控制
 - 关闭时返回 `403`
 - provider 不受支持时返回 `400`
-- provider 认证失败时沿用 provider 自身的认证异常语义
+- provider 认证失败时使用 `ProviderAuthenticationFailureCode` 的稳定分类
+- Provider 非 `READY` 时不会把凭证发送给 Adapter
+- Adapter 不创建账号、Binding、角色或 Session
+- 凭证无效、TLS、超时、配置或响应错误不会把上游详情写入用户响应
 - 成功时建立标准 Session，并返回与 `/api/v1/auth/me` 一致的用户结构
 - 现有 `/api/v1/auth/local/login` 保持不变，兼容层只是新增可选入口
 

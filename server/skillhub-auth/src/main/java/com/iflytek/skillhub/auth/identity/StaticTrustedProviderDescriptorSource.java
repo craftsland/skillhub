@@ -27,8 +27,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 class StaticTrustedProviderDescriptorSource
-        implements TrustedProviderDescriptorSource,
-        TrustedProviderRouteResolver {
+        implements ConfiguredProviderDescriptorSource {
 
     private static final Logger log = LoggerFactory.getLogger(
             StaticTrustedProviderDescriptorSource.class);
@@ -93,7 +92,7 @@ class StaticTrustedProviderDescriptorSource
     }
 
     @Override
-    public ResolvedProviderHandle resolve(
+    public String resolveBrowserProviderCode(
             ClientRegistration registration) {
         if (registration == null) {
             throw providerDisabled();
@@ -107,24 +106,11 @@ class StaticTrustedProviderDescriptorSource
         if (trusted == null || trusted != registration) {
             throw providerDisabled();
         }
-        return new DefaultResolvedProviderHandle(providerCode);
+        return providerCode;
     }
 
     @Override
-    public ProviderDescriptor require(ResolvedProviderHandle provider) {
-        if (!(provider instanceof DefaultResolvedProviderHandle handle)) {
-            throw providerDisabled();
-        }
-        ProviderDescriptor descriptor =
-                descriptors.get(handle.providerCode());
-        if (descriptor == null) {
-            throw providerDisabled();
-        }
-        return descriptor;
-    }
-
-    @Override
-    public List<ProviderDescriptor> enabledDescriptors() {
+    public List<ProviderDescriptor> configuredDescriptors() {
         return descriptors.values().stream()
                 .sorted(Comparator.comparing(
                         ProviderDescriptor::providerCode))

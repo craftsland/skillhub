@@ -4,6 +4,7 @@ import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
 import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
 import com.iflytek.skillhub.auth.identity.ProviderAttributeValue;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import java.util.HashMap;
@@ -62,6 +63,9 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
     public OidcUser loadUser(OidcUserRequest request) throws OAuth2AuthenticationException {
         String registrationId = request.getClientRegistration().getRegistrationId();
         log.debug("OIDC login initiated for registration '{}'", registrationId);
+        ResolvedProviderHandle provider =
+                oauthLoginFlowService.requireReadyProvider(
+                        request.getClientRegistration());
         var loginContext = contextResolver.current();
 
         OidcUser upstreamUser = delegate.loadUser(request);
@@ -75,7 +79,7 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
         PlatformPrincipal principal;
         try {
             principal = oauthLoginFlowService.authenticate(
-                    request.getClientRegistration(),
+                    provider,
                     result,
                     loginContext);
         } catch (OAuth2AuthenticationException e) {

@@ -1,20 +1,13 @@
 package com.iflytek.skillhub.auth.bootstrap;
 
-import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.Optional;
+import com.iflytek.skillhub.auth.provider.PassiveAuthenticationAdapter;
 
 /**
- * Extension point for establishing a SkillHub session from an external passive session,
- * such as an SSO cookie already present on the request.
+ * Compatibility name for passive request adapters.
+ *
+ * @deprecated implement {@link PassiveAuthenticationAdapter} directly.
  */
-public interface PassiveSessionAuthenticator {
-
-    String providerCode();
-
-    default String displayName() {
-        return providerCode();
-    }
-
-    Optional<PlatformPrincipal> authenticate(HttpServletRequest request);
+@Deprecated(forRemoval = true)
+public interface PassiveSessionAuthenticator
+        extends PassiveAuthenticationAdapter {
 }

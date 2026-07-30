@@ -1846,6 +1846,10 @@ SAML IdP
 
 `PassiveSessionAuthenticator` 的替代 Adapter 目标输出改为
 `ProviderAuthenticationResult`，再由核心构造 `IdentityAssertion`；不得返回 Principal。
+App 层必须先把 `HttpServletRequest` 转换成不可变、仅依赖 JDK 的
+`PassiveAuthenticationRequest`（method、request URI、query、remote address 和 Header
+快照），再调用 Adapter。Passive SPI 和 Adapter 不得引用 Servlet、`HttpSession` 或
+`SecurityContext`；这保证 Adapter 即使被复用也没有建立平台 Session 的能力。
 
 ### 14.7 Kerberos/SPNEGO
 

@@ -1,14 +1,15 @@
 package com.iflytek.skillhub.controller;
 
-import com.iflytek.skillhub.auth.identity.IdentityProviderCatalog;
-import com.iflytek.skillhub.auth.identity.IdentityProviderLoginMethod;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.local.LocalCredentialRepository;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
+import com.iflytek.skillhub.dto.AuthMethodResponse;
+import com.iflytek.skillhub.dto.AuthProviderResponse;
 import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.security.AuthFailureThrottleService;
+import com.iflytek.skillhub.service.AuthMethodCatalog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,15 +73,41 @@ class AuthControllerTest {
     private LocalCredentialRepository localCredentialRepository;
 
     @MockBean
-    private IdentityProviderCatalog identityProviderCatalog;
+    private AuthMethodCatalog authMethodCatalog;
 
     @BeforeEach
     void setUpReadyIdentityProviders() {
-        given(identityProviderCatalog.listReadyProviders())
-            .willReturn(List.of(new IdentityProviderLoginMethod(
+        given(authMethodCatalog.listOAuthProviders(null))
+            .willReturn(List.of(new AuthProviderResponse(
                 "github",
-                "GitHub"
+                "GitHub",
+                "/oauth2/authorization/github"
             )));
+        given(authMethodCatalog.listOAuthProviders(
+            "/dashboard/publish"
+        )).willReturn(List.of(new AuthProviderResponse(
+            "github",
+            "GitHub",
+            "/oauth2/authorization/github?returnTo=%2Fdashboard%2Fpublish"
+        )));
+        given(authMethodCatalog.listMethods(
+            "/dashboard/publish"
+        )).willReturn(List.of(
+            new AuthMethodResponse(
+                "local-password",
+                "PASSWORD",
+                "local",
+                "Local Account",
+                "/api/v1/auth/local/login"
+            ),
+            new AuthMethodResponse(
+                "oauth-github",
+                "OAUTH_REDIRECT",
+                "github",
+                "GitHub",
+                "/oauth2/authorization/github?returnTo=%2Fdashboard%2Fpublish"
+            )
+        ));
     }
 
     @Test
