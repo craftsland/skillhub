@@ -346,6 +346,59 @@ class ProviderAuthorityStateTransactionTest {
                 org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void readyStateWithDifferentFingerprintIsPersistedAsMismatch() {
+        String differentFingerprint = "a".repeat(64);
+        IdentityProviderState staleReady = IdentityProviderState.ready(
+                "github",
+                "oauth2-github",
+                "https://github.example",
+                differentFingerprint,
+                NOW);
+        IdentityProviderState mismatch =
+                IdentityProviderState.authorityMismatch(
+                        "github",
+                        "oauth2-github",
+                        "https://github.example",
+                        differentFingerprint,
+                        NOW);
+        when(stateRepository.recoverSameAuthority(
+                "github",
+                "oauth2-github",
+                FINGERPRINT)).thenReturn(0);
+        when(stateRepository.findById("github"))
+                .thenReturn(
+                        Optional.of(staleReady),
+                        Optional.of(mismatch));
+        when(stateRepository.markAuthorityMismatch(
+                "github",
+                "oauth2-github",
+                FINGERPRINT)).thenReturn(1);
+
+        SameAuthorityRecoveryEvaluation recovery =
+                transaction.recoverSameAuthority(
+                        GITHUB,
+                        FINGERPRINT,
+                        recoveryContext());
+
+        assertThat(recovery.recovered()).isFalse();
+        assertThat(recovery.authority().state())
+                .isEqualTo(IdentityProviderStatus.AUTHORITY_MISMATCH);
+        verify(stateRepository).markAuthorityMismatch(
+                "github",
+                "oauth2-github",
+                FINGERPRINT);
+        verify(auditLogService, never()).record(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
     private static ProviderDescriptor githubDescriptor() {
         return new ProviderDescriptor(
                 "github",
