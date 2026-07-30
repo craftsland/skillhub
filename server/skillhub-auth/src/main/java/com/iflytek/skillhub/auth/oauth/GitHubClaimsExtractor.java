@@ -9,7 +9,6 @@ import org.springframework.web.client.RestClient;
 
 import java.util.Comparator;
 import java.util.List;
-import org.springframework.stereotype.Component;
 import java.util.Map;
 
 /**
@@ -19,10 +18,14 @@ import java.util.Map;
 @Component
 public class GitHubClaimsExtractor implements OAuthClaimsExtractor {
 
-    private final RestClient restClient = RestClient.builder()
-        .baseUrl("https://api.github.com")
-        .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-        .build();
+    private final RestClient restClient;
+
+    public GitHubClaimsExtractor(RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder
+            .baseUrl("https://api.github.com")
+            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+            .build();
+    }
 
     @Override
     public String getProvider() { return "github"; }
@@ -32,9 +35,7 @@ public class GitHubClaimsExtractor implements OAuthClaimsExtractor {
         Map<String, Object> attrs = oAuth2User.getAttributes();
         GitHubEmail primaryEmail = loadPrimaryEmail(request);
         String email = primaryEmail != null ? primaryEmail.email() : (String) attrs.get("email");
-        boolean emailVerified = primaryEmail != null
-            ? primaryEmail.verified()
-            : attrs.get("email") != null;
+        boolean emailVerified = primaryEmail != null && primaryEmail.verified();
 
         return new OAuthClaims(
             "github",

@@ -49,6 +49,30 @@ class OAuthLoginFlowServiceTest {
     }
 
     @Test
+    void resolveFailureRedirect_mapsMergedAccountToAccessDenied() {
+        OAuthLoginFlowService service = new OAuthLoginFlowService(
+                List.of(),
+                mock(AccessPolicy.class),
+                mock(IdentityBindingService.class)
+        );
+
+        assertThat(service.resolveFailureRedirect(new AccountMergedException(), null))
+                .isEqualTo("/access-denied");
+    }
+
+    @Test
+    void resolveFailureRedirect_mapsSystemAccountToAccessDenied() {
+        OAuthLoginFlowService service = new OAuthLoginFlowService(
+                List.of(),
+                mock(AccessPolicy.class),
+                mock(IdentityBindingService.class)
+        );
+
+        assertThat(service.resolveFailureRedirect(new SystemAccountLoginException(), null))
+                .isEqualTo("/access-denied");
+    }
+
+    @Test
     void consumeReturnTo_clearsUnsafeSessionValue() {
         OAuthLoginFlowService service = new OAuthLoginFlowService(
                 List.of(),

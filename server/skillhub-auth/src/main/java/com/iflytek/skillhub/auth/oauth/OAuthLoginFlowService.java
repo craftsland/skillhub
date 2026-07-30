@@ -98,7 +98,9 @@ public class OAuthLoginFlowService {
         if (exception instanceof AccountPendingException) {
             return "/pending-approval";
         }
-        if (exception instanceof AccountDisabledException) {
+        if (exception instanceof AccountDisabledException
+                || exception instanceof AccountMergedException
+                || exception instanceof SystemAccountLoginException) {
             return "/access-denied";
         }
         if (exception instanceof OAuth2AuthenticationException oauth2Exception
