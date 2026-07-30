@@ -245,11 +245,14 @@ class ProfileSynchronizationServiceTest {
                 .isEqualTo("legacy name");
         assertThat(user.getEmail())
                 .isEqualTo("legacy@example.com");
+        assertThat(user.getAvatarUrl())
+                .isEqualTo(
+                        "https://avatars.example/alice.png");
         ArgumentCaptor<UserProfileFieldSource> sources =
                 ArgumentCaptor.forClass(
                         UserProfileFieldSource.class);
         verify(sourceRepository,
-                org.mockito.Mockito.times(2))
+                org.mockito.Mockito.times(3))
                 .save(sources.capture());
         assertThat(sources.getAllValues())
                 .extracting(
@@ -263,7 +266,11 @@ class ProfileSynchronizationServiceTest {
                         org.assertj.core.groups.Tuple.tuple(
                                 "email",
                                 UserProfileFieldSourceType
-                                        .LEGACY_LOCAL));
+                                        .LEGACY_LOCAL),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "avatarUrl",
+                                UserProfileFieldSourceType
+                                        .PROVIDER));
     }
 
     @Test

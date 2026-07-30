@@ -258,6 +258,11 @@ class IdentityResolutionTransactionTest {
 
     @Test
     void loginPolicyReceivesNewIdentityContextBeforeProvisioning() {
+        when(principalFactory.create(
+                any(UserAccount.class),
+                org.mockito.ArgumentMatchers.eq("github")))
+                .thenReturn(principal("provisioned"));
+
         transaction.resolve(
                 githubAssertion(Set.of()),
                 githubDescriptor(ProvisioningMode.AUTO),

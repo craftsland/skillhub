@@ -126,6 +126,7 @@ class IdentityBindingV2ContractPostgresTest {
                         database.username(),
                         database.password())
                 .locations("classpath:db/migration")
+                .target(MigrationVersion.fromVersion("46"))
                 .load()
                 .migrate();
 

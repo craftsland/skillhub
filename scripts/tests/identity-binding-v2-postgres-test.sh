@@ -98,10 +98,7 @@ run_test() {
 }
 
 run_test IdentityBindingV2MigrationPostgresTest
-run_test \
-  "IdentityBindingV2PostgresIntegrationTest#upgradesMixedVersionWriteAndPreservesLegacyReadColumn+concurrentFirstLoginConvergesOnOneBinding" \
-  45
 run_test IdentityBindingV2ContractPostgresTest 46
-run_test \
-  "IdentityBindingV2PostgresIntegrationTest#concurrentFirstLoginConvergesAfterContractGate" \
-  46
+run_test UserProfileFieldSourceMigrationPostgresTest
+run_test IdentityBindingV2PostgresIntegrationTest 47
+run_test IdentityProfileProvisioningPostgresIntegrationTest 47

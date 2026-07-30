@@ -168,6 +168,55 @@ class IdentityBindingV2MigrationPostgresTest {
                     WHERE binding.user_id =
                         'identity-v2-mixed-version-user'
                     """)).isZero();
+
+            statement.executeUpdate("""
+                    INSERT INTO identity_binding_subject (
+                        binding_id,
+                        provider_code,
+                        subject_type,
+                        subject_value,
+                        is_primary,
+                        status,
+                        created_at,
+                        last_seen_at
+                    )
+                    SELECT
+                        id,
+                        provider_code,
+                        'legacy_subject',
+                        subject,
+                        FALSE,
+                        'ACTIVE',
+                        created_at,
+                        updated_at
+                    FROM identity_binding
+                    WHERE user_id =
+                        'identity-v2-mixed-version-user'
+                    UNION ALL
+                    SELECT
+                        id,
+                        provider_code,
+                        'github_user_id',
+                        subject,
+                        TRUE,
+                        'ACTIVE',
+                        created_at,
+                        updated_at
+                    FROM identity_binding
+                    WHERE user_id =
+                        'identity-v2-mixed-version-user'
+                    """);
+            assertThat(singleLong(
+                    statement,
+                    """
+                    SELECT COUNT(*)
+                    FROM identity_binding_subject subject
+                    JOIN identity_binding binding
+                      ON binding.id = subject.binding_id
+                    WHERE binding.user_id =
+                        'identity-v2-mixed-version-user'
+                      AND subject.status = 'ACTIVE'
+                    """)).isEqualTo(2L);
         }
     }
 
