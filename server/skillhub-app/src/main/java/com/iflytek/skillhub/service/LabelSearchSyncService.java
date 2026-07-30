@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.service;
 
+import com.iflytek.skillhub.metrics.SkillHubMetrics;
 import com.iflytek.skillhub.search.SearchRebuildService;
 import java.util.List;
 import org.slf4j.Logger;
@@ -15,9 +16,12 @@ public class LabelSearchSyncService {
     private static final Logger log = LoggerFactory.getLogger(LabelSearchSyncService.class);
 
     private final SearchRebuildService searchRebuildService;
+    private final SkillHubMetrics metrics;
 
-    public LabelSearchSyncService(SearchRebuildService searchRebuildService) {
+    public LabelSearchSyncService(SearchRebuildService searchRebuildService,
+                                  SkillHubMetrics metrics) {
         this.searchRebuildService = searchRebuildService;
+        this.metrics = metrics;
     }
 
     @Async("skillhubEventExecutor")
@@ -25,6 +29,7 @@ public class LabelSearchSyncService {
         try {
             searchRebuildService.rebuildBySkill(skillId);
         } catch (RuntimeException ex) {
+            metrics.incrementSearchRebuildFailure();
             log.error("Failed to rebuild search document for skill {}", skillId, ex);
         }
     }
@@ -41,6 +46,7 @@ public class LabelSearchSyncService {
                 try {
                     searchRebuildService.rebuildBySkill(skillId);
                 } catch (RuntimeException ex) {
+                    metrics.incrementSearchRebuildFailure();
                     log.error("Failed to rebuild search document for skill {} after label change", skillId, ex);
                 }
             }
