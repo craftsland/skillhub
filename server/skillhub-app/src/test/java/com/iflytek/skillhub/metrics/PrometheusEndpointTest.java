@@ -39,6 +39,7 @@ class PrometheusEndpointTest {
         skillHubMetrics.incrementUserRegister();
         skillHubMetrics.recordLocalLogin(true);
         skillHubMetrics.incrementSkillPublish("global", "PENDING_REVIEW");
+        skillHubMetrics.incrementSearchRebuildFailure();
 
         assertThat(environment.getProperty("management.endpoints.web.exposure.include"))
             .doesNotContain("prometheus")
@@ -52,6 +53,9 @@ class PrometheusEndpointTest {
         assertThat(meterRegistry.get("skillhub.skill.publish")
             .tag("namespace", "global")
             .tag("status", "PENDING_REVIEW")
+            .counter()
+            .count()).isEqualTo(1.0d);
+        assertThat(meterRegistry.get("skillhub.search.rebuild.failure")
             .counter()
             .count()).isEqualTo(1.0d);
     }
