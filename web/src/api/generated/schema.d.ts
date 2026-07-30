@@ -1620,6 +1620,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/identity-providers/{providerCode}/authority/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recoverSameAuthority"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/account/merge/verify": {
         parameters: {
             query?: never;
@@ -3966,6 +3982,20 @@ export interface components {
             /** Format: int32 */
             sortOrder?: number;
             translations: components["schemas"]["LabelTranslationItemRequest"][];
+        };
+        ApiResponseIdentityProviderAuthorityRecoveryResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["IdentityProviderAuthorityRecoveryResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        IdentityProviderAuthorityRecoveryResponse: {
+            providerCode?: string;
+            recovered?: boolean;
+            state?: string;
         };
         MergeVerifyRequest: {
             /** Format: int64 */
@@ -8322,6 +8352,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseLabelDefinitionResponse"];
+                };
+            };
+        };
+    };
+    recoverSameAuthority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                providerCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityProviderAuthorityRecoveryResponse"];
                 };
             };
         };
