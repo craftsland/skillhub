@@ -245,6 +245,7 @@
 | avatar_url | varchar(512) | |
 | status | enum | `ACTIVE` / `PENDING` / `DISABLED` / `MERGED` |
 | merged_to_user_id | varchar(128) | 合并目标用户 ID，仅 MERGED 状态有值 |
+| system_account | boolean | 系统服务账号，禁止交互式 Web/OAuth 登录 |
 | created_at | datetime | |
 | updated_at | datetime | |
 
@@ -252,8 +253,10 @@
   - `ACTIVE`：正常使用
   - `PENDING`：等待管理员审批（AccessPolicy 返回 PENDING_APPROVAL 时创建）
   - `DISABLED`：管理员封禁，登录后拒绝所有操作，返回 403
-  - `MERGED`：已合并到其他账号，保留记录不物理删除，登录时自动跳转到合并目标账号
+  - `MERGED`：已合并到其他账号，保留记录不物理删除；登录直接拒绝，不向调用方泄露合并目标
 - 授权层在每次请求时检查用户状态，非 `ACTIVE` 用户拒绝所有写操作
+- system account 可按独立 Token Policy 使用非交互凭证，但不能通过本地密码或外部 OAuth
+  建立普通用户 Session
 
 ### identity_binding
 

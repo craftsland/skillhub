@@ -94,7 +94,8 @@ astron:
 - `DENY`：抛出 `OAuth2AccessDeniedException`，由 `failureHandler` 重定向到 `/access-denied` 页面。不创建用户，不建立 Session。
 - `PENDING_APPROVAL`：创建 `user_account`（status=`PENDING`），但不建立业务 Session。抛出 `AccountPendingException`，由 `failureHandler` 重定向到 `/pending-approval` 页面（纯静态提示页，无需登录态）。管理员在后台审批后状态变为 `ACTIVE`，用户下次 OAuth 登录才会正常建立 Session。
 
-安全边界：PENDING / DISABLED 用户绝不会拥有有效的业务 Session，从根源上杜绝"待审批账号已认证"的风险。
+安全边界：PENDING / DISABLED / MERGED 用户和 system account 绝不会通过交互式登录获得
+业务 Session。外部身份命中这些账号时，在更新用户资料或加载角色前直接拒绝。
 
 ### 2.3 扩展性
 
@@ -361,7 +362,8 @@ public class OAuthClaimsExtractor {
 合并操作规则：
 - 合并操作写入审计日志
 - 合并后原 user_account 标记为 `MERGED`，保留记录不物理删除
-- 预留扩展位：未来可配置 `astron.identity.auto-merge-on-verified-email=true` 开启基于已验证邮箱的自动合并
+- 不提供按 email 自动合并；即使 Provider 声明 email 已验证，也不能替代对两个账号控制权
+  的分别证明。未来绑定/合并必须使用显式、可审计的重新认证流程。
 
 ## 5. CLI 认证（OAuth Device Flow + 平台凭证）
 
