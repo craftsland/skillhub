@@ -20,7 +20,10 @@ make test-builtin-skills
 
 The build writes deterministic, uncompressed ZIPs and `artifacts.json` to
 `builtin-skills/dist/`. The artifact index records each ZIP's SHA-256 for the release step; runtime
-manifest integration is maintained separately from the reviewed source collection.
+manifest integration is maintained separately from the reviewed source collection. A package is
+added to the runtime manifest only after its immutable CDN URL is available; the manifest records
+the matching SHA-256 so the backend can reject changed or incorrectly uploaded bytes before
+extraction.
 
 ## Share a Skill with the Community
 

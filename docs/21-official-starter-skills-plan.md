@@ -19,7 +19,8 @@ SkillHub 已经支持通过 manifest 将远程 Skill 包同步到 `@global`。�
 2. 完成协议、许可证、安全和可用性检查。
 3. 将审查后源码、来源和回归用例纳入开源仓库。
 4. 确定性打包并上传官方云存储。
-5. 加入 `builtin-skills/manifest.json`。
+5. 将不可变 URL 和制品 SHA-256 加入
+   `server/skillhub-app/src/main/resources/builtin-skills/manifest.json`。
 6. 随 SkillHub 默认部署同步到 `@global`。
 
 目标总量为 30～50 个。当前已有的 `skillhub-hello` 和 `agentguard` 也需要重新检查，通过质量
