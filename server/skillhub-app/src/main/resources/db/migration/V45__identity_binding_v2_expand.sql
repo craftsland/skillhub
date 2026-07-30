@@ -30,6 +30,9 @@ ALTER TABLE identity_binding
 DO $$
 DECLARE
     duplicate_summary TEXT;
+    account_summary TEXT;
+    identifier_summary TEXT;
+    violations TEXT[] := ARRAY[]::TEXT[];
 BEGIN
     SELECT string_agg(
         format('%s/%s (%s bindings)', user_id, provider_code, binding_count),
@@ -40,13 +43,85 @@ BEGIN
         FROM identity_binding
         GROUP BY user_id, provider_code
         HAVING COUNT(*) > 1
+        ORDER BY user_id, provider_code
         LIMIT 20
     ) duplicates;
 
     IF duplicate_summary IS NOT NULL THEN
+        violations := array_append(
+            violations,
+            format(
+                'multiple active bindings for user/provider: %s',
+                duplicate_summary
+            )
+        );
+    END IF;
+
+    SELECT string_agg(
+        format(
+            '%s/%s -> %s (%s)',
+            binding_id,
+            provider_code,
+            user_id,
+            account_state
+        ),
+        ', ' ORDER BY binding_id
+    )
+    INTO account_summary
+    FROM (
+        SELECT
+            binding.id AS binding_id,
+            binding.provider_code,
+            binding.user_id,
+            COALESCE(account.status, 'MISSING') AS account_state
+        FROM identity_binding binding
+        LEFT JOIN user_account account
+          ON account.id = binding.user_id
+        WHERE account.id IS NULL
+           OR account.status = 'MERGED'
+        ORDER BY binding.id
+        LIMIT 20
+    ) invalid_accounts;
+
+    IF account_summary IS NOT NULL THEN
+        violations := array_append(
+            violations,
+            format(
+                'bindings reference missing or MERGED accounts: %s',
+                account_summary
+            )
+        );
+    END IF;
+
+    SELECT string_agg(
+        format('%s/%s', binding_id, provider_code),
+        ', ' ORDER BY binding_id
+    )
+    INTO identifier_summary
+    FROM (
+        SELECT id AS binding_id, provider_code
+        FROM identity_binding
+        WHERE provider_code !~ '^[a-z0-9][a-z0-9._-]{0,63}$'
+           OR btrim(subject) = ''
+           OR subject ~ '[[:cntrl:]]'
+        ORDER BY id
+        LIMIT 20
+    ) invalid_identifiers;
+
+    IF identifier_summary IS NOT NULL THEN
+        violations := array_append(
+            violations,
+            format(
+                'bindings contain invalid provider/subject identifiers: %s',
+                identifier_summary
+            )
+        );
+    END IF;
+
+    IF cardinality(violations) > 0 THEN
         RAISE EXCEPTION
-            'Binding V2 preflight failed: multiple active bindings for user/provider: %',
-            duplicate_summary;
+            'Binding V2 preflight failed: %',
+            array_to_string(violations, '; ');
     END IF;
 END
 $$;
