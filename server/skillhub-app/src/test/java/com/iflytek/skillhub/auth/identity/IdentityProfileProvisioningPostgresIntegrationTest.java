@@ -88,6 +88,9 @@ class IdentityProfileProvisioningPostgresIntegrationTest {
         registry.add(
                 "spring.flyway.schemas",
                 () -> SCHEMA);
+        registry.add(
+                "skillhub.builtin-skills.enabled",
+                () -> "false");
     }
 
     @BeforeEach
@@ -190,7 +193,7 @@ class IdentityProfileProvisioningPostgresIntegrationTest {
                 userId)).isEqualTo(1L);
         assertThat(count(
                 "SELECT COUNT(*) FROM user_profile_field_source WHERE user_id = ?",
-                userId)).isEqualTo(3L);
+                userId)).isEqualTo(2L);
         assertThat(count(
                 "SELECT COUNT(*) FROM namespace_member WHERE user_id = ?",
                 userId)).isZero();
