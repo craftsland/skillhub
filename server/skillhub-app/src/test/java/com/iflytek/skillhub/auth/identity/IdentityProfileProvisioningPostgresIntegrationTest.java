@@ -24,6 +24,8 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -47,6 +49,12 @@ class IdentityProfileProvisioningPostgresIntegrationTest {
 
     @Autowired
     private AdminUserAppService adminUserAppService;
+
+    @Autowired
+    private IdentitySecurityAuditWriter securityAuditWriter;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -333,6 +341,13 @@ class IdentityProfileProvisioningPostgresIntegrationTest {
                     'ACTIVE',
                     CURRENT_TIMESTAMP,
                     CURRENT_TIMESTAMP
+                ), (
+                    'existing-collision-user-2',
+                    'Existing User 2',
+                    'collision@example.com',
+                    'ACTIVE',
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
                 )
                 """);
 
@@ -357,7 +372,42 @@ class IdentityProfileProvisioningPostgresIntegrationTest {
                 provider)).isZero();
         assertThat(count(
                 "SELECT COUNT(*) FROM user_account WHERE email = ?",
-                "collision@example.com")).isEqualTo(1L);
+                "collision@example.com")).isEqualTo(2L);
+    }
+
+    @Test
+    void deniedSecurityAuditSurvivesCallerTransactionRollback() {
+        TransactionTemplate transactionTemplate =
+                new TransactionTemplate(transactionManager);
+
+        assertThatThrownBy(() ->
+                transactionTemplate.executeWithoutResult(status -> {
+                    securityAuditWriter.recordDenied(
+                            "profile-auto",
+                            "oidc",
+                            IdentityFailureCode.ACCESS_DENIED,
+                            new IdentityLoginContext(
+                                    "identity-denial-audit-rollback",
+                                    "127.0.0.1",
+                                    "identity-profile-test"));
+                    throw new IllegalStateException(
+                            "force caller rollback");
+                }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("force caller rollback");
+
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM audit_log
+                WHERE action = 'IDENTITY_LOGIN_DENIED'
+                  AND request_id =
+                      'identity-denial-audit-rollback'
+                  AND detail_json ->> 'providerCode' =
+                      'profile-auto'
+                  AND detail_json ->> 'reason' =
+                      'ACCESS_DENIED'
+                """)).isEqualTo(1L);
     }
 
     @Test

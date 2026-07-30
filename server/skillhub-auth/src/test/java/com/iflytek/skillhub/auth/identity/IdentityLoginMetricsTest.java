@@ -25,20 +25,24 @@ class IdentityLoginMetricsTest {
 
         metrics.recordOutcome(
                 "github",
+                "oauth2-github",
                 new IdentityLoginOutcome.Authenticated(
                         principal,
                         true,
                         true));
         metrics.recordOutcome(
                 "github",
+                "oauth2-github",
                 new IdentityLoginOutcome.PendingApproval(
                         "ACCOUNT_PENDING"));
         metrics.recordOutcome(
                 "github",
+                "oauth2-github",
                 new IdentityLoginOutcome.LinkRequired(
                         "EMAIL_COLLISION"));
         metrics.recordFailure(
                 "github",
+                "oauth2-github",
                 IdentityFailureCode.ACCESS_DENIED);
 
         assertThat(counter(
@@ -62,6 +66,8 @@ class IdentityLoginMetricsTest {
                 .tags(
                         "provider",
                         "github",
+                        "protocol",
+                        "oauth2-github",
                         "result",
                         result)
                 .counter()

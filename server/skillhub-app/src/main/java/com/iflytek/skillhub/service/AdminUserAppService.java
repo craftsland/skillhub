@@ -133,7 +133,7 @@ public class AdminUserAppService {
             String status,
             String actorUserId,
             AuditRequestContext auditContext) {
-        UserAccount user = loadUser(userId);
+        UserAccount user = loadUserForUpdate(userId);
         rejectSystemAccountMutation(user);
         UserStatus nextStatus = parseManageableStatus(status);
         UserStatus previousStatus = user.getStatus();
@@ -256,6 +256,13 @@ public class AdminUserAppService {
     private UserAccount loadUser(String userId) {
         return userAccountRepository.findById(userId)
                 .orElseThrow(() -> new DomainNotFoundException("error.admin.user.notFound", userId));
+    }
+
+    private UserAccount loadUserForUpdate(String userId) {
+        return userAccountRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new DomainNotFoundException(
+                        "error.admin.user.notFound",
+                        userId));
     }
 
     private void rejectSystemAccountMutation(UserAccount user) {

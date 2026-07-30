@@ -3,6 +3,7 @@ package com.iflytek.skillhub.auth.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,7 @@ class DefaultExternalIdentityLoginServiceTest {
     private ProviderAuthorityLockService authorityLockService;
     private IdentityResolutionTransaction resolutionTransaction;
     private IdentityLoginMetrics metrics;
+    private IdentitySecurityAuditWriter securityAuditWriter;
     private DefaultExternalIdentityLoginService service;
 
     @BeforeEach
@@ -37,12 +39,15 @@ class DefaultExternalIdentityLoginServiceTest {
         resolutionTransaction =
                 mock(IdentityResolutionTransaction.class);
         metrics = mock(IdentityLoginMetrics.class);
+        securityAuditWriter =
+                mock(IdentitySecurityAuditWriter.class);
         service = new DefaultExternalIdentityLoginService(
                 descriptorSource,
                 authorityLockService,
                 new IdentityAssertionFactory(),
                 resolutionTransaction,
-                metrics);
+                metrics,
+                securityAuditWriter);
     }
 
     @Test
@@ -75,7 +80,10 @@ class DefaultExternalIdentityLoginServiceTest {
                 any(IdentityAssertion.class),
                 org.mockito.ArgumentMatchers.eq(descriptor),
                 org.mockito.ArgumentMatchers.eq(context));
-        order.verify(metrics).recordOutcome("github", expected);
+        order.verify(metrics).recordOutcome(
+                "github",
+                "oauth2-github",
+                expected);
     }
 
     @Test
@@ -98,7 +106,10 @@ class DefaultExternalIdentityLoginServiceTest {
                 IdentityLoginContext.empty());
 
         assertThat(outcome).isSameAs(pending);
-        verify(metrics).recordOutcome("github", pending);
+        verify(metrics).recordOutcome(
+                "github",
+                "oauth2-github",
+                pending);
     }
 
     @Test
@@ -126,7 +137,10 @@ class DefaultExternalIdentityLoginServiceTest {
                         any(IdentityAssertion.class),
                         org.mockito.ArgumentMatchers.eq(descriptor),
                         any(IdentityLoginContext.class));
-        verify(metrics).recordOutcome("github", expected);
+        verify(metrics).recordOutcome(
+                "github",
+                "oauth2-github",
+                expected);
     }
 
     @Test
@@ -152,7 +166,44 @@ class DefaultExternalIdentityLoginServiceTest {
                                 .IDENTITY_IDENTIFIER_CONFLICT);
         verify(metrics).recordFailure(
                 "github",
+                "oauth2-github",
                 IdentityFailureCode.IDENTITY_IDENTIFIER_CONFLICT);
+        verify(securityAuditWriter).recordDenied(
+                "github",
+                "oauth2-github",
+                IdentityFailureCode.IDENTITY_IDENTIFIER_CONFLICT,
+                IdentityLoginContext.empty());
+    }
+
+    @Test
+    void auditFailureDoesNotReplaceIdentityDenial() {
+        ResolvedProviderHandle handle =
+                new DefaultResolvedProviderHandle("github");
+        IdentityLoginContext context =
+                IdentityLoginContext.empty();
+        when(descriptorSource.require(handle))
+                .thenReturn(descriptor);
+        when(resolutionTransaction.resolve(
+                any(IdentityAssertion.class),
+                org.mockito.ArgumentMatchers.eq(descriptor),
+                org.mockito.ArgumentMatchers.eq(context)))
+                .thenThrow(new IdentityCoreException(
+                        IdentityFailureCode.ACCESS_DENIED));
+        doThrow(new IllegalStateException("audit unavailable"))
+                .when(securityAuditWriter)
+                .recordDenied(
+                        "github",
+                        "oauth2-github",
+                        IdentityFailureCode.ACCESS_DENIED,
+                        context);
+
+        assertThatThrownBy(() -> service.authenticate(
+                handle,
+                result(),
+                context))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
     }
 
     @Test
@@ -182,7 +233,9 @@ class DefaultExternalIdentityLoginServiceTest {
                 any(IdentityAssertion.class),
                 org.mockito.ArgumentMatchers.eq(descriptor),
                 any(IdentityLoginContext.class));
-        verify(metrics).recordSystemError("github");
+        verify(metrics).recordSystemError(
+                "github",
+                "oauth2-github");
     }
 
     private static IdentityLoginOutcome authenticated() {

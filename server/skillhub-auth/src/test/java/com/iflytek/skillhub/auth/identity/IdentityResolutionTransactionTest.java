@@ -221,12 +221,9 @@ class IdentityResolutionTransactionTest {
 
     @Test
     void verifiedEmailCollisionReturnsOnlyStableLinkReason() {
-        when(userRepository.findByEmailIgnoreCase(
+        when(userRepository.existsByEmailIgnoreCase(
                 "alice@example.com"))
-                .thenReturn(Optional.of(user(
-                        "usr_existing",
-                        UserStatus.ACTIVE,
-                        false)));
+                .thenReturn(true);
 
         IdentityLoginOutcome outcome = transaction.resolve(
                 githubAssertion(Set.of()),
@@ -537,6 +534,58 @@ class IdentityResolutionTransactionTest {
                 .isEqualTo("original@example.com");
         verify(userRepository, never()).save(user);
         verify(subjectRepository).saveAll(any());
+        ArgumentCaptor<IdentityAccessContext> accessContext =
+                ArgumentCaptor.forClass(
+                        IdentityAccessContext.class);
+        verify(accessPolicy).evaluate(accessContext.capture());
+        assertThat(accessContext.getValue().accessKind())
+                .isEqualTo(
+                        IdentityAccessKind.RETURNING_IDENTITY);
+        assertThat(accessContext.getValue()
+                .existingAccountStatus())
+                .contains(UserStatus.PENDING);
+    }
+
+    @Test
+    void deniedLoginPolicyDoesNotMutatePendingBinding() {
+        IdentityBinding binding = binding(
+                1L,
+                "usr_1",
+                "github",
+                "123456");
+        UserAccount user = user("usr_1", UserStatus.PENDING, false);
+        when(bindingRepository.findByProviderCodeAndSubject(
+                "github",
+                "123456")).thenReturn(Optional.of(binding));
+        when(bindingRepository.findByIdAndStatusForUpdate(
+                1L,
+                IdentityBindingStatus.ACTIVE))
+                .thenReturn(Optional.of(binding));
+        when(userRepository.findByIdForUpdate("usr_1"))
+                .thenReturn(Optional.of(user));
+        when(accessPolicy.evaluate(any()))
+                .thenReturn(AccessDecision.DENY);
+
+        assertThatThrownBy(() -> transaction.resolve(
+                githubAssertion(Set.of()),
+                githubDescriptor(ProvisioningMode.APPROVAL),
+                IdentityLoginContext.empty()))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
+
+        verify(subjectRepository, never())
+                .demoteActivePrimary(any(), any());
+        verify(bindingRepository, never()).save(any());
+        verify(auditLogService, never()).record(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any());
     }
 
     @Test
