@@ -212,6 +212,32 @@ class IdentityBindingServiceTest {
     }
 
     @Test
+    void bindOrCreate_existingApprovedUserIgnoresPendingInitialStatus() {
+        OAuthClaims claims = new OAuthClaims(
+                "github",
+                "gh_1",
+                "alice@example.com",
+                true,
+                "alice",
+                Map.of()
+        );
+        IdentityBinding binding = new IdentityBinding("usr_1", "github", "gh_1", "alice");
+        UserAccount user = new UserAccount("usr_1", "alice", "alice@example.com", null);
+        user.setStatus(UserStatus.ACTIVE);
+
+        when(bindingRepo.findByProviderCodeAndSubject("github", "gh_1")).thenReturn(Optional.of(binding));
+        when(userRepo.findById("usr_1")).thenReturn(Optional.of(user));
+        when(userRepo.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(roleBindingRepo.findByUserId("usr_1")).thenReturn(List.of());
+
+        PlatformPrincipal principal = service.bindOrCreate(claims, UserStatus.PENDING);
+
+        assertThat(principal.userId()).isEqualTo("usr_1");
+        assertThat(principal.platformRoles()).containsExactly("USER");
+        verify(globalNamespaceMembershipService, never()).ensureMember(any());
+    }
+
+    @Test
     void bindOrCreate_returnsExplicitPlatformRolesWhenBindingsExist() {
         OAuthClaims claims = new OAuthClaims(
                 "github",

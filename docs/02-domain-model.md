@@ -251,9 +251,9 @@
 
 - 状态语义：
   - `ACTIVE`：正常使用
-  - `PENDING`：等待管理员审批（AccessPolicy 返回 PENDING_APPROVAL 时创建）
+  - `PENDING`：等待管理员审批（AccessPolicy 返回 PENDING_APPROVAL 时创建）；批准时必须在同一事务补齐 `@global` membership 后转为 `ACTIVE`
   - `DISABLED`：管理员封禁，登录后拒绝所有操作，返回 403
-  - `MERGED`：已合并到其他账号，保留记录不物理删除；登录直接拒绝，不向调用方泄露合并目标
+  - `MERGED`：已合并到其他账号，保留记录不物理删除；登录直接拒绝且不向调用方泄露合并目标，也不允许通过管理员状态接口重新激活
 - 授权层在每次请求时检查用户状态，非 `ACTIVE` 用户拒绝所有写操作
 - system account 可按独立 Token Policy 使用非交互凭证，但不能通过本地密码或外部 OAuth
   建立普通用户 Session

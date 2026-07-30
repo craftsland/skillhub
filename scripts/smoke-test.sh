@@ -5,13 +5,14 @@ BASE_URL="${1:-http://localhost:8080}"
 PASS=0
 FAIL=0
 COOKIE_JAR="$(mktemp)"
+REGISTER_RESPONSE_FILE="$(mktemp)"
 USERNAME="smoketest_$(date +%s)"
 EMAIL="${USERNAME}@example.com"
 PASSWORD="Smoke@2026"
 NEW_PASSWORD="Smoke@2027"
 
 cleanup() {
-  rm -f "$COOKIE_JAR"
+  rm -f "$COOKIE_JAR" "$REGISTER_RESPONSE_FILE"
 }
 
 trap cleanup EXIT
@@ -43,7 +44,7 @@ check "Auth required" "$BASE_URL/api/v1/auth/me" "401"
 curl -s -c "$COOKIE_JAR" "$BASE_URL/api/v1/auth/me" >/dev/null
 CSRF_TOKEN="$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$COOKIE_JAR" | tail -n 1)"
 
-REGISTER_STATUS="$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" \
+REGISTER_STATUS="$(curl --max-time 10 -s -o "$REGISTER_RESPONSE_FILE" -w "%{http_code}" \
   -X POST "$BASE_URL/api/v1/auth/local/register" \
   -b "$COOKIE_JAR" \
   -c "$COOKIE_JAR" \
@@ -57,6 +58,18 @@ else
   echo "FAIL: Register (got $REGISTER_STATUS)"
   FAIL=$((FAIL + 1))
 fi
+
+REGISTERED_USER_ID="$(python3 - "$REGISTER_RESPONSE_FILE" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as response:
+        print(json.load(response)["data"]["userId"])
+except (KeyError, TypeError, json.JSONDecodeError):
+    pass
+PY
+)"
 
 AUTH_ME_STATUS="$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" -b "$COOKIE_JAR" "$BASE_URL/api/v1/auth/me" || true)"
 if [[ "$AUTH_ME_STATUS" == "200" ]]; then
@@ -145,6 +158,65 @@ fi
 
 # Refresh CSRF after login
 ADMIN_CSRF="$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$ADMIN_COOKIE_JAR" | tail -n 1)"
+
+# Exercise the administrator activation workflow over HTTP. The transactional
+# integration test covers the missing-membership precondition; this smoke path
+# verifies the deployed controller, security, persistence, and read model.
+if [[ -n "$REGISTERED_USER_ID" && "$ADMIN_LOGIN_STATUS" == "200" ]]; then
+  DISABLE_USER_STATUS="$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" \
+    -X POST "$BASE_URL/api/v1/admin/users/$REGISTERED_USER_ID/disable" \
+    -b "$ADMIN_COOKIE_JAR" \
+    -H "X-XSRF-TOKEN: $ADMIN_CSRF" || true)"
+  if [[ "$DISABLE_USER_STATUS" == "200" ]]; then
+    echo "PASS: Admin disables smoke user (HTTP $DISABLE_USER_STATUS)"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: Admin disables smoke user (got $DISABLE_USER_STATUS)"
+    FAIL=$((FAIL + 1))
+  fi
+
+  APPROVE_USER_STATUS="$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" \
+    -X POST "$BASE_URL/api/v1/admin/users/$REGISTERED_USER_ID/approve" \
+    -b "$ADMIN_COOKIE_JAR" \
+    -H "X-XSRF-TOKEN: $ADMIN_CSRF" || true)"
+  if [[ "$APPROVE_USER_STATUS" == "200" ]]; then
+    echo "PASS: Admin activates smoke user (HTTP $APPROVE_USER_STATUS)"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: Admin activates smoke user (got $APPROVE_USER_STATUS)"
+    FAIL=$((FAIL + 1))
+  fi
+
+  GLOBAL_MEMBERS_RESPONSE="$(curl --max-time 10 -s \
+    -b "$ADMIN_COOKIE_JAR" \
+    "$BASE_URL/api/web/namespaces/global/members?size=1000" || true)"
+  if JSON_INPUT="$GLOBAL_MEMBERS_RESPONSE" python3 - "$REGISTERED_USER_ID" <<'PY'
+import json
+import os
+import sys
+
+user_id = sys.argv[1]
+try:
+    items = json.loads(os.environ["JSON_INPUT"])["data"]["items"]
+except (KeyError, TypeError, json.JSONDecodeError):
+    raise SystemExit(1)
+
+raise SystemExit(0 if any(
+    item.get("userId") == user_id and item.get("role") == "MEMBER"
+    for item in items
+) else 1)
+PY
+  then
+    echo "PASS: Activated user has @global MEMBER membership"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: Activated user is missing @global MEMBER membership"
+    FAIL=$((FAIL + 1))
+  fi
+else
+  echo "FAIL: Cannot exercise admin activation workflow without registered user and admin session"
+  FAIL=$((FAIL + 1))
+fi
 
 # Create label definition
 CREATE_LABEL_STATUS="$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" \

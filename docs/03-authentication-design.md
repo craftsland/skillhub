@@ -92,7 +92,7 @@ astron:
 ### 2.2 准入失败处理
 
 - `DENY`：抛出 `OAuth2AccessDeniedException`，由 `failureHandler` 重定向到 `/access-denied` 页面。不创建用户，不建立 Session。
-- `PENDING_APPROVAL`：创建 `user_account`（status=`PENDING`），但不建立业务 Session。抛出 `AccountPendingException`，由 `failureHandler` 重定向到 `/pending-approval` 页面（纯静态提示页，无需登录态）。管理员在后台审批后状态变为 `ACTIVE`，用户下次 OAuth 登录才会正常建立 Session。
+- `PENDING_APPROVAL`：首次登录创建 `user_account`（status=`PENDING`），但不建立业务 Session。抛出 `AccountPendingException`，由 `failureHandler` 重定向到 `/pending-approval` 页面（纯静态提示页，无需登录态）。管理员在后台审批时，系统在同一事务内把状态变为 `ACTIVE` 并补齐 `@global` 的 `MEMBER` membership；任一步失败都回滚。后续登录以已绑定账号的持久化状态为准：`ACTIVE` 正常建立 Session，`PENDING` 继续等待，`DISABLED` 拒绝登录；准入策略持续返回 `PENDING_APPROVAL` 不会覆盖已完成的管理员审批。
 
 安全边界：PENDING / DISABLED / MERGED 用户和 system account 绝不会通过交互式登录获得
 业务 Session。外部身份命中这些账号时，在更新用户资料或加载角色前直接拒绝。

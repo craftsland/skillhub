@@ -63,8 +63,7 @@ public class OAuthLoginFlowService {
         AccessDecision decision = accessPolicy.evaluate(claims);
 
         if (decision == AccessDecision.PENDING_APPROVAL) {
-            identityBindingService.createPendingUserIfAbsent(claims);
-            throw new AccountPendingException();
+            return identityBindingService.bindOrCreate(claims, UserStatus.PENDING);
         }
         if (decision == AccessDecision.DENY) {
             throw new OAuth2AuthenticationException(
