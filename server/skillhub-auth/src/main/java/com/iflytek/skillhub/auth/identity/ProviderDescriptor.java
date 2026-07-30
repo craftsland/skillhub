@@ -1,8 +1,8 @@
 package com.iflytek.skillhub.auth.identity;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 record ProviderDescriptor(
@@ -11,8 +11,8 @@ record ProviderDescriptor(
         String canonicalAuthority,
         String displayName,
         String primarySubjectType,
-        Set<String> allowedSubjectTypes,
-        SubjectCanonicalizer subjectCanonicalizer,
+        String legacyPrimarySubjectType,
+        Map<String, SubjectCanonicalizer> subjectCanonicalizers,
         List<String> displayNameAttributes,
         List<String> emailAttributes,
         List<String> avatarAttributes,
@@ -29,8 +29,12 @@ record ProviderDescriptor(
         Objects.requireNonNull(canonicalAuthority, "canonicalAuthority");
         Objects.requireNonNull(displayName, "displayName");
         Objects.requireNonNull(primarySubjectType, "primarySubjectType");
-        Objects.requireNonNull(allowedSubjectTypes, "allowedSubjectTypes");
-        Objects.requireNonNull(subjectCanonicalizer, "subjectCanonicalizer");
+        Objects.requireNonNull(
+                legacyPrimarySubjectType,
+                "legacyPrimarySubjectType");
+        Objects.requireNonNull(
+                subjectCanonicalizers,
+                "subjectCanonicalizers");
         Objects.requireNonNull(displayNameAttributes, "displayNameAttributes");
         Objects.requireNonNull(emailAttributes, "emailAttributes");
         Objects.requireNonNull(avatarAttributes, "avatarAttributes");
@@ -48,12 +52,26 @@ record ProviderDescriptor(
         if (displayName.isBlank() || displayName.length() > 128) {
             throw new IllegalArgumentException("Invalid provider display name");
         }
-        allowedSubjectTypes = Set.copyOf(allowedSubjectTypes);
-        if (!allowedSubjectTypes.contains(primarySubjectType)) {
+        subjectCanonicalizers = Map.copyOf(subjectCanonicalizers);
+        if (!subjectCanonicalizers.containsKey(primarySubjectType)) {
             throw new IllegalArgumentException("Primary subject type is not allowed");
+        }
+        if (!subjectCanonicalizers.containsKey(legacyPrimarySubjectType)) {
+            throw new IllegalArgumentException(
+                    "Legacy primary subject type is not allowed");
         }
         displayNameAttributes = List.copyOf(displayNameAttributes);
         emailAttributes = List.copyOf(emailAttributes);
         avatarAttributes = List.copyOf(avatarAttributes);
+    }
+
+    SubjectCanonicalizer canonicalizerFor(String subjectType) {
+        SubjectCanonicalizer canonicalizer =
+                subjectCanonicalizers.get(subjectType);
+        if (canonicalizer == null) {
+            throw new IdentityCoreException(
+                    IdentityFailureCode.INVALID_IDENTITY_ASSERTION);
+        }
+        return canonicalizer;
     }
 }

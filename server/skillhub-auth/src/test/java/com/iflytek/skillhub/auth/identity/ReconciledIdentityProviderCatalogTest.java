@@ -111,8 +111,10 @@ class ReconciledIdentityProviderCatalogTest {
                 "https://" + providerCode + ".example",
                 displayName,
                 "oidc_sub",
-                Set.of("oidc_sub"),
-                SubjectCanonicalizer.EXACT,
+                "oidc_sub",
+                java.util.Map.of(
+                        "oidc_sub",
+                        SubjectCanonicalizer.EXACT),
                 List.of("name"),
                 List.of("email"),
                 List.of("picture"),

@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+RUN_ID="skillhub-identity-v2-$$"
+POSTGRES_CONTAINER="${RUN_ID}-postgres"
+NETWORK="${RUN_ID}-network"
+POSTGRES_USER="identity_v2"
+POSTGRES_PASSWORD="identity-v2-test-password"
+POSTGRES_DB="identity_v2"
+MAVEN_CACHE_DIR="${MAVEN_CACHE_DIR:-${HOME}/.m2}"
+
+cleanup() {
+  docker rm -f "${POSTGRES_CONTAINER}" >/dev/null 2>&1 || true
+  docker network rm "${NETWORK}" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+docker network create \
+  --label "skillhub.test.run=${RUN_ID}" \
+  "${NETWORK}" >/dev/null
+docker run -d \
+  --name "${POSTGRES_CONTAINER}" \
+  --label "skillhub.test.run=${RUN_ID}" \
+  --network "${NETWORK}" \
+  --memory=1g \
+  --cpus=1 \
+  -e "POSTGRES_USER=${POSTGRES_USER}" \
+  -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+  -e "POSTGRES_DB=${POSTGRES_DB}" \
+  -p 127.0.0.1::5432 \
+  postgres:16-alpine >/dev/null
+
+for _ in $(seq 1 60); do
+  if docker exec "${POSTGRES_CONTAINER}" \
+      pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
+      >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+docker exec "${POSTGRES_CONTAINER}" \
+  pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
+  >/dev/null
+
+run_test() {
+  test_class="$1"
+  java_version=""
+  if command -v java >/dev/null 2>&1; then
+    java_version="$(java -version 2>&1 | head -n 1)"
+  fi
+  if [[ "${java_version}" == *'"21.'* ]]; then
+    host_port="$(docker port "${POSTGRES_CONTAINER}" 5432/tcp \
+      | sed -n 's/.*://p')"
+    (
+      cd "${REPO_ROOT}/server"
+      IDENTITY_BINDING_V2_POSTGRES_URL="jdbc:postgresql://127.0.0.1:${host_port}/${POSTGRES_DB}" \
+      IDENTITY_BINDING_V2_POSTGRES_USERNAME="${POSTGRES_USER}" \
+      IDENTITY_BINDING_V2_POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+      MAVEN_OPTS="-Xmx2g -XX:MaxMetaspaceSize=512m" \
+        ./mvnw \
+          -pl skillhub-app \
+          -am \
+          "-Dtest=${test_class}" \
+          -Dsurefire.failIfNoSpecifiedTests=false \
+          test
+    )
+    return
+  fi
+
+  mkdir -p "${MAVEN_CACHE_DIR}"
+  docker run --rm \
+    --name "${RUN_ID}-java" \
+    --label "skillhub.test.run=${RUN_ID}" \
+    --network "${NETWORK}" \
+    --memory=4g \
+    --cpus=2 \
+    --user "$(id -u):$(id -g)" \
+    -e MAVEN_USER_HOME=/tmp/skillhub-maven-home/.m2 \
+    -e MAVEN_OPTS="-Xmx2g -XX:MaxMetaspaceSize=512m" \
+    -e "IDENTITY_BINDING_V2_POSTGRES_URL=jdbc:postgresql://${POSTGRES_CONTAINER}:5432/${POSTGRES_DB}" \
+    -e "IDENTITY_BINDING_V2_POSTGRES_USERNAME=${POSTGRES_USER}" \
+    -e "IDENTITY_BINDING_V2_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}" \
+    -v "${REPO_ROOT}:/workspace" \
+    -v "${MAVEN_CACHE_DIR}:/tmp/skillhub-maven-home/.m2" \
+    -w /workspace/server \
+    eclipse-temurin:21-jdk-alpine \
+      ./mvnw \
+        -Dmaven.repo.local=/tmp/skillhub-maven-home/.m2/repository \
+        -pl skillhub-app \
+        -am \
+        "-Dtest=${test_class}" \
+        -Dsurefire.failIfNoSpecifiedTests=false \
+        test
+}
+
+run_test IdentityBindingV2MigrationPostgresTest
+run_test IdentityBindingV2PostgresIntegrationTest

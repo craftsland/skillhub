@@ -2,6 +2,7 @@ package com.iflytek.skillhub.auth.identity;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,20 +19,27 @@ final class IdentityAssertionFactory {
             throw invalidAssertion();
         }
         validatePayload(result);
-        if (!result.alternateSubjects().isEmpty()) {
-            throw invalidAssertion();
-        }
 
         SubjectCandidate primary = result.primarySubject();
         if (!descriptor.primarySubjectType().equals(primary.type())
-                || !descriptor.allowedSubjectTypes().contains(primary.type())) {
+                || !descriptor.subjectCanonicalizers()
+                        .containsKey(primary.type())) {
             throw invalidAssertion();
         }
 
-        String canonicalValue = descriptor.subjectCanonicalizer()
+        String canonicalValue = descriptor.canonicalizerFor(primary.type())
                 .canonicalize(primary.value());
         ExternalSubject primarySubject =
                 new ExternalSubject(primary.type(), canonicalValue);
+        Set<ExternalSubject> alternateSubjects =
+                canonicalizeAlternates(
+                        descriptor,
+                        result.alternateSubjects(),
+                        primarySubject);
+        validateLegacySubject(
+                descriptor,
+                primarySubject,
+                alternateSubjects);
         ExternalProfile profile = createProfile(descriptor, result, primarySubject);
         AuthenticationEvidence evidence = new AuthenticationEvidence(
                 descriptor.protocol(),
@@ -44,10 +52,57 @@ final class IdentityAssertionFactory {
                         descriptor.protocol(),
                         descriptor.canonicalAuthority()),
                 primarySubject,
-                Set.of(),
+                alternateSubjects,
                 profile,
                 Map.of(),
                 evidence);
+    }
+
+    private Set<ExternalSubject> canonicalizeAlternates(
+            ProviderDescriptor descriptor,
+            List<SubjectCandidate> candidates,
+            ExternalSubject primarySubject) {
+        if (candidates.size()
+                > ProviderAssertionLimits.MAX_ALTERNATE_SUBJECT_COUNT) {
+            throw invalidAssertion();
+        }
+        LinkedHashSet<ExternalSubject> canonical = new LinkedHashSet<>();
+        for (SubjectCandidate candidate : candidates) {
+            ExternalSubject subject = new ExternalSubject(
+                    candidate.type(),
+                    descriptor.canonicalizerFor(candidate.type())
+                            .canonicalize(candidate.value()));
+            if (subject.equals(primarySubject) || !canonical.add(subject)) {
+                throw invalidAssertion();
+            }
+        }
+        return Set.copyOf(canonical);
+    }
+
+    private void validateLegacySubject(
+            ProviderDescriptor descriptor,
+            ExternalSubject primarySubject,
+            Set<ExternalSubject> alternateSubjects) {
+        ExternalSubject legacy = null;
+        if (primarySubject.type().equals(
+                descriptor.legacyPrimarySubjectType())) {
+            legacy = primarySubject;
+        }
+        for (ExternalSubject subject : alternateSubjects) {
+            if (!subject.type().equals(
+                    descriptor.legacyPrimarySubjectType())) {
+                continue;
+            }
+            if (legacy != null) {
+                throw invalidAssertion();
+            }
+            legacy = subject;
+        }
+        if (legacy == null
+                || legacy.value().length()
+                > ProviderAssertionLimits.MAX_LEGACY_SUBJECT_VALUE_LENGTH) {
+            throw invalidAssertion();
+        }
     }
 
     private ExternalProfile createProfile(

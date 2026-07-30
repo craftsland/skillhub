@@ -82,7 +82,9 @@ class StaticTrustedProviderDescriptorSourceTest {
         assertThat(descriptor.canonicalAuthority())
                 .isEqualTo("https://id.example.com/tenant");
         assertThat(descriptor.primarySubjectType()).isEqualTo("oidc_sub");
-        assertThat(descriptor.subjectCanonicalizer())
+        assertThat(descriptor.legacyPrimarySubjectType())
+                .isEqualTo("oidc_sub");
+        assertThat(descriptor.canonicalizerFor("oidc_sub"))
                 .isEqualTo(SubjectCanonicalizer.EXACT);
     }
 

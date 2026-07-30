@@ -60,8 +60,8 @@ class IdentityAssertionFactoryTest {
                 "https://id.example.com",
                 "Corporate OIDC",
                 "oidc_sub",
-                Set.of("oidc_sub"),
-                SubjectCanonicalizer.EXACT,
+                "oidc_sub",
+                Map.of("oidc_sub", SubjectCanonicalizer.EXACT),
                 List.of("preferred_username", "name", "sub"),
                 List.of("email"),
                 List.of("picture"),
@@ -130,15 +130,71 @@ class IdentityAssertionFactoryTest {
     }
 
     @Test
-    void rejectsAliasesUntilBindingV2IsAvailable() {
+    void canonicalizesTypedAliasesForBindingV2() {
+        ProviderDescriptor descriptor = new ProviderDescriptor(
+                "corp",
+                "oidc",
+                "https://id.example.com",
+                "Corporate Identity",
+                "stable_id",
+                "legacy_id",
+                Map.of(
+                        "stable_id",
+                        SubjectCanonicalizer.EXACT,
+                        "legacy_id",
+                        SubjectCanonicalizer.EXACT,
+                        "alias_id",
+                        SubjectCanonicalizer.EXACT),
+                List.of("name"),
+                List.of("email"),
+                List.of("picture"),
+                EmailAssurance.VERIFIED);
         ProviderAuthenticationResult result = result(
-                new SubjectCandidate("github_user_id", "123456"),
-                List.of(new SubjectCandidate("github_user_id", "654321")),
+                new SubjectCandidate("stable_id", "stable-123"),
+                List.of(
+                        new SubjectCandidate(
+                                "alias_id",
+                                "alias-123"),
+                        new SubjectCandidate(
+                                "legacy_id",
+                                "legacy-123")),
                 Map.of("login", values("alice", ProviderAttributeTrust.ASSERTED)),
-                "oauth2-github"
+                "oidc"
         );
 
-        assertThatThrownBy(() -> factory.create(githubDescriptor(), result))
+        IdentityAssertion assertion =
+                factory.create(descriptor, result);
+
+        assertThat(assertion.primarySubject()).isEqualTo(
+                new ExternalSubject("stable_id", "stable-123"));
+        assertThat(assertion.alternateSubjects())
+                .containsExactlyInAnyOrder(
+                        new ExternalSubject(
+                                "alias_id",
+                                "alias-123"),
+                        new ExternalSubject(
+                                "legacy_id",
+                                "legacy-123"));
+        assertThat(assertion.requireUniqueSubject("legacy_id"))
+                .isEqualTo(new ExternalSubject(
+                        "legacy_id",
+                        "legacy-123"));
+    }
+
+    @Test
+    void rejectsDuplicateLegacySubjectCandidates() {
+        ProviderAuthenticationResult result = result(
+                new SubjectCandidate("github_user_id", "123456"),
+                List.of(new SubjectCandidate(
+                        "github_user_id",
+                        "654321")),
+                Map.of("login", values(
+                        "alice",
+                        ProviderAttributeTrust.ASSERTED)),
+                "oauth2-github");
+
+        assertThatThrownBy(() ->
+                factory.create(githubDescriptor(), result))
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(IdentityFailureCode.INVALID_IDENTITY_ASSERTION);
@@ -193,8 +249,10 @@ class IdentityAssertionFactoryTest {
                 "https://github.com",
                 "GitHub",
                 "github_user_id",
-                Set.of("github_user_id"),
-                SubjectCanonicalizer.DECIMAL,
+                "github_user_id",
+                Map.of(
+                        "github_user_id",
+                        SubjectCanonicalizer.DECIMAL),
                 List.of("login"),
                 List.of("email"),
                 List.of("avatar_url"),
