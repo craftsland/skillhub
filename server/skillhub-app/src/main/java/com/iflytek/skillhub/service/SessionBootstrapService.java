@@ -1,6 +1,11 @@
 package com.iflytek.skillhub.service;
 
-import com.iflytek.skillhub.auth.bootstrap.PassiveSessionAuthenticator;
+import com.iflytek.skillhub.auth.exception.AuthFlowException;
+import com.iflytek.skillhub.auth.identity.IdentityCoreException;
+import com.iflytek.skillhub.auth.identity.IdentityFailureCode;
+import com.iflytek.skillhub.auth.identity.IdentityProviderRegistry;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.session.PlatformSessionService;
 import com.iflytek.skillhub.config.AuthSessionBootstrapProperties;
@@ -8,9 +13,8 @@ import com.iflytek.skillhub.exception.BadRequestException;
 import com.iflytek.skillhub.exception.ForbiddenException;
 import com.iflytek.skillhub.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
+import java.util.Optional;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
@@ -21,18 +25,17 @@ import org.springframework.stereotype.Service;
 public class SessionBootstrapService {
 
     private final AuthSessionBootstrapProperties properties;
-    private final Map<String, PassiveSessionAuthenticator> authenticatorsByProvider;
+    private final IdentityProviderRegistry providerRegistry;
+    private final ProviderLoginAppService providerLoginAppService;
     private final PlatformSessionService platformSessionService;
 
     public SessionBootstrapService(AuthSessionBootstrapProperties properties,
-                                   List<PassiveSessionAuthenticator> authenticators,
+                                   IdentityProviderRegistry providerRegistry,
+                                   ProviderLoginAppService providerLoginAppService,
                                    PlatformSessionService platformSessionService) {
         this.properties = properties;
-        this.authenticatorsByProvider = authenticators.stream()
-            .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                PassiveSessionAuthenticator::providerCode,
-                Function.identity()
-            ));
+        this.providerRegistry = providerRegistry;
+        this.providerLoginAppService = providerLoginAppService;
         this.platformSessionService = platformSessionService;
     }
 
@@ -41,15 +44,46 @@ public class SessionBootstrapService {
             throw new ForbiddenException("error.auth.sessionBootstrap.disabled");
         }
 
-        PassiveSessionAuthenticator authenticator = authenticatorsByProvider.get(providerCode);
-        if (authenticator == null) {
-            throw new BadRequestException("error.auth.sessionBootstrap.providerUnsupported", providerCode);
+        IdentityProviderRegistry.PassiveRoute route;
+        try {
+            route = providerRegistry.requirePassiveRoute(providerCode);
+        } catch (IdentityCoreException exception) {
+            if (exception.getReasonCode()
+                    == IdentityFailureCode.PROVIDER_DISABLED) {
+                throw new BadRequestException(
+                        "error.auth.sessionBootstrap.providerUnsupported",
+                        providerCode);
+            }
+            throw new AuthFlowException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "error.auth.external.providerUnavailable");
         }
 
-        PlatformPrincipal principal = authenticator.authenticate(request)
-            .orElseThrow(() -> new UnauthorizedException("error.auth.sessionBootstrap.notAuthenticated"));
+        var authentication = authenticate(route, request);
+        if (authentication == null) {
+            throw new AuthFlowException(
+                    HttpStatus.UNAUTHORIZED,
+                    "error.auth.external.invalidAssertion");
+        }
+        var result = authentication
+                .orElseThrow(() -> new UnauthorizedException(
+                        "error.auth.sessionBootstrap.notAuthenticated"));
+        PlatformPrincipal principal = providerLoginAppService.authenticate(
+                route.provider(),
+                result,
+                request);
         platformSessionService.establishSession(principal, request);
         return principal;
+    }
+
+    private Optional<ProviderAuthenticationResult> authenticate(
+            IdentityProviderRegistry.PassiveRoute route,
+            HttpServletRequest request) {
+        try {
+            return route.adapter().authenticate(request);
+        } catch (ProviderAuthenticationException exception) {
+            throw ProviderAuthenticationFailureMapper.map(exception);
+        }
     }
 
     public void establishSession(PlatformPrincipal principal, HttpServletRequest request) {

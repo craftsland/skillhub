@@ -57,7 +57,10 @@ public class GitLabClaimsExtractor implements OAuthClaimsExtractor {
 
         boolean emailVerified = isConfirmed(attrs.get("confirmed_at"));
 
-        log.debug("Initial email from GitLab: {}, verified: {}", email, emailVerified);
+        log.debug(
+                "GitLab email claim present: {}, verified: {}",
+                email != null,
+                emailVerified);
 
         // If email is not verified or not present, try to fetch from emails API
         if (email == null || !emailVerified) {
@@ -66,7 +69,7 @@ public class GitLabClaimsExtractor implements OAuthClaimsExtractor {
             if (primaryEmail != null) {
                 email = primaryEmail.email();
                 emailVerified = true;
-                log.debug("Found verified email from GitLab API: {}", email);
+                log.debug("Found a verified email from GitLab API");
             } else {
                 log.debug("No verified email found from GitLab emails API");
             }
@@ -79,8 +82,11 @@ public class GitLabClaimsExtractor implements OAuthClaimsExtractor {
         }
 
         String subject = String.valueOf(attrs.get("id"));
-        log.info("GitLab OAuth claims extracted - subject: {}, username: {}, email: {}, emailVerified: {}",
-                subject, username, email, emailVerified);
+        log.debug(
+                "GitLab OAuth claims extracted: usernamePresent={}, emailPresent={}, emailVerified={}",
+                username != null,
+                email != null,
+                emailVerified);
 
         Map<String, List<ProviderAttributeValue>> attributes =
                 new LinkedHashMap<>();
@@ -149,7 +155,10 @@ public class GitLabClaimsExtractor implements OAuthClaimsExtractor {
                 .findFirst()
                 .orElse(null);
         } catch (Exception e) {
-            log.warn("Failed to fetch emails from GitLab API: {}", e.getMessage());
+            log.warn("Failed to fetch verified email from GitLab API");
+            log.debug(
+                    "GitLab email lookup failure type: {}",
+                    e.getClass().getSimpleName());
             return null;
         }
     }

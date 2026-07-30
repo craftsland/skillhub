@@ -1,15 +1,19 @@
 package com.iflytek.skillhub.service;
 
-import com.iflytek.skillhub.auth.direct.DirectAuthProvider;
-import com.iflytek.skillhub.auth.direct.DirectAuthRequest;
+import com.iflytek.skillhub.auth.exception.AuthFlowException;
+import com.iflytek.skillhub.auth.identity.IdentityCoreException;
+import com.iflytek.skillhub.auth.identity.IdentityFailureCode;
+import com.iflytek.skillhub.auth.identity.IdentityProviderRegistry;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.local.LocalAuthService;
+import com.iflytek.skillhub.auth.provider.CredentialAuthenticationRequest;
+import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.config.DirectAuthProperties;
 import com.iflytek.skillhub.exception.BadRequestException;
 import com.iflytek.skillhub.exception.ForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,18 +24,20 @@ import org.springframework.stereotype.Service;
 public class DirectAuthService {
 
     private final DirectAuthProperties properties;
-    private final Map<String, DirectAuthProvider> providersByCode;
+    private final IdentityProviderRegistry providerRegistry;
+    private final LocalAuthService localAuthService;
+    private final ProviderLoginAppService providerLoginAppService;
     private final SessionBootstrapService sessionBootstrapService;
 
     public DirectAuthService(DirectAuthProperties properties,
-                             List<DirectAuthProvider> providers,
+                             IdentityProviderRegistry providerRegistry,
+                             LocalAuthService localAuthService,
+                             ProviderLoginAppService providerLoginAppService,
                              SessionBootstrapService sessionBootstrapService) {
         this.properties = properties;
-        this.providersByCode = providers.stream()
-            .collect(java.util.stream.Collectors.toUnmodifiableMap(
-                DirectAuthProvider::providerCode,
-                Function.identity()
-            ));
+        this.providerRegistry = providerRegistry;
+        this.localAuthService = localAuthService;
+        this.providerLoginAppService = providerLoginAppService;
         this.sessionBootstrapService = sessionBootstrapService;
     }
 
@@ -43,13 +49,54 @@ public class DirectAuthService {
             throw new ForbiddenException("error.auth.direct.disabled");
         }
 
-        DirectAuthProvider provider = providersByCode.get(providerCode);
-        if (provider == null) {
-            throw new BadRequestException("error.auth.direct.providerUnsupported", providerCode);
+        PlatformPrincipal principal;
+        if ("local".equals(providerCode)) {
+            principal = localAuthService.login(username, password);
+        } else {
+            IdentityProviderRegistry.CredentialRoute route;
+            try {
+                route = providerRegistry.requireCredentialRoute(providerCode);
+            } catch (IdentityCoreException exception) {
+                if (exception.getReasonCode()
+                        == IdentityFailureCode.PROVIDER_DISABLED) {
+                    throw new BadRequestException(
+                            "error.auth.direct.providerUnsupported",
+                            providerCode);
+                }
+                throw new AuthFlowException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "error.auth.external.providerUnavailable");
+            }
+            var result = authenticate(
+                    route,
+                    username,
+                    password);
+            if (result == null) {
+                throw new AuthFlowException(
+                        HttpStatus.UNAUTHORIZED,
+                        "error.auth.external.invalidAssertion");
+            }
+            principal = providerLoginAppService.authenticate(
+                    route.provider(),
+                    result,
+                    request);
         }
 
-        PlatformPrincipal principal = provider.authenticate(new DirectAuthRequest(username, password));
         sessionBootstrapService.establishSession(principal, request);
         return principal;
+    }
+
+    private ProviderAuthenticationResult authenticate(
+            IdentityProviderRegistry.CredentialRoute route,
+            String username,
+            String password) {
+        try {
+            return route.adapter().authenticate(
+                    new CredentialAuthenticationRequest(
+                            username,
+                            password));
+        } catch (ProviderAuthenticationException exception) {
+            throw ProviderAuthenticationFailureMapper.map(exception);
+        }
     }
 }

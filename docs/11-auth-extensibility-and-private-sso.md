@@ -1,130 +1,207 @@
 # 认证扩展与私有 SSO 兼容设计
 
-> 状态说明：本文记录当前 Direct/Passive 私有 SSO 兼容入口。新外部身份实现和这些入口的
-> 后续迁移，以 [统一身份联邦设计](./21-unified-identity-federation-design.md) 为准。
-> `DirectAuthProvider` 和 `PassiveSessionAuthenticator` 直接返回
-> `PlatformPrincipal` 的方式属于待迁移设计，不应继续扩展到 LDAP、CAS、DingTalk、
-> SAML 或新的私有 SSO。新 Adapter 只返回协议验证结果，由统一核心归一化为
-> `IdentityAssertion`。
+> 本文描述 Provider Registry 落地后的当前扩展边界。完整身份、不变量、迁移顺序和协议
+> 路线以 [统一身份联邦设计](./21-unified-identity-federation-design.md) 为准。
 
 ## 1. 目标
 
-在不影响当前开源版 OAuth 和本地账号登录能力的前提下，为未来私有仓库接入企业 SSO 预留稳定扩展点，并把代码差异控制在 provider 实现层和少量配置层。
+SkillHub 保留已有公共登录协议，同时允许受信、随发布物构建的企业认证 Adapter 接入。
+Adapter 只验证协议并返回外部身份事实；Provider Registry 和统一身份核心负责 Provider
+路由、Authority 锁定、账号创建、身份绑定、审批、资料同步、角色保护和 Session。
 
-## 2. 已确认约束
+不支持上传或热加载第三方 JAR。Adapter 与 SkillHub 运行在同一 JVM，必须经过代码
+Review 和 Provider Conformance Kit。
 
-- 私有 SSO 能提供稳定唯一 UID
-- 用户名密码校验与 Cookie 会话校验都会返回同一稳定 UID
-- 生产部署预期为 `skill.xxx.com` 与 `sso.xxx.com`
-- 私有版可通过后端内部接口/RPC 代调用 SSO 校验用户名密码
-- 首次 SSO 登录自动创建 skillhub 账号
-- 不做账号合并设计，不依赖 email
-- 登出联动可保留扩展点，但不是近期目标
+## 2. 不可绕过的边界
 
-## 3. 开源版兼容策略
+- Adapter 不返回或构造 `PlatformPrincipal`。
+- Adapter 不创建、查询或修改 `UserAccount`、平台角色、Namespace role 或 Binding。
+- Adapter 不操作 `HttpSession`、`SecurityContext` 或 Redis。
+- Adapter 不把 provider code、Authority、平台 userId 或角色放入认证结果。
+- Adapter 不把 token、密码、Cookie、Ticket、Authorization header 或原始上游响应放入
+  `ProviderAuthenticationResult`。
+- Adapter 的 `provider()` 定义必须来自受信代码和服务端配置，不能来自登录请求或上游
+  响应。
+- Provider 未启用、配置冲突、Authority 不匹配或状态非 `READY` 时，Registry 不返回
+  路由；Adapter 的网络认证方法不会被调用。
 
-### 3.1 不改变现有主链路
+外部 I/O 顺序固定为：
 
-- 现有 OAuth 登录流程保持不变
-- 现有本地用户名密码登录保持不变
-- 现有 `/api/v1/auth/providers` 协议保持不变
-- 不在开源版中引入私有 SSO 的真实实现
-
-### 3.2 新增的公共扩展协议
-
-开源版新增显式被动会话引导接口：
-
-- `POST /api/v1/auth/session/bootstrap`
-
-请求：
-
-```json
-{
-  "provider": "private-sso"
-}
+```text
+Provider Registry READY gate
+  → Adapter 验证协议或凭证（事务外）
+  → ProviderAuthenticationResult
+  → ExternalIdentityLoginService（事务内）
+  → PlatformPrincipal
+  → PlatformSessionService
 ```
 
-行为约束：
+## 3. 公共协议兼容
 
-- 默认关闭，由 `skillhub.auth.session-bootstrap.enabled=false` 控制
-- 关闭时返回 `403`
-- provider 不存在时返回 `400`
-- 外部会话校验失败时返回 `401`
-- 成功时建立 skillhub Session，并返回当前用户信息
+以下 HTTP API 保持不变：
 
-同时新增默认关闭的直连认证兼容接口：
-
+- `GET /api/v1/auth/providers`
+- `GET /api/v1/auth/methods`
 - `POST /api/v1/auth/direct/login`
+- `POST /api/v1/auth/session/bootstrap`
+- `POST /api/v1/auth/local/login`
 
-请求：
+兼容入口仍默认关闭：
 
-```json
-{
-  "provider": "private-sso",
-  "username": "alice",
-  "password": "secret"
-}
+```yaml
+skillhub:
+  auth:
+    direct:
+      enabled: false
+    session-bootstrap:
+      enabled: false
 ```
 
-行为约束：
+关闭时返回 `403`；入口开启但 provider 不存在或不具备对应能力时返回 `400`；被动请求中
+没有有效外部身份时返回 `401`。Provider Authority 不匹配等运行故障返回 `503`。
 
-- 默认关闭，由 `skillhub.auth.direct.enabled=false` 控制
-- 关闭时返回 `403`
-- provider 不存在时返回 `400`
-- 成功时建立 skillhub Session，并返回当前用户信息
-- 开源版仍保留原始 `/api/v1/auth/local/login`
+`provider=local` 的 direct-login 兼容行为保留，但本地密码不属于外部 Provider，也不进入
+Identity Binding。新的企业认证必须实现下面的 Adapter 契约。
 
-### 3.3 代码级扩展点
+## 4. Provider Instance 定义
+
+Credential 和 Passive Adapter 都声明一个不可变的
+`ProviderInstanceDefinition`：
 
 ```java
-public interface PassiveSessionAuthenticator {
-    String providerCode();
-    Optional<PlatformPrincipal> authenticate(HttpServletRequest request);
-}
+new ProviderInstanceDefinition(
+    "private-sso",
+    "private-sso",
+    "https://sso.example",
+    "Enterprise SSO",
+    "private_subject",
+    "private_subject",
+    Map.of("private_subject", SubjectNormalization.EXACT),
+    List.of("display_name"),
+    List.of("email"),
+    List.of("avatar_url"),
+    EmailAssurance.VERIFIED,
+    true
+);
 ```
+
+字段含义：
+
+- `providerCode`：稳定 Provider Instance 标识；不能因部署或登录方式变化。
+- `protocol`：写入认证证据和 Authority fingerprint 的协议代码。
+- `canonicalAuthority`：该 Provider 所代表的身份域。
+- `primarySubjectType`：稳定外部主键的类型。
+- `subjectNormalizations`：核心允许的 Subject 类型和规范化规则。
+- 属性列表：统一核心可读取的 display name、email、avatar 候选键及优先级。
+- `emailAssuranceLimit`：该受信 Adapter 允许的 email assurance 上限。
+- `enabled`：Adapter 能力开关；关闭时不进入目录和路由。
+
+同一 Provider 同时实现 Credential 和 Passive 能力时，两者返回的定义必须完全一致。
+Registry 检测到定义或同类能力冲突时，对整个 Provider fail closed。
+
+## 5. Adapter 契约
+
+### 5.1 Browser
+
+Browser 协议保留各自强类型 exchange：
 
 ```java
-public interface DirectAuthProvider {
-    String providerCode();
-    PlatformPrincipal authenticate(DirectAuthRequest request);
+public interface BrowserAuthenticationAdapter<T> {
+    ProviderAuthenticationResult authenticate(T exchange);
 }
 ```
 
-私有版只需要新增实现，例如：
+Redirect、Callback、state、nonce、SAML POST 或 CAS Ticket 的传输流程仍由协议模块持有，
+不使用万能请求对象。现有 GitHub/GitLab claims Adapter 已使用此结果契约；OAuth 路由由
+Registry 对服务端 `ClientRegistration` 做身份匹配。
 
-- `private-sso-cookie`：读取共享 Cookie 并向 SSO 校验
-- 后续如果需要，也可以补“用户名密码直连认证 provider”扩展点
+### 5.2 Credential
 
-为减少私有 fork 的前端硬编码，扩展 provider 可额外声明展示名称：
+```java
+public interface CredentialAuthenticationAdapter {
+    ProviderInstanceDefinition provider();
+    ProviderAuthenticationResult authenticate(
+        CredentialAuthenticationRequest request
+    );
+}
+```
 
-- `DirectAuthProvider.displayName()` 默认回退为 `providerCode()`
-- `PassiveSessionAuthenticator.displayName()` 默认回退为 `providerCode()`
-- `GET /api/v1/auth/methods` 会返回该展示名称，供登录页直接渲染
+适用于 LDAP bind、企业 RPC 等主动凭证校验。全局入口由
+`skillhub.auth.direct.enabled` 控制。
 
-## 4. 本轮已落地内容
+### 5.3 Passive
 
-- 新增 `PassiveSessionAuthenticator` SPI
-- 新增 `DirectAuthProvider` SPI
-- 新增统一会话建立服务 `PlatformSessionService`
-- 新增 `POST /api/v1/auth/session/bootstrap` 协议
-- 新增 `POST /api/v1/auth/direct/login` 协议
-- 新增 `skillhub.auth.direct.enabled` 开关，默认关闭
-- 新增 `skillhub.auth.session-bootstrap.enabled` 开关，默认关闭
-- 前端新增基于运行时配置的账号密码兼容接入层
-- 前端新增基于运行时配置的被动会话兼容入口
-- 前端新增显式按钮和可选自动尝试逻辑，默认都不启用
-- 增加 controller 集成测试，验证：
-  - 默认关闭时不会影响现有系统
-  - 启用并提供 authenticator 时可以建立 skillhub Session
+```java
+public interface PassiveAuthenticationAdapter {
+    ProviderInstanceDefinition provider();
+    Optional<ProviderAuthenticationResult> authenticate(
+        HttpServletRequest request
+    );
+}
+```
 
-统一会话建立约束：
+适用于可信 Header、签名 JWT、已有企业会话和 SPNEGO。Adapter 可以只读请求，但不能写
+Session 或 Security Context。全局入口由
+`skillhub.auth.session-bootstrap.enabled` 控制。
 
-- 本地登录、OAuth 成功回调、direct auth、session bootstrap、mock 登录旁路都走 `PlatformSessionService`
-- 会话写入统一依赖 `HttpSession` 属性：`platformPrincipal` 与 `SPRING_SECURITY_CONTEXT`
-- 因此在生产环境启用 Spring Session Redis 时，不需要为不同登录方式分别处理 Session 序列化或存储逻辑
-- 交互式登录默认轮换 session id；OAuth 这类已在 Spring Security 认证链中的流程复用现有 `Authentication`
+旧名称 `DirectAuthProvider` 和 `PassiveSessionAuthenticator` 仅保留为待删除的源码迁移
+别名；它们已经继承新契约，不能再返回 `PlatformPrincipal`。
 
-前端运行时配置：
+### 5.4 失败分类
+
+Adapter 不能抛出携带上游响应、用户名或凭证的自由文本异常。协议校验或上游调用失败时，
+统一抛出 `ProviderAuthenticationException`，只携带
+`ProviderAuthenticationFailureCode`：
+
+- `UPSTREAM_INVALID_CREDENTIALS`、`REPLAY_DETECTED` → 401。
+- `UPSTREAM_ACCESS_DENIED` → 403。
+- `UPSTREAM_UNAVAILABLE`、`UPSTREAM_MISCONFIGURED`、
+  `TLS_VALIDATION_FAILED`、`UPSTREAM_INVALID_RESPONSE` → 503。
+
+`PassiveAuthenticationAdapter` 只有在请求完全没有外部认证信息时返回 `Optional.empty()`；
+断言存在但无效、过期、重放或无法验证时必须使用稳定失败码，不能伪装成“未登录”。
+
+## 6. Auth Method Catalog
+
+`GET /api/v1/auth/methods` 只从 Registry 的 `READY` Provider 和已协商能力投影：
+
+```text
+Browser    → OAUTH_REDIRECT
+Credential → DIRECT_PASSWORD
+Passive    → SESSION_BOOTSTRAP
+```
+
+返回的 action URL 由核心按能力生成。Adapter 不能提供任意 URL，也不能向目录暴露
+Authority、endpoint、属性映射或上游错误。
+
+`GET /api/v1/auth/providers` 继续只返回 Browser/OAuth 兼容目录，保持旧前端兼容。
+
+## 7. 从旧 SPI 迁移
+
+旧实现如果执行了以下操作，必须删除：
+
+- 按外部 UID 自行查询或创建平台用户。
+- 自行创建 Identity Binding。
+- 从 email、username 或 Provider login 推导平台 userId。
+- 构造 `PlatformPrincipal` 或授予角色。
+- 在 Adapter 中建立 Session。
+
+迁移步骤：
+
+1. 把稳定 provider code、protocol、Authority、Subject 类型和属性映射写入
+   `ProviderInstanceDefinition`。
+2. 把外部 UID 转成 `SubjectCandidate`。
+3. 把非敏感资料转成带 `ProviderAttributeTrust` 的属性。
+4. 返回协议一致的 `ProtocolAuthenticationEvidence`。
+5. 让统一身份核心按 `AUTO`、`APPROVAL` 或 `EXISTING_BINDING_ONLY` 完成账号和 Binding。
+6. 为 Adapter 增加 Conformance、稳定失败码、超时和无敏感日志测试。
+
+具体实现示例见
+[私有 SSO 接入手册](./12-private-sso-integration-playbook.md)。
+
+## 8. 前端与部署
+
+前端运行时配置保持不变：
 
 - `SKILLHUB_WEB_AUTH_DIRECT_ENABLED`
 - `SKILLHUB_WEB_AUTH_DIRECT_PROVIDER`
@@ -132,24 +209,6 @@ public interface DirectAuthProvider {
 - `SKILLHUB_WEB_AUTH_SESSION_BOOTSTRAP_PROVIDER`
 - `SKILLHUB_WEB_AUTH_SESSION_BOOTSTRAP_AUTO`
 
-使用方式：
-
-1. 若要做密码直连，后端启用 `skillhub.auth.direct.enabled=true`
-2. 私有版提供 `DirectAuthProvider` 实现
-3. 前端设置 `SKILLHUB_WEB_AUTH_DIRECT_*`
-4. 若要做被动会话，后端启用 `skillhub.auth.session-bootstrap.enabled=true`
-5. 私有版提供 `PassiveSessionAuthenticator` 实现
-6. 前端设置 bootstrap provider 和开关
-7. 登录页显示兼容入口，或在配置允许时自动尝试一次 bootstrap
-
-## 5. 后续建议
-
-- 私有版实现 `DirectAuthProvider` 和 / 或 `PassiveSessionAuthenticator` 时，只扩展 provider 层，不复制 session 建立逻辑
-- 私有版优先采用显式 bootstrap，而不是透明全局拦截器自动登录
-- 如后续需要登出联动，只通过 `LogoutPropagationHandler` 扩展，不改动现有主登出链路
-
-## 6. 实施手册
-
-更详细的私有 SSO 接入步骤、最佳实践、测试矩阵和给后续 coding agent 的执行约束，见：
-
-- [12-private-sso-integration-playbook.md](./12-private-sso-integration-playbook.md)
+后端开关、Provider definition 的 `enabled` 和前端开关需要同时满足。建议先启用
+Credential，再人工验证 Passive Cookie/Header 的作用域、SameSite、Secure、CSRF 和代理
+信任边界，最后才评估自动 bootstrap。

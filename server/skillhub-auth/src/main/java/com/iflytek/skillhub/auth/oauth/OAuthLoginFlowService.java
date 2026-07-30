@@ -62,7 +62,9 @@ public class OAuthLoginFlowService {
         }
 
         ProviderAuthenticationResult result =
-                extractor.extract(request, upstreamUser);
+                extractor.authenticate(new OAuthAuthenticationExchange(
+                        request,
+                        upstreamUser));
         PlatformPrincipal principal = authenticate(
                 request.getClientRegistration(),
                 result,

@@ -1,5 +1,5 @@
 /**
- * Authentication bootstrap helpers that restore session state from existing
- * request context without forcing an explicit login step.
+ * Deprecated compatibility names for passive authentication. New adapters
+ * live in {@code com.iflytek.skillhub.auth.provider}.
  */
 package com.iflytek.skillhub.auth.bootstrap;

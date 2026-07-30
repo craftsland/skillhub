@@ -1,17 +1,13 @@
 package com.iflytek.skillhub.auth.direct;
 
-import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
+import com.iflytek.skillhub.auth.provider.CredentialAuthenticationAdapter;
 
 /**
- * Extension point for username/password style direct authentication sources.
+ * Compatibility name for credential adapters.
+ *
+ * @deprecated implement {@link CredentialAuthenticationAdapter} directly.
  */
-public interface DirectAuthProvider {
-
-    String providerCode();
-
-    default String displayName() {
-        return providerCode();
-    }
-
-    PlatformPrincipal authenticate(DirectAuthRequest request);
+@Deprecated(forRemoval = true)
+public interface DirectAuthProvider
+        extends CredentialAuthenticationAdapter {
 }

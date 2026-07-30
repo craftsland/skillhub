@@ -1,9 +1,8 @@
 package com.iflytek.skillhub.service;
 
-import com.iflytek.skillhub.auth.bootstrap.PassiveSessionAuthenticator;
-import com.iflytek.skillhub.auth.direct.DirectAuthProvider;
-import com.iflytek.skillhub.auth.identity.IdentityProviderCatalog;
+import com.iflytek.skillhub.auth.identity.IdentityProviderRegistry;
 import com.iflytek.skillhub.auth.identity.IdentityProviderLoginMethod;
+import com.iflytek.skillhub.auth.identity.IdentityProviderLoginMethodType;
 import com.iflytek.skillhub.auth.oauth.OAuthLoginRedirectSupport;
 import com.iflytek.skillhub.config.AuthSessionBootstrapProperties;
 import com.iflytek.skillhub.config.DirectAuthProperties;
@@ -23,27 +22,21 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthMethodCatalog {
 
-    private final IdentityProviderCatalog identityProviderCatalog;
+    private final IdentityProviderRegistry identityProviderRegistry;
     private final DirectAuthProperties directAuthProperties;
     private final AuthSessionBootstrapProperties sessionBootstrapProperties;
-    private final List<DirectAuthProvider> directAuthProviders;
-    private final List<PassiveSessionAuthenticator> passiveSessionAuthenticators;
 
-    public AuthMethodCatalog(IdentityProviderCatalog identityProviderCatalog,
+    public AuthMethodCatalog(IdentityProviderRegistry identityProviderRegistry,
                              DirectAuthProperties directAuthProperties,
-                             AuthSessionBootstrapProperties sessionBootstrapProperties,
-                             List<DirectAuthProvider> directAuthProviders,
-                             List<PassiveSessionAuthenticator> passiveSessionAuthenticators) {
-        this.identityProviderCatalog = identityProviderCatalog;
+                             AuthSessionBootstrapProperties sessionBootstrapProperties) {
+        this.identityProviderRegistry = identityProviderRegistry;
         this.directAuthProperties = directAuthProperties;
         this.sessionBootstrapProperties = sessionBootstrapProperties;
-        this.directAuthProviders = directAuthProviders;
-        this.passiveSessionAuthenticators = passiveSessionAuthenticators;
     }
 
     public List<AuthProviderResponse> listOAuthProviders(String returnTo) {
         String sanitizedReturnTo = OAuthLoginRedirectSupport.sanitizeReturnTo(returnTo);
-        return new ArrayList<>(identityProviderCatalog.listReadyProviders().stream()
+        return new ArrayList<>(identityProviderRegistry.listReadyProviders().stream()
             .sorted(Comparator.comparing(IdentityProviderLoginMethod::providerCode))
             .map(provider -> new AuthProviderResponse(
                 provider.providerCode(),
@@ -65,41 +58,64 @@ public class AuthMethodCatalog {
             "/api/v1/auth/local/login"
         ));
 
-        identityProviderCatalog.listReadyProviders().stream()
-            .sorted(Comparator.comparing(IdentityProviderLoginMethod::providerCode))
-            .forEach(provider -> methods.add(new AuthMethodResponse(
-                "oauth-" + provider.providerCode(),
-                "OAUTH_REDIRECT",
-                provider.providerCode(),
-                provider.displayName(),
-                buildAuthorizationUrl(provider.providerCode(), sanitizedReturnTo)
+        if (directAuthProperties.isEnabled()) {
+            methods.add(new AuthMethodResponse(
+                "direct-local",
+                "DIRECT_PASSWORD",
+                "local",
+                "Local Account",
+                "/api/v1/auth/direct/login"
+            ));
+        }
+
+        identityProviderRegistry.listReadyLoginMethods().stream()
+            .filter(this::isMethodEnabled)
+            .sorted(Comparator
+                .comparing(IdentityProviderLoginMethod::providerCode)
+                .thenComparing(IdentityProviderLoginMethod::methodType))
+            .forEach(provider -> methods.add(toResponse(
+                provider,
+                sanitizedReturnTo
             )));
 
-        if (directAuthProperties.isEnabled()) {
-            directAuthProviders.stream()
-                .sorted(Comparator.comparing(DirectAuthProvider::providerCode))
-                .forEach(provider -> methods.add(new AuthMethodResponse(
-                    "direct-" + provider.providerCode(),
-                    "DIRECT_PASSWORD",
-                    provider.providerCode(),
-                    provider.displayName(),
-                    "/api/v1/auth/direct/login"
-                )));
-        }
-
-        if (sessionBootstrapProperties.isEnabled()) {
-            passiveSessionAuthenticators.stream()
-                .sorted(Comparator.comparing(PassiveSessionAuthenticator::providerCode))
-                .forEach(provider -> methods.add(new AuthMethodResponse(
-                    "bootstrap-" + provider.providerCode(),
-                    "SESSION_BOOTSTRAP",
-                    provider.providerCode(),
-                    provider.displayName(),
-                    "/api/v1/auth/session/bootstrap"
-                )));
-        }
-
         return methods;
+    }
+
+    private boolean isMethodEnabled(IdentityProviderLoginMethod method) {
+        return switch (method.methodType()) {
+            case OAUTH_REDIRECT -> true;
+            case DIRECT_PASSWORD -> directAuthProperties.isEnabled();
+            case SESSION_BOOTSTRAP -> sessionBootstrapProperties.isEnabled();
+        };
+    }
+
+    private AuthMethodResponse toResponse(
+            IdentityProviderLoginMethod method,
+            String returnTo) {
+        String providerCode = method.providerCode();
+        return switch (method.methodType()) {
+            case OAUTH_REDIRECT -> new AuthMethodResponse(
+                "oauth-" + providerCode,
+                IdentityProviderLoginMethodType.OAUTH_REDIRECT.name(),
+                providerCode,
+                method.displayName(),
+                buildAuthorizationUrl(providerCode, returnTo)
+            );
+            case DIRECT_PASSWORD -> new AuthMethodResponse(
+                "direct-" + providerCode,
+                IdentityProviderLoginMethodType.DIRECT_PASSWORD.name(),
+                providerCode,
+                method.displayName(),
+                "/api/v1/auth/direct/login"
+            );
+            case SESSION_BOOTSTRAP -> new AuthMethodResponse(
+                "bootstrap-" + providerCode,
+                IdentityProviderLoginMethodType.SESSION_BOOTSTRAP.name(),
+                providerCode,
+                method.displayName(),
+                "/api/v1/auth/session/bootstrap"
+            );
+        };
     }
 
     private String buildAuthorizationUrl(String registrationId, String returnTo) {
