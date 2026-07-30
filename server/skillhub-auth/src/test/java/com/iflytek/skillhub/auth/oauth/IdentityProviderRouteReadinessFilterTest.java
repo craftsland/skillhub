@@ -71,6 +71,7 @@ class IdentityProviderRouteReadinessFilterTest {
         filter.doFilter(request, response, chain);
 
         assertThat(response.getStatus()).isEqualTo(503);
+        assertThat(response.isCommitted()).isFalse();
         verify(chain, never()).doFilter(request, response);
     }
 
@@ -89,6 +90,7 @@ class IdentityProviderRouteReadinessFilterTest {
         filter.doFilter(request, response, chain);
 
         assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.isCommitted()).isFalse();
         verify(chain, never()).doFilter(request, response);
     }
 
@@ -104,6 +106,7 @@ class IdentityProviderRouteReadinessFilterTest {
         filter.doFilter(request, response, chain);
 
         assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.isCommitted()).isFalse();
         verify(readinessService, never())
                 .requireReady(registration);
         verify(chain, never()).doFilter(request, response);

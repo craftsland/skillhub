@@ -55,7 +55,7 @@ public final class IdentityProviderRouteReadinessFilter
                 ? null
                 : registrationRepository.findByRegistrationId(registrationId);
         if (registration == null) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
 
@@ -70,14 +70,14 @@ public final class IdentityProviderRouteReadinessFilter
                     "Identity provider route '{}' rejected before upstream I/O: {}",
                     registration.getRegistrationId(),
                     exception.getReasonCode());
-            response.sendError(status);
+            response.setStatus(status);
             return;
         } catch (RuntimeException exception) {
             log.error(
                     "Identity provider route '{}' readiness check failed",
                     registration.getRegistrationId(),
                     exception);
-            response.sendError(
+            response.setStatus(
                     HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             return;
         }
