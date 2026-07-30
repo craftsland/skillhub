@@ -1,73 +1,121 @@
 package com.iflytek.skillhub.auth.oauth;
 
-import com.iflytek.skillhub.auth.identity.IdentityBindingService;
-import com.iflytek.skillhub.auth.policy.AccessDecision;
-import com.iflytek.skillhub.auth.policy.AccessPolicy;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.iflytek.skillhub.auth.identity.ExternalIdentityLoginService;
+import com.iflytek.skillhub.auth.identity.IdentityCoreException;
+import com.iflytek.skillhub.auth.identity.IdentityFailureCode;
+import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
+import com.iflytek.skillhub.auth.identity.IdentityLoginOutcome;
+import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.identity.SubjectCandidate;
+import com.iflytek.skillhub.auth.identity.TrustedProviderRouteResolver;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
-import com.iflytek.skillhub.domain.user.UserStatus;
 import jakarta.servlet.http.HttpSession;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class OAuthLoginFlowServiceTest {
 
     @Test
-    void authenticate_allowsPreviouslyApprovedUserWhenPolicyRequiresApproval() {
-        AccessPolicy accessPolicy = mock(AccessPolicy.class);
-        IdentityBindingService identityBindingService = mock(IdentityBindingService.class);
-        OAuthLoginFlowService service = new OAuthLoginFlowService(
-                List.of(),
-                accessPolicy,
-                identityBindingService
-        );
-        OAuthClaims claims = claims();
-        PlatformPrincipal approvedPrincipal = new PlatformPrincipal(
-                "usr_1", "alice", "alice@example.com", null, "github", Set.of("USER"));
-        when(accessPolicy.evaluate(claims)).thenReturn(AccessDecision.PENDING_APPROVAL);
-        when(identityBindingService.bindOrCreate(claims, UserStatus.PENDING)).thenReturn(approvedPrincipal);
+    void authenticateReturnsPrincipalOnlyForAuthenticatedOutcome() {
+        TrustedProviderRouteResolver resolver =
+                mock(TrustedProviderRouteResolver.class);
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(),
+                        resolver,
+                        identityLoginService);
+        PlatformPrincipal principal = principal();
+        when(identityLoginService.authenticate(any(), any(), any()))
+                .thenReturn(new IdentityLoginOutcome.Authenticated(
+                        principal,
+                        false,
+                        false));
+        ClientRegistration registration = registration();
+        IdentityLoginContext context = context();
 
-        PlatformPrincipal principal = service.authenticate(claims);
+        PlatformPrincipal authenticated =
+                service.authenticate(registration, result(), context);
 
-        assertThat(principal).isSameAs(approvedPrincipal);
-        verify(identityBindingService).bindOrCreate(claims, UserStatus.PENDING);
+        assertThat(authenticated).isSameAs(principal);
+        verify(resolver).resolve(registration);
+        verify(identityLoginService).authenticate(
+                any(),
+                any(),
+                org.mockito.ArgumentMatchers.eq(context));
     }
 
     @Test
-    void authenticate_rejectsDisabledUserWhenPolicyRequiresApproval() {
-        AccessPolicy accessPolicy = mock(AccessPolicy.class);
-        IdentityBindingService identityBindingService = mock(IdentityBindingService.class);
-        OAuthLoginFlowService service = new OAuthLoginFlowService(
-                List.of(),
-                accessPolicy,
-                identityBindingService
-        );
-        OAuthClaims claims = claims();
-        when(accessPolicy.evaluate(claims)).thenReturn(AccessDecision.PENDING_APPROVAL);
-        when(identityBindingService.bindOrCreate(claims, UserStatus.PENDING))
-                .thenThrow(new AccountDisabledException());
+    void pendingOutcomeUsesExistingPendingFailureContract() {
+        TrustedProviderRouteResolver resolver =
+                mock(TrustedProviderRouteResolver.class);
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(),
+                        resolver,
+                        identityLoginService);
+        when(identityLoginService.authenticate(any(), any(), any()))
+                .thenReturn(new IdentityLoginOutcome.PendingApproval(
+                        "ACCOUNT_PENDING"));
 
-        assertThatThrownBy(() -> service.authenticate(claims))
-                .isInstanceOf(AccountDisabledException.class);
+        assertThatThrownBy(() ->
+                service.authenticate(
+                        registration(),
+                        result(),
+                        context()))
+                .isInstanceOf(AccountPendingException.class);
     }
 
     @Test
-    void rememberReturnTo_stores_sanitized_return_target() {
-        OAuthLoginFlowService service = new OAuthLoginFlowService(
-                List.of(),
-                mock(AccessPolicy.class),
-                mock(IdentityBindingService.class)
-        );
+    void authorityMismatchIsMappedToStableOAuthFailure() {
+        TrustedProviderRouteResolver resolver =
+                mock(TrustedProviderRouteResolver.class);
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(),
+                        resolver,
+                        identityLoginService);
+        when(identityLoginService.authenticate(any(), any(), any()))
+                .thenThrow(new IdentityCoreException(
+                        IdentityFailureCode.PROVIDER_AUTHORITY_MISMATCH));
+
+        assertThatThrownBy(() ->
+                service.authenticate(
+                        registration(),
+                        result(),
+                        context()))
+                .isInstanceOfSatisfying(
+                        OAuth2AuthenticationException.class,
+                        exception -> assertThat(
+                                exception.getError().getErrorCode())
+                                .isEqualTo(
+                                        "provider_authority_mismatch"));
+    }
+
+    @Test
+    void rememberReturnToStoresSanitizedReturnTarget() {
+        OAuthLoginFlowService service = service();
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setParameter("returnTo", "/dashboard/publish");
 
@@ -75,75 +123,104 @@ class OAuthLoginFlowServiceTest {
 
         HttpSession session = request.getSession(false);
         assertThat(session).isNotNull();
-        assertThat(session.getAttribute(OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE))
+        assertThat(session.getAttribute(
+                OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE))
                 .isEqualTo("/dashboard/publish");
     }
 
     @Test
-    void resolveFailureRedirect_maps_access_denied_to_user_facing_page() {
-        OAuthLoginFlowService service = new OAuthLoginFlowService(
-                List.of(),
-                mock(AccessPolicy.class),
-                mock(IdentityBindingService.class)
-        );
+    void resolveFailureRedirectMapsAccessDeniedToUserFacingPage() {
+        OAuthLoginFlowService service = service();
 
         String redirect = service.resolveFailureRedirect(
-                new OAuth2AuthenticationException(new OAuth2Error("access_denied")),
-                "/settings/accounts"
-        );
+                new OAuth2AuthenticationException(
+                        new OAuth2Error("access_denied")),
+                "/settings/accounts");
 
         assertThat(redirect).isEqualTo("/access-denied");
     }
 
     @Test
-    void resolveFailureRedirect_mapsMergedAccountToAccessDenied() {
-        OAuthLoginFlowService service = new OAuthLoginFlowService(
-                List.of(),
-                mock(AccessPolicy.class),
-                mock(IdentityBindingService.class)
-        );
-
-        assertThat(service.resolveFailureRedirect(new AccountMergedException(), null))
-                .isEqualTo("/access-denied");
+    void resolveFailureRedirectMapsMergedAccountToAccessDenied() {
+        assertThat(service().resolveFailureRedirect(
+                new AccountMergedException(),
+                null)).isEqualTo("/access-denied");
     }
 
     @Test
-    void resolveFailureRedirect_mapsSystemAccountToAccessDenied() {
-        OAuthLoginFlowService service = new OAuthLoginFlowService(
-                List.of(),
-                mock(AccessPolicy.class),
-                mock(IdentityBindingService.class)
-        );
-
-        assertThat(service.resolveFailureRedirect(new SystemAccountLoginException(), null))
-                .isEqualTo("/access-denied");
+    void resolveFailureRedirectMapsSystemAccountToAccessDenied() {
+        assertThat(service().resolveFailureRedirect(
+                new SystemAccountLoginException(),
+                null)).isEqualTo("/access-denied");
     }
 
     @Test
-    void consumeReturnTo_clearsUnsafeSessionValue() {
-        OAuthLoginFlowService service = new OAuthLoginFlowService(
-                List.of(),
-                mock(AccessPolicy.class),
-                mock(IdentityBindingService.class)
-        );
+    void consumeReturnToClearsUnsafeSessionValue() {
+        OAuthLoginFlowService service = service();
         MockHttpServletRequest request = new MockHttpServletRequest();
         HttpSession session = request.getSession(true);
-        session.setAttribute(OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE, "https://evil.example");
+        session.setAttribute(
+                OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE,
+                "https://evil.example");
 
         String returnTo = service.consumeReturnTo(session);
 
         assertThat(returnTo).isNull();
-        assertThat(session.getAttribute(OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE)).isNull();
+        assertThat(session.getAttribute(
+                OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE))
+                .isNull();
     }
 
-    private OAuthClaims claims() {
-        return new OAuthClaims(
-                "github",
-                "gh_1",
-                "alice@example.com",
-                true,
+    private static OAuthLoginFlowService service() {
+        return new OAuthLoginFlowService(
+                List.of(),
+                mock(TrustedProviderRouteResolver.class),
+                mock(ExternalIdentityLoginService.class));
+    }
+
+    private static ProviderAuthenticationResult result() {
+        return new ProviderAuthenticationResult(
+                new SubjectCandidate("github_user_id", "123"),
+                List.of(),
+                Map.of(),
+                new ProtocolAuthenticationEvidence(
+                        "oauth2-github",
+                        Instant.parse("2026-07-30T08:00:00Z"),
+                        Set.of("oauth2_authorization_code")));
+    }
+
+    private static IdentityLoginContext context() {
+        return new IdentityLoginContext(
+                "req-123",
+                "203.0.113.9",
+                "SkillHub Browser");
+    }
+
+    private static PlatformPrincipal principal() {
+        return new PlatformPrincipal(
+                "usr_1",
                 "alice",
-                Map.of()
-        );
+                "alice@example.com",
+                null,
+                "github",
+                Set.of("USER"));
+    }
+
+    private static ClientRegistration registration() {
+        return ClientRegistration.withRegistrationId("github")
+                .clientId("client")
+                .clientSecret("secret")
+                .authorizationGrantType(
+                        AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri(
+                        "{baseUrl}/login/oauth2/code/{registrationId}")
+                .authorizationUri(
+                        "https://github.com/login/oauth/authorize")
+                .tokenUri(
+                        "https://github.com/login/oauth/access_token")
+                .userInfoUri("https://api.github.com/user")
+                .userNameAttributeName("id")
+                .clientName("GitHub")
+                .build();
     }
 }

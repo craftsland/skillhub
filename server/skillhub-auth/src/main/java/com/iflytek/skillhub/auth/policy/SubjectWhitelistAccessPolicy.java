@@ -1,6 +1,5 @@
 package com.iflytek.skillhub.auth.policy;
 
-import com.iflytek.skillhub.auth.oauth.OAuthClaims;
 import java.util.Set;
 
 /**
@@ -14,8 +13,8 @@ public class SubjectWhitelistAccessPolicy implements AccessPolicy {
     }
 
     @Override
-    public AccessDecision evaluate(OAuthClaims claims) {
-        String key = claims.provider() + ":" + claims.subject();
+    public AccessDecision evaluate(IdentityAccessContext context) {
+        String key = context.providerCode() + ":" + context.subjectValue();
         return whitelistedSubjects.contains(key)
             ? AccessDecision.ALLOW : AccessDecision.DENY;
     }

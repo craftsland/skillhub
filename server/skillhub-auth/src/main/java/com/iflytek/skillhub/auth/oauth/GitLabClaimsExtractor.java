@@ -1,6 +1,11 @@
 package com.iflytek.skillhub.auth.oauth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
+import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
+import com.iflytek.skillhub.auth.identity.ProviderAttributeValue;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -11,7 +16,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Provider-specific claims extractor that enriches GitLab OAuth users with their
@@ -39,7 +46,9 @@ public class GitLabClaimsExtractor implements OAuthClaimsExtractor {
     }
 
     @Override
-    public OAuthClaims extract(OAuth2UserRequest request, OAuth2User oAuth2User) {
+    public ProviderAuthenticationResult extract(
+            OAuth2UserRequest request,
+            OAuth2User oAuth2User) {
         Map<String, Object> attrs = oAuth2User.getAttributes();
         log.debug("Extracting GitLab OAuth claims for user attributes: {}", attrs.keySet());
 
@@ -73,14 +82,47 @@ public class GitLabClaimsExtractor implements OAuthClaimsExtractor {
         log.info("GitLab OAuth claims extracted - subject: {}, username: {}, email: {}, emailVerified: {}",
                 subject, username, email, emailVerified);
 
-        return new OAuthClaims(
-            "gitlab",
-            subject,
-            email,
-            emailVerified,
-            username,
-            attrs
-        );
+        Map<String, List<ProviderAttributeValue>> attributes =
+                new LinkedHashMap<>();
+        put(
+                attributes,
+                "username",
+                username,
+                ProviderAttributeTrust.ASSERTED);
+        put(
+                attributes,
+                "email",
+                email,
+                emailVerified
+                        ? ProviderAttributeTrust.VERIFIED
+                        : ProviderAttributeTrust.UNVERIFIED);
+        put(
+                attributes,
+                "avatar_url",
+                attrs.get("avatar_url"),
+                ProviderAttributeTrust.ASSERTED);
+
+        return new ProviderAuthenticationResult(
+                new SubjectCandidate("gitlab_user_id", subject),
+                List.of(),
+                attributes,
+                new ProtocolAuthenticationEvidence(
+                        "oauth2-gitlab",
+                        request.getAccessToken().getIssuedAt(),
+                        Set.of("oauth2_authorization_code")));
+    }
+
+    private void put(
+            Map<String, List<ProviderAttributeValue>> attributes,
+            String key,
+            Object rawValue,
+            ProviderAttributeTrust trust) {
+        if (!(rawValue instanceof String value) || value.isBlank()) {
+            return;
+        }
+        attributes.put(
+                key,
+                List.of(new ProviderAttributeValue(value, trust)));
     }
 
     private GitLabEmail loadPrimaryEmail(OAuth2UserRequest request) {

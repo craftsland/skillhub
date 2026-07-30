@@ -5,6 +5,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -35,10 +37,20 @@ class GitHubClaimsExtractorTest {
                 ));
         GitHubClaimsExtractor extractor = new GitHubClaimsExtractor(restClientBuilder);
 
-        OAuthClaims claims = extractor.extract(userRequest(), githubUser("alice@example.com"));
+        ProviderAuthenticationResult result =
+                extractor.extract(
+                        userRequest(),
+                        githubUser("alice@example.com"));
 
-        assertThat(claims.email()).isEqualTo("alice@example.com");
-        assertThat(claims.emailVerified()).isFalse();
+        assertThat(result.primarySubject().type())
+                .isEqualTo("github_user_id");
+        assertThat(result.primarySubject().value()).isEqualTo("42");
+        assertThat(result.attributes().get("email").getFirst().value())
+                .isEqualTo("alice@example.com");
+        assertThat(result.attributes().get("email").getFirst().trust())
+                .isEqualTo(ProviderAttributeTrust.UNVERIFIED);
+        assertThat(result.evidence().protocol())
+                .isEqualTo("oauth2-github");
         server.verify();
     }
 
@@ -59,10 +71,13 @@ class GitHubClaimsExtractorTest {
                 ));
         GitHubClaimsExtractor extractor = new GitHubClaimsExtractor(restClientBuilder);
 
-        OAuthClaims claims = extractor.extract(userRequest(), githubUser(null));
+        ProviderAuthenticationResult result =
+                extractor.extract(userRequest(), githubUser(null));
 
-        assertThat(claims.email()).isEqualTo("alice@example.com");
-        assertThat(claims.emailVerified()).isTrue();
+        assertThat(result.attributes().get("email").getFirst().value())
+                .isEqualTo("alice@example.com");
+        assertThat(result.attributes().get("email").getFirst().trust())
+                .isEqualTo(ProviderAttributeTrust.VERIFIED);
         server.verify();
     }
 

@@ -1,9 +1,10 @@
 package com.iflytek.skillhub.auth.local;
 
 import com.iflytek.skillhub.auth.exception.AuthFlowException;
+import com.iflytek.skillhub.auth.identity.AccountLoginDecision;
+import com.iflytek.skillhub.auth.identity.AccountLoginGuard;
+import com.iflytek.skillhub.auth.identity.PlatformPrincipalFactory;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
-import com.iflytek.skillhub.auth.rbac.PlatformRoleDefaults;
-import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
 import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
@@ -12,10 +13,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -39,26 +38,29 @@ public class LocalAuthService {
 
     private final LocalCredentialRepository credentialRepository;
     private final UserAccountRepository userAccountRepository;
-    private final UserRoleBindingRepository userRoleBindingRepository;
     private final GlobalNamespaceMembershipService globalNamespaceMembershipService;
     private final PasswordPolicyValidator passwordPolicyValidator;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final AccountLoginGuard accountLoginGuard;
+    private final PlatformPrincipalFactory principalFactory;
 
     public LocalAuthService(LocalCredentialRepository credentialRepository,
                             UserAccountRepository userAccountRepository,
-                            UserRoleBindingRepository userRoleBindingRepository,
                             GlobalNamespaceMembershipService globalNamespaceMembershipService,
                             PasswordPolicyValidator passwordPolicyValidator,
                             PasswordEncoder passwordEncoder,
-                            Clock clock) {
+                            Clock clock,
+                            AccountLoginGuard accountLoginGuard,
+                            PlatformPrincipalFactory principalFactory) {
         this.credentialRepository = credentialRepository;
         this.userAccountRepository = userAccountRepository;
-        this.userRoleBindingRepository = userRoleBindingRepository;
         this.globalNamespaceMembershipService = globalNamespaceMembershipService;
         this.passwordPolicyValidator = passwordPolicyValidator;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
+        this.accountLoginGuard = accountLoginGuard;
+        this.principalFactory = principalFactory;
     }
 
     /**
@@ -101,7 +103,7 @@ public class LocalAuthService {
         ));
         globalNamespaceMembershipService.ensureMember(user.getId());
 
-        return buildPrincipal(user);
+        return principalFactory.create(user, "local");
     }
 
     /**
@@ -122,7 +124,8 @@ public class LocalAuthService {
         UserAccount user = userAccountRepository.findById(credential.getUserId())
             .orElseThrow(() -> new IllegalStateException("User not found for local credential"));
 
-        ensureUserCanLogin(user);
+        requireLocalLoginAllowed(
+                accountLoginGuard.evaluateInteractive(user));
         ensureNotLocked(credential);
 
         if (!passwordEncoder.matches(password, credential.getPasswordHash())) {
@@ -133,7 +136,7 @@ public class LocalAuthService {
         credential.setFailedAttempts(0);
         credential.setLockedUntil(null);
         credentialRepository.save(credential);
-        return buildPrincipal(user);
+        return principalFactory.create(user, "local");
     }
 
     /**
@@ -159,30 +162,16 @@ public class LocalAuthService {
         credentialRepository.save(credential);
     }
 
-    private PlatformPrincipal buildPrincipal(UserAccount user) {
-        Set<String> roles = userRoleBindingRepository.findByUserId(user.getId()).stream()
-            .map(binding -> binding.getRole().getCode())
-            .collect(Collectors.toSet());
-        roles = PlatformRoleDefaults.withDefaultUserRole(roles);
-        return new PlatformPrincipal(
-            user.getId(),
-            user.getDisplayName(),
-            user.getEmail(),
-            user.getAvatarUrl(),
-            "local",
-            roles
-        );
-    }
-
-    private void ensureUserCanLogin(UserAccount user) {
-        if (user.getStatus() == UserStatus.DISABLED) {
-            throw new AuthFlowException(HttpStatus.FORBIDDEN, "error.auth.local.accountDisabled");
-        }
-        if (user.getStatus() == UserStatus.PENDING) {
-            throw new AuthFlowException(HttpStatus.FORBIDDEN, "error.auth.local.accountPending");
-        }
-        if (user.getStatus() == UserStatus.MERGED) {
-            throw new AuthFlowException(HttpStatus.FORBIDDEN, "error.auth.local.accountMerged");
+    private void requireLocalLoginAllowed(AccountLoginDecision decision) {
+        String messageKey = switch (decision) {
+            case ALLOWED -> null;
+            case DISABLED -> "error.auth.local.accountDisabled";
+            case PENDING -> "error.auth.local.accountPending";
+            case MERGED -> "error.auth.local.accountMerged";
+            case SYSTEM_ACCOUNT -> "error.auth.local.systemAccount";
+        };
+        if (messageKey != null) {
+            throw new AuthFlowException(HttpStatus.FORBIDDEN, messageKey);
         }
     }
 

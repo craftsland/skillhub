@@ -1,6 +1,5 @@
 package com.iflytek.skillhub.auth.policy;
 
-import com.iflytek.skillhub.auth.oauth.OAuthClaims;
 import java.util.Set;
 
 /**
@@ -14,8 +13,8 @@ public class ProviderAllowlistAccessPolicy implements AccessPolicy {
     }
 
     @Override
-    public AccessDecision evaluate(OAuthClaims claims) {
-        return allowedProviders.contains(claims.provider())
+    public AccessDecision evaluate(IdentityAccessContext context) {
+        return allowedProviders.contains(context.providerCode())
             ? AccessDecision.ALLOW : AccessDecision.DENY;
     }
 }
