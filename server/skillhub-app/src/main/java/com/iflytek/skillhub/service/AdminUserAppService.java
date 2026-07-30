@@ -4,6 +4,7 @@ import com.iflytek.skillhub.auth.entity.Role;
 import com.iflytek.skillhub.auth.entity.UserRoleBinding;
 import com.iflytek.skillhub.auth.repository.RoleRepository;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
+import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
@@ -44,16 +45,19 @@ public class AdminUserAppService {
     private final UserAccountRepository userAccountRepository;
     private final UserRoleBindingRepository userRoleBindingRepository;
     private final RoleRepository roleRepository;
+    private final GlobalNamespaceMembershipService globalNamespaceMembershipService;
 
     public AdminUserAppService(
             AdminUserSearchRepository adminUserSearchRepository,
             UserAccountRepository userAccountRepository,
             UserRoleBindingRepository userRoleBindingRepository,
-            RoleRepository roleRepository) {
+            RoleRepository roleRepository,
+            GlobalNamespaceMembershipService globalNamespaceMembershipService) {
         this.adminUserSearchRepository = adminUserSearchRepository;
         this.userAccountRepository = userAccountRepository;
         this.userRoleBindingRepository = userRoleBindingRepository;
         this.roleRepository = roleRepository;
+        this.globalNamespaceMembershipService = globalNamespaceMembershipService;
     }
 
     @Transactional(readOnly = true)
@@ -111,6 +115,9 @@ public class AdminUserAppService {
         UserStatus nextStatus = parseManageableStatus(status);
         user.setStatus(nextStatus);
         userAccountRepository.save(user);
+        if (nextStatus == UserStatus.ACTIVE) {
+            globalNamespaceMembershipService.ensureMember(user.getId());
+        }
         return new AdminUserMutationResponse(user.getId(), null, nextStatus.name());
     }
 

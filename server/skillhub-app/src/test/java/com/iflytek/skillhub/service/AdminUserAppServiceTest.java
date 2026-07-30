@@ -4,6 +4,7 @@ import com.iflytek.skillhub.auth.entity.Role;
 import com.iflytek.skillhub.auth.entity.UserRoleBinding;
 import com.iflytek.skillhub.auth.repository.RoleRepository;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
+import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
@@ -35,11 +36,14 @@ class AdminUserAppServiceTest {
     private final UserRoleBindingRepository userRoleBindingRepository = mock(UserRoleBindingRepository.class);
     private final RoleRepository roleRepository = mock(RoleRepository.class);
     private final UserAccountRepository userAccountRepository = mock(UserAccountRepository.class);
+    private final GlobalNamespaceMembershipService globalNamespaceMembershipService =
+            mock(GlobalNamespaceMembershipService.class);
     private final AdminUserAppService service = new AdminUserAppService(
             adminUserSearchRepository,
             userAccountRepository,
             userRoleBindingRepository,
-            roleRepository
+            roleRepository,
+            globalNamespaceMembershipService
     );
 
     @Test
@@ -159,8 +163,23 @@ class AdminUserAppServiceTest {
         var response = service.updateUserStatus("user-1", "DISABLED");
 
         verify(userAccountRepository).save(user);
+        verify(globalNamespaceMembershipService, never()).ensureMember(any());
         assertThat(user.getStatus()).isEqualTo(UserStatus.DISABLED);
         assertThat(response.status()).isEqualTo("DISABLED");
+    }
+
+    @Test
+    void updateUserStatus_activatingUserEnsuresGlobalMembership() {
+        UserAccount user = user("user-1", "alice", "alice@example.com", UserStatus.PENDING);
+        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.save(user)).thenReturn(user);
+
+        var response = service.updateUserStatus("user-1", "ACTIVE");
+
+        verify(userAccountRepository).save(user);
+        verify(globalNamespaceMembershipService).ensureMember("user-1");
+        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(response.status()).isEqualTo("ACTIVE");
     }
 
     @Test
