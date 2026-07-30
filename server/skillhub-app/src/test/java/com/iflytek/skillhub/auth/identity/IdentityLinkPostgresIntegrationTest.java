@@ -3,6 +3,7 @@ package com.iflytek.skillhub.auth.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.iflytek.skillhub.auth.entity.IdentityLinkRequestStatus;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -15,9 +16,13 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -54,6 +59,9 @@ class IdentityLinkPostgresIntegrationTest {
 
     @Autowired
     private ExternalIdentityLinkService externalLinkService;
+
+    @Autowired
+    private ExternalIdentityLoginService externalLoginService;
 
     @Autowired
     private TrustedProviderRouteResolver routeResolver;
@@ -207,6 +215,91 @@ class IdentityLinkPostgresIntegrationTest {
                   AND detail_json ->> 'result' = 'already_consumed'
                 """,
                 intentId.toString())).isEqualTo(1L);
+    }
+
+    @Test
+    void cancelledIntentCannotBeReadReauthenticatedOrConsumed() {
+        String userId = "identity-link-cancelled";
+        seedLocalUser(userId, "identity_link_cancelled");
+        IdentityLinkActor actor = actor(
+                userId,
+                "nonce-link-cancelled");
+        UUID intentId = UUID.randomUUID();
+        intentService.createLinkIntent(
+                actor,
+                intentId,
+                "github");
+
+        IdentityLinkIntent cancelled = intentService.cancel(
+                actor,
+                intentId);
+
+        assertThat(cancelled.status())
+                .isEqualTo(IdentityLinkRequestStatus.CANCELLED);
+        assertAlreadyConsumed(() ->
+                intentService.getIntent(actor, intentId));
+        assertAlreadyConsumed(() ->
+                intentService.reauthenticateLocal(
+                        actor,
+                        intentId,
+                        PASSWORD));
+        assertAlreadyConsumed(() ->
+                externalLinkService.link(
+                        actor,
+                        intentId,
+                        githubProvider(),
+                        githubResult("6551201")));
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM identity_link_request
+                WHERE id = ?
+                  AND status = 'CANCELLED'
+                """,
+                intentId)).isEqualTo(1L);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("blockedAccountStates")
+    void blockedAccountsCannotCreateLinkOrUnlinkIntents(
+            String caseName,
+            String accountStatus,
+            boolean systemAccount) {
+        String suffix = caseName.toLowerCase().replace('_', '-');
+        String userId = "identity-link-blocked-" + suffix;
+        String username = "identity_link_blocked_"
+                + caseName.toLowerCase();
+        seedLocalUser(
+                userId,
+                username,
+                accountStatus,
+                systemAccount);
+        long bindingId = insertLegacyBinding(
+                userId,
+                "blocked-" + suffix,
+                "655-blocked-" + suffix,
+                username);
+        IdentityLinkActor actor = actor(
+                userId,
+                "nonce-blocked-" + suffix);
+
+        assertAccountNotEligible(() ->
+                intentService.createLinkIntent(
+                        actor,
+                        UUID.randomUUID(),
+                        "github"));
+        assertAccountNotEligible(() ->
+                intentService.createUnlinkIntent(
+                        actor,
+                        UUID.randomUUID(),
+                        bindingId));
+        assertThat(count(
+                """
+                SELECT COUNT(*)
+                FROM identity_link_request
+                WHERE primary_user_id = ?
+                """,
+                userId)).isZero();
     }
 
     @Test
@@ -532,6 +625,19 @@ class IdentityLinkPostgresIntegrationTest {
                 PASSWORD);
         intentService.completeUnlink(actor, unlinkIntent);
 
+        assertThatThrownBy(() ->
+                externalLoginService.authenticate(
+                        githubProvider(),
+                        githubResult(subject),
+                        IdentityLoginContext.empty()))
+                .isInstanceOfSatisfying(
+                        IdentityCoreException.class,
+                        exception -> assertThat(
+                                exception.getReasonCode())
+                                .isEqualTo(
+                                        IdentityFailureCode
+                                                .ACCESS_DENIED));
+
         UUID secondLinkIntent = readyLinkIntent(actor, PASSWORD);
         IdentityLinkOutcome.Linked secondLink =
                 (IdentityLinkOutcome.Linked)
@@ -678,6 +784,28 @@ class IdentityLinkPostgresIntegrationTest {
         }
     }
 
+    private void assertAlreadyConsumed(Runnable operation) {
+        assertThatThrownBy(operation::run)
+                .isInstanceOfSatisfying(
+                        IdentityLinkException.class,
+                        exception -> assertThat(
+                                exception.getReasonCode())
+                                .isEqualTo(
+                                        IdentityLinkFailureCode
+                                                .ALREADY_CONSUMED));
+    }
+
+    private void assertAccountNotEligible(Runnable operation) {
+        assertThatThrownBy(operation::run)
+                .isInstanceOfSatisfying(
+                        IdentityLinkException.class,
+                        exception -> assertThat(
+                                exception.getReasonCode())
+                                .isEqualTo(
+                                        IdentityLinkFailureCode
+                                                .ACCOUNT_NOT_ELIGIBLE));
+    }
+
     private IdentityLinkActor actor(
             String userId,
             String nonce) {
@@ -691,6 +819,18 @@ class IdentityLinkPostgresIntegrationTest {
     private void seedLocalUser(
             String userId,
             String username) {
+        seedLocalUser(
+                userId,
+                username,
+                "ACTIVE",
+                false);
+    }
+
+    private void seedLocalUser(
+            String userId,
+            String username,
+            String accountStatus,
+            boolean systemAccount) {
         jdbcTemplate.update(
                 """
                 INSERT INTO user_account (
@@ -701,13 +841,23 @@ class IdentityLinkPostgresIntegrationTest {
                     system_account,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, 'ACTIVE', FALSE,
+                ) VALUES (?, ?, ?, ?, ?,
                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 userId,
                 username,
-                username + "@example.com");
+                username + "@example.com",
+                accountStatus,
+                systemAccount);
         insertLocalCredential(userId, username);
+    }
+
+    private static Stream<Arguments> blockedAccountStates() {
+        return Stream.of(
+                Arguments.of("PENDING", "PENDING", false),
+                Arguments.of("DISABLED", "DISABLED", false),
+                Arguments.of("MERGED", "MERGED", false),
+                Arguments.of("SYSTEM", "ACTIVE", true));
     }
 
     private void insertLocalCredential(
