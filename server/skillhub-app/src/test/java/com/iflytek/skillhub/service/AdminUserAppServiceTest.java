@@ -154,7 +154,7 @@ class AdminUserAppServiceTest {
 
     @Test
     void updateUserStatus_rejectsUnsupportedStatuses() {
-        when(userAccountRepository.findById("user-1"))
+        when(userAccountRepository.findByIdForUpdate("user-1"))
                 .thenReturn(Optional.of(user("user-1", "alice", "alice@example.com", UserStatus.ACTIVE)));
 
         assertThrows(DomainBadRequestException.class, () -> service.updateUserStatus("user-1", "MERGED"));
@@ -163,7 +163,7 @@ class AdminUserAppServiceTest {
     @Test
     void updateUserStatus_updatesPersistedStatus() {
         UserAccount user = user("user-1", "alice", "alice@example.com", UserStatus.ACTIVE);
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(userAccountRepository.save(user)).thenReturn(user);
 
         var response = service.updateUserStatus("user-1", "DISABLED");
@@ -177,7 +177,7 @@ class AdminUserAppServiceTest {
     @Test
     void updateUserStatus_activatingUserEnsuresGlobalMembership() {
         UserAccount user = user("user-1", "alice", "alice@example.com", UserStatus.PENDING);
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
         when(userAccountRepository.save(user)).thenReturn(user);
 
         var response = service.updateUserStatus("user-1", "ACTIVE");
@@ -195,7 +195,7 @@ class AdminUserAppServiceTest {
                 "alice",
                 "alice@example.com",
                 UserStatus.PENDING);
-        when(userAccountRepository.findById("user-1"))
+        when(userAccountRepository.findByIdForUpdate("user-1"))
                 .thenReturn(Optional.of(user));
         when(userAccountRepository.save(user)).thenReturn(user);
 
@@ -226,7 +226,7 @@ class AdminUserAppServiceTest {
     @Test
     void updateUserStatus_rejectsReactivatingMergedAccount() {
         UserAccount user = user("user-1", "alice", "alice@example.com", UserStatus.MERGED);
-        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userAccountRepository.findByIdForUpdate("user-1")).thenReturn(Optional.of(user));
 
         assertThrows(DomainBadRequestException.class,
                 () -> service.updateUserStatus("user-1", "ACTIVE"));
@@ -238,7 +238,7 @@ class AdminUserAppServiceTest {
 
     @Test
     void updateUserStatus_rejectsSystemAccount() {
-        when(userAccountRepository.findById("builtin-skill-publisher"))
+        when(userAccountRepository.findByIdForUpdate("builtin-skill-publisher"))
                 .thenReturn(Optional.of(systemUser()));
 
         assertThrows(DomainForbiddenException.class,
@@ -249,7 +249,7 @@ class AdminUserAppServiceTest {
 
     @Test
     void updateUserStatus_withUnknownUser_throwsNotFound() {
-        when(userAccountRepository.findById("missing")).thenReturn(Optional.empty());
+        when(userAccountRepository.findByIdForUpdate("missing")).thenReturn(Optional.empty());
 
         assertThrows(DomainNotFoundException.class, () -> service.updateUserStatus("missing", "DISABLED"));
     }

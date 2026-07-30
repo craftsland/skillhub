@@ -228,6 +228,11 @@ class IdentityResolutionTransaction {
             requireAllowed(decision);
         }
 
+        requireAccessAllowed(
+                assertion,
+                context,
+                IdentityAccessKind.RETURNING_IDENTITY,
+                Optional.of(user.getStatus()));
         if (decision == AccountLoginDecision.PENDING) {
             reconcileSubjects(
                     binding,
@@ -247,11 +252,6 @@ class IdentityResolutionTransaction {
                     ACCOUNT_PENDING);
         }
 
-        requireAccessAllowed(
-                assertion,
-                context,
-                IdentityAccessKind.RETURNING_IDENTITY,
-                Optional.of(user.getStatus()));
         reconcileSubjects(
                 binding,
                 assertion,
@@ -378,7 +378,7 @@ class IdentityResolutionTransaction {
         }
 
         Optional<String> email = trustedEmail(assertion.profile());
-        if (email.flatMap(userRepository::findByEmailIgnoreCase)
+        if (email.filter(userRepository::existsByEmailIgnoreCase)
                 .isPresent()) {
             recordAudit(
                     null,

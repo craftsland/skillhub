@@ -41,7 +41,7 @@ class IdentityBindingV2MigrationPostgresTest {
         Flyway.configure()
                 .dataSource(url, username, password)
                 .locations("classpath:db/migration")
-                .target(MigrationVersion.fromVersion("44"))
+                .target(MigrationVersion.fromVersion("45"))
                 .load()
                 .migrate();
 
@@ -91,7 +91,7 @@ class IdentityBindingV2MigrationPostgresTest {
         Flyway.configure()
                 .dataSource(url, username, password)
                 .locations("classpath:db/migration")
-                .target(MigrationVersion.fromVersion("45"))
+                .target(MigrationVersion.fromVersion("46"))
                 .load()
                 .migrate();
 
@@ -237,7 +237,7 @@ class IdentityBindingV2MigrationPostgresTest {
                     .schemas(PREFLIGHT_SCHEMA)
                     .defaultSchema(PREFLIGHT_SCHEMA)
                     .createSchemas(true)
-                    .target(MigrationVersion.fromVersion("44"))
+                    .target(MigrationVersion.fromVersion("45"))
                     .load()
                     .migrate();
 
@@ -315,7 +315,7 @@ class IdentityBindingV2MigrationPostgresTest {
                             .schemas(PREFLIGHT_SCHEMA)
                             .defaultSchema(PREFLIGHT_SCHEMA)
                             .createSchemas(true)
-                            .target(MigrationVersion.fromVersion("45"))
+                            .target(MigrationVersion.fromVersion("46"))
                             .load()
                             .migrate());
 
@@ -343,7 +343,7 @@ class IdentityBindingV2MigrationPostgresTest {
                         WHERE success = TRUE
                         ORDER BY installed_rank DESC
                         LIMIT 1
-                        """)).isEqualTo("44");
+                        """)).isEqualTo("45");
                 assertThat(singleLong(
                         statement,
                         """

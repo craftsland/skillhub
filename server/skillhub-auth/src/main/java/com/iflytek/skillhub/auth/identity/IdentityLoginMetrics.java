@@ -15,6 +15,7 @@ class IdentityLoginMetrics {
 
     void recordOutcome(
             String providerCode,
+            String protocol,
             IdentityLoginOutcome outcome) {
         String result;
         if (outcome instanceof
@@ -28,28 +29,35 @@ class IdentityLoginMetrics {
         } else {
             result = "link_required";
         }
-        counter(providerCode, result);
+        counter(providerCode, protocol, result);
     }
 
     void recordFailure(
             String providerCode,
+            String protocol,
             IdentityFailureCode failureCode) {
         counter(
                 providerCode,
+                protocol,
                 failureCode.name().toLowerCase(Locale.ROOT));
     }
 
-    void recordSystemError(String providerCode) {
-        counter(providerCode, "system_error");
+    void recordSystemError(
+            String providerCode,
+            String protocol) {
+        counter(providerCode, protocol, "system_error");
     }
 
     private void counter(
             String providerCode,
+            String protocol,
             String result) {
         meterRegistry.counter(
                 "skillhub.identity.login",
                 "provider",
                 providerCode,
+                "protocol",
+                protocol,
                 "result",
                 result).increment();
     }

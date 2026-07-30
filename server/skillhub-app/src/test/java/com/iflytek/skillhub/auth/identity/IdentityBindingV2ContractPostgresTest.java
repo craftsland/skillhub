@@ -37,7 +37,7 @@ class IdentityBindingV2ContractPostgresTest {
                     .schemas(PREFLIGHT_SCHEMA)
                     .defaultSchema(PREFLIGHT_SCHEMA)
                     .createSchemas(true)
-                    .target(MigrationVersion.fromVersion("45"))
+                    .target(MigrationVersion.fromVersion("46"))
                     .load()
                     .migrate();
 
@@ -95,7 +95,7 @@ class IdentityBindingV2ContractPostgresTest {
                         WHERE success = TRUE
                         ORDER BY installed_rank DESC
                         LIMIT 1
-                        """)).isEqualTo("45");
+                        """)).isEqualTo("46");
                 assertThat(singleLong(
                         statement,
                         """
@@ -126,7 +126,7 @@ class IdentityBindingV2ContractPostgresTest {
                         database.username(),
                         database.password())
                 .locations("classpath:db/migration")
-                .target(MigrationVersion.fromVersion("46"))
+                .target(MigrationVersion.fromVersion("47"))
                 .load()
                 .migrate();
 

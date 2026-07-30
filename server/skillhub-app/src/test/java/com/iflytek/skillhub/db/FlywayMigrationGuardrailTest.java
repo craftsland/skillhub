@@ -103,10 +103,23 @@ class FlywayMigrationGuardrailTest {
     }
 
     @Test
+    void complianceIndexMigration_mustMatchReservedV44() throws IOException {
+        String migration = Files.readString(
+                migrationPath(
+                        "V44__skill_version_compliance_index.sql"));
+
+        assertThat(migration).isEqualTo("""
+                CREATE INDEX IF NOT EXISTS idx_skill_version_compliance_mappings
+                ON skill_version
+                USING GIN ((parsed_metadata_json -> 'frontmatter' -> 'x-astron-compliance'));
+                """);
+    }
+
+    @Test
     void identityBindingContractGate_mustRemainDeferred() throws IOException {
         String migration = Files.readString(
                 migrationPath(
-                        "V46__identity_binding_v2_contract_gate.sql"));
+                        "V47__identity_binding_v2_contract_gate.sql"));
 
         assertThat(migration)
                 .contains("CREATE CONSTRAINT TRIGGER")
@@ -120,7 +133,7 @@ class FlywayMigrationGuardrailTest {
             throws IOException {
         String migration = Files.readString(
                 migrationPath(
-                        "V47__user_profile_field_source.sql"));
+                        "V48__user_profile_field_source.sql"));
 
         assertThat(migration)
                 .contains("LEGACY_LOCAL")

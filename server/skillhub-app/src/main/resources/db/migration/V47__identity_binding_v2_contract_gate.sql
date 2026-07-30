@@ -1,7 +1,7 @@
 -- Binding V2 contract gate.
 --
 -- Deploy this migration only after every pre-Binding-V2 application instance
--- has exited. Unlike the V45 expand migration, this gate rejects transactions
+-- has exited. Unlike the V46 expand migration, this gate rejects transactions
 -- that leave an ACTIVE binding without exactly one ACTIVE primary subject.
 
 DO $$
