@@ -101,6 +101,15 @@ public class IdentityBindingSubject {
         }
     }
 
+    public void revoke(Instant revokedAt) {
+        requireActive();
+        primary = false;
+        status = IdentityBindingSubjectStatus.REVOKED;
+        this.revokedAt = java.util.Objects.requireNonNull(
+                revokedAt,
+                "revokedAt");
+    }
+
     private void requireActive() {
         if (status != IdentityBindingSubjectStatus.ACTIVE) {
             throw new IllegalStateException(

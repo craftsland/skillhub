@@ -1,11 +1,13 @@
 package com.iflytek.skillhub.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iflytek.skillhub.auth.config.IdentityLinkRouteRequestMatcher;
+import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
 import com.iflytek.skillhub.auth.token.ApiTokenAccessDeniedException;
-import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -13,8 +15,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 /**
  * Converts authorization failures on API routes into the platform's standard JSON error envelope.
@@ -51,13 +51,24 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
                 accessDeniedException.getClass().getSimpleName(),
                 apiTokenException != null ? apiTokenException.getMessage() : null
         );
-        ApiResponse<Void> body = apiTokenException != null
-                ? apiResponseFactory.error(
-                        403,
-                        apiTokenException.getMessageCode(),
-                        apiTokenException.getMessageArgs()
-                )
-                : apiResponseFactory.error(403, "error.forbidden");
+        Object body;
+        if (apiTokenException != null) {
+            body = apiResponseFactory.error(
+                    403,
+                    apiTokenException.getMessageCode(),
+                    apiTokenException.getMessageArgs());
+        } else if (IdentityLinkRouteRequestMatcher.matches(request)) {
+            body = apiResponseFactory.identityLinkError(
+                    403,
+                    IdentityLinkFailureCode.SESSION_MISMATCH
+                            .messageCode(),
+                    IdentityLinkFailureCode.SESSION_MISMATCH
+                            .name());
+        } else {
+            body = apiResponseFactory.error(
+                    403,
+                    "error.forbidden");
+        }
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(), body);

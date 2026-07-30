@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.auth.oauth;
 
+import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
@@ -16,27 +17,45 @@ public class SkillHubOAuth2AuthorizationRequestResolver
 
     private final DefaultOAuth2AuthorizationRequestResolver delegate;
     private final OAuthLoginFlowService oauthLoginFlowService;
+    private final IdentityLinkSessionManager identityLinkSessionManager;
 
     public SkillHubOAuth2AuthorizationRequestResolver(ClientRegistrationRepository clientRegistrationRepository,
-                                                      OAuthLoginFlowService oauthLoginFlowService) {
+                                                      OAuthLoginFlowService oauthLoginFlowService,
+                                                      IdentityLinkSessionManager identityLinkSessionManager) {
         this.delegate = new DefaultOAuth2AuthorizationRequestResolver(
                 clientRegistrationRepository,
                 "/oauth2/authorization"
         );
         this.oauthLoginFlowService = oauthLoginFlowService;
+        this.identityLinkSessionManager = identityLinkSessionManager;
     }
 
     @Override
     public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
         OAuth2AuthorizationRequest authorizationRequest = delegate.resolve(request);
-        oauthLoginFlowService.rememberReturnTo(request);
+        rememberAuthorizationFlow(request, authorizationRequest);
         return authorizationRequest;
     }
 
     @Override
     public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
         OAuth2AuthorizationRequest authorizationRequest = delegate.resolve(request, clientRegistrationId);
-        oauthLoginFlowService.rememberReturnTo(request);
+        rememberAuthorizationFlow(request, authorizationRequest);
         return authorizationRequest;
+    }
+
+    private void rememberAuthorizationFlow(
+            HttpServletRequest request,
+            OAuth2AuthorizationRequest authorizationRequest) {
+        if (authorizationRequest == null) {
+            return;
+        }
+        oauthLoginFlowService.rememberReturnTo(request);
+        String registrationId = authorizationRequest.getAttribute(
+                "registration_id");
+        identityLinkSessionManager.activateBrowserFlow(
+                request.getSession(false),
+                registrationId,
+                authorizationRequest.getState());
     }
 }

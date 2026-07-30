@@ -131,9 +131,10 @@ class IdentityResolutionTransaction {
                         assertion.provider().providerCode(),
                         subjectValuesByType(assertion.allSubjects()));
         IdentityBinding legacyMatch = bindingRepository
-                .findByProviderCodeAndSubject(
+                .findByProviderCodeAndSubjectAndStatus(
                         assertion.provider().providerCode(),
-                        legacySubject.value())
+                        legacySubject.value(),
+                        IdentityBindingStatus.ACTIVE)
                 .orElse(null);
 
         LinkedHashSet<Long> activeBindingIds = typedMatches.stream()

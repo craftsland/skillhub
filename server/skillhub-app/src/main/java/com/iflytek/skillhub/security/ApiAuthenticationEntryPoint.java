@@ -1,10 +1,12 @@
 package com.iflytek.skillhub.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.iflytek.skillhub.dto.ApiResponse;
+import com.iflytek.skillhub.auth.config.IdentityLinkRouteRequestMatcher;
+import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -12,8 +14,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 /**
  * Converts unauthenticated API access attempts into a consistent JSON 401 response.
@@ -45,7 +45,18 @@ public class ApiAuthenticationEntryPoint implements AuthenticationEntryPoint {
                 sensitiveLogSanitizer.sanitizeRequestTarget(request),
                 authException.getClass().getSimpleName()
         );
-        ApiResponse<Void> body = apiResponseFactory.error(401, "error.auth.required");
+        Object body = IdentityLinkRouteRequestMatcher.matches(request)
+                ? apiResponseFactory.identityLinkError(
+                        401,
+                        IdentityLinkFailureCode
+                                .REAUTHENTICATION_REQUIRED
+                                .messageCode(),
+                        IdentityLinkFailureCode
+                                .REAUTHENTICATION_REQUIRED
+                                .name())
+                : apiResponseFactory.error(
+                        401,
+                        "error.auth.required");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(), body);

@@ -134,4 +134,27 @@ class ApiAccessDeniedHandlerTest {
         assertThat(body.path("msg").asText()).isEqualTo("Forbidden");
         assertThat(response.getContentAsString()).doesNotContain("internal authorization detail");
     }
+
+    @Test
+    void shouldUseStableIdentityLinkReasonForCsrfOrSessionDenial()
+            throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/api/v1/auth/identity-link-intents/link");
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+
+        handler.handle(
+                request,
+                response,
+                new AccessDeniedException("csrf detail"));
+
+        JsonNode body = objectMapper.readTree(
+                response.getContentAsByteArray());
+        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(body.path("reasonCode").asText())
+                .isEqualTo("SESSION_MISMATCH");
+        assertThat(response.getContentAsString())
+                .doesNotContain("csrf detail");
+    }
 }

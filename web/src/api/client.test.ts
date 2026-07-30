@@ -24,11 +24,19 @@ vi.mock('@/shared/lib/api-error', () => ({
     status: number
     serverMessage?: string
     serverMessageKey?: string
-    constructor(message: string, status: number, serverMessage?: string, serverMessageKey?: string) {
+    reasonCode?: string
+    constructor(
+      message: string,
+      status: number,
+      serverMessage?: string,
+      serverMessageKey?: string,
+      reasonCode?: string,
+    ) {
       super(message)
       this.status = status
       this.serverMessage = serverMessage
       this.serverMessageKey = serverMessageKey
+      this.reasonCode = reasonCode
     }
   },
   handleApiError: vi.fn(),
@@ -40,6 +48,7 @@ import {
   fetchText,
   getDirectAuthRuntimeConfig,
   getSessionBootstrapRuntimeConfig,
+  identityLinkApi,
   namespaceApi,
 } from './client'
 
@@ -160,6 +169,131 @@ describe('namespaceApi.delete', () => {
         headers: expect.any(Headers),
       }),
     )
+  })
+})
+
+describe('identityLinkApi', () => {
+  it('normalizes the login-method account state', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        code: 0,
+        msg: 'ok',
+        data: {
+          localPasswordEnabled: true,
+          linkedProviders: [{
+            bindingId: 41,
+            providerCode: 'github',
+            displayName: 'GitHub',
+            methodTypes: ['OAUTH_REDIRECT'],
+            usable: true,
+            canUnlink: true,
+          }],
+          availableProviders: [{
+            providerCode: 'oidc',
+            displayName: 'Company OIDC',
+            methodTypes: ['OAUTH_REDIRECT'],
+          }],
+        },
+        timestamp: '2026-07-31T00:00:00Z',
+        requestId: 'req-identity-link',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(identityLinkApi.getAccountState()).resolves.toEqual({
+      localPasswordEnabled: true,
+      linkedProviders: [{
+        bindingId: 41,
+        providerCode: 'github',
+        displayName: 'GitHub',
+        methodTypes: ['OAUTH_REDIRECT'],
+        usable: true,
+        canUnlink: true,
+      }],
+      availableProviders: [{
+        providerCode: 'oidc',
+        displayName: 'Company OIDC',
+        methodTypes: ['OAUTH_REDIRECT'],
+      }],
+    })
+  })
+
+  it('creates a session-bound link intent with CSRF protection', async () => {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      writable: true,
+      value: {
+        cookie: 'XSRF-TOKEN=identity-link-csrf',
+      },
+    })
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        code: 0,
+        msg: 'ok',
+        data: {
+          id: 'a0b89f51-a892-4b73-bdac-63df2cb14691',
+          operation: 'LINK',
+          status: 'PENDING_REAUTHENTICATION',
+          providerCode: 'github',
+          expiresAt: '2026-07-31T00:10:00Z',
+        },
+        timestamp: '2026-07-31T00:00:00Z',
+        requestId: 'req-identity-link',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const intent = await identityLinkApi.createLinkIntent('github')
+
+    expect(intent.status).toBe('PENDING_REAUTHENTICATION')
+    const request = fetchMock.mock.calls[0]?.[0] as Request
+    expect(request.url).toBe(
+      'http://localhost/api/v1/auth/identity-link-intents/link',
+    )
+    expect(request.method).toBe('POST')
+    await expect(request.clone().json()).resolves.toEqual({
+      providerCode: 'github',
+    })
+    expect(request.headers.get('X-XSRF-TOKEN'))
+      .toBe('identity-link-csrf')
+  })
+
+  it('preserves stable identity-link failure reason codes', async () => {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      writable: true,
+      value: {
+        cookie: 'XSRF-TOKEN=identity-link-csrf',
+      },
+    })
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        code: 409,
+        msg: 'Keep another login method.',
+        reasonCode: 'FINAL_LOGIN_METHOD',
+        timestamp: '2026-07-31T00:00:00Z',
+        requestId: 'req-identity-link-error',
+      }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      identityLinkApi.completeUnlink(
+        'a0b89f51-a892-4b73-bdac-63df2cb14691',
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      reasonCode: 'FINAL_LOGIN_METHOD',
+    })
   })
 })
 

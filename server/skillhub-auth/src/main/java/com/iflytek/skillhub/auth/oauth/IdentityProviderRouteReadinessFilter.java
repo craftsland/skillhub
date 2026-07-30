@@ -3,6 +3,7 @@ package com.iflytek.skillhub.auth.oauth;
 import com.iflytek.skillhub.auth.identity.IdentityCoreException;
 import com.iflytek.skillhub.auth.identity.IdentityFailureCode;
 import com.iflytek.skillhub.auth.identity.IdentityProviderReadinessService;
+import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,12 +30,15 @@ public final class IdentityProviderRouteReadinessFilter
             "/login/oauth2/code/";
     private final ClientRegistrationRepository registrationRepository;
     private final IdentityProviderReadinessService readinessService;
+    private final OAuth2LoginFailureHandler failureHandler;
 
     public IdentityProviderRouteReadinessFilter(
             ClientRegistrationRepository registrationRepository,
-            IdentityProviderReadinessService readinessService) {
+            IdentityProviderReadinessService readinessService,
+            OAuth2LoginFailureHandler failureHandler) {
         this.registrationRepository = registrationRepository;
         this.readinessService = readinessService;
+        this.failureHandler = failureHandler;
     }
 
     @Override
@@ -55,6 +59,9 @@ public final class IdentityProviderRouteReadinessFilter
                 ? null
                 : registrationRepository.findByRegistrationId(registrationId);
         if (registration == null) {
+            if (redirectIdentityLinkFailure(request, response)) {
+                return;
+            }
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -62,6 +69,9 @@ public final class IdentityProviderRouteReadinessFilter
         try {
             readinessService.requireReady(registration);
         } catch (IdentityCoreException exception) {
+            if (redirectIdentityLinkFailure(request, response)) {
+                return;
+            }
             int status = exception.getReasonCode()
                     == IdentityFailureCode.PROVIDER_AUTHORITY_MISMATCH
                     ? HttpServletResponse.SC_SERVICE_UNAVAILABLE
@@ -77,11 +87,24 @@ public final class IdentityProviderRouteReadinessFilter
                     "Identity provider route '{}' readiness check failed",
                     registration.getRegistrationId(),
                     exception);
+            if (redirectIdentityLinkFailure(request, response)) {
+                return;
+            }
             response.setStatus(
                     HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             return;
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean redirectIdentityLinkFailure(
+            HttpServletRequest request,
+            HttpServletResponse response)
+            throws IOException {
+        return failureHandler.redirectIdentityLinkRouteFailure(
+                request,
+                response,
+                IdentityLinkFailureCode.PROVIDER_UNAVAILABLE);
     }
 
     private String registrationId(HttpServletRequest request) {

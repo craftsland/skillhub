@@ -110,10 +110,11 @@ public class LocalAuthService {
      * Authenticates a local account and returns the principal snapshot used to
      * establish a web session.
      */
-    @Transactional
+    @Transactional(noRollbackFor = AuthFlowException.class)
     public PlatformPrincipal login(String username, String password) {
         String normalizedUsername = normalizeUsername(username);
-        LocalCredential credential = credentialRepository.findByUsernameIgnoreCase(normalizedUsername)
+        LocalCredential credential = credentialRepository
+            .findByUsernameIgnoreCaseForUpdate(normalizedUsername)
             .orElse(null);
 
         if (credential == null) {
@@ -129,6 +130,39 @@ public class LocalAuthService {
         ensureNotLocked(credential);
 
         if (!passwordEncoder.matches(password, credential.getPasswordHash())) {
+            handleFailedLogin(credential);
+            throw invalidCredentials();
+        }
+
+        credential.setFailedAttempts(0);
+        credential.setLockedUntil(null);
+        credentialRepository.save(credential);
+        return principalFactory.create(user, "local");
+    }
+
+    /**
+     * Reauthenticates the already authenticated account without creating,
+     * replacing, or rotating its web session.
+     */
+    @Transactional(noRollbackFor = AuthFlowException.class)
+    public PlatformPrincipal reauthenticate(
+            String userId,
+            String password) {
+        LocalCredential credential = credentialRepository
+            .findByUserIdForUpdate(userId)
+            .orElseThrow(() -> new AuthFlowException(
+                HttpStatus.BAD_REQUEST,
+                "error.auth.local.notEnabled"));
+        UserAccount user = userAccountRepository.findById(userId)
+            .orElseThrow(() -> new IllegalStateException(
+                "User not found for local credential"));
+
+        requireLocalLoginAllowed(
+                accountLoginGuard.evaluateInteractive(user));
+        ensureNotLocked(credential);
+        if (!passwordEncoder.matches(
+                password == null ? "" : password,
+                credential.getPasswordHash())) {
             handleFailedLogin(credential);
             throw invalidCredentials();
         }

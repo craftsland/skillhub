@@ -150,7 +150,18 @@ public class SecurityConfig {
                 .invalidSessionStrategy((request, response) -> {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                    response.getWriter().write("{\"code\":401,\"msg\":\"Session expired\"}");
+                    if (IdentityLinkRouteRequestMatcher
+                            .matches(request)) {
+                        response.getWriter().write(
+                                "{\"code\":401,"
+                                        + "\"msg\":\"Session expired\","
+                                        + "\"reasonCode\":"
+                                        + "\"REAUTHENTICATION_REQUIRED\"}");
+                    } else {
+                        response.getWriter().write(
+                                "{\"code\":401,"
+                                        + "\"msg\":\"Session expired\"}");
+                    }
                 })
             )
             .exceptionHandling(exceptions -> exceptions
@@ -169,7 +180,8 @@ public class SecurityConfig {
             .addFilterBefore(
                 new IdentityProviderRouteReadinessFilter(
                     clientRegistrationRepository,
-                    providerReadinessService),
+                    providerReadinessService,
+                    failureHandler),
                 OAuth2AuthorizationRequestRedirectFilter.class)
             .addFilterBefore(apiTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(apiTokenScopeFilter, ApiTokenAuthenticationFilter.class);
