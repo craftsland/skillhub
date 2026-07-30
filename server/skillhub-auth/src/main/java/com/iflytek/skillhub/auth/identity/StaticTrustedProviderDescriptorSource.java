@@ -15,6 +15,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.security.oauth2.client.OAuth2ClientProperties;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -35,6 +36,7 @@ class StaticTrustedProviderDescriptorSource
     private final Map<String, ProviderDescriptor> descriptors;
     private final Map<String, ClientRegistration> trustedRegistrations;
 
+    @Autowired
     StaticTrustedProviderDescriptorSource(
             OAuth2ClientProperties properties,
             ClientRegistrationRepository registrationRepository,
