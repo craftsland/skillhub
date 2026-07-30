@@ -1,9 +1,17 @@
 package com.iflytek.skillhub.auth.oauth;
 
+import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
+import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
+import com.iflytek.skillhub.auth.identity.ProviderAttributeValue;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,34 +38,51 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
 
     private final OAuthLoginFlowService oauthLoginFlowService;
     private final OAuth2UserService<OidcUserRequest, OidcUser> delegate;
+    private final OAuthIdentityLoginContextResolver contextResolver;
 
     @Autowired
-    public CustomOidcUserService(OAuthLoginFlowService oauthLoginFlowService) {
-        this(oauthLoginFlowService, new OidcUserService());
+    public CustomOidcUserService(
+            OAuthLoginFlowService oauthLoginFlowService,
+            OAuthIdentityLoginContextResolver contextResolver) {
+        this(
+                oauthLoginFlowService,
+                new OidcUserService(),
+                contextResolver);
     }
 
     CustomOidcUserService(OAuthLoginFlowService oauthLoginFlowService,
-                          OAuth2UserService<OidcUserRequest, OidcUser> delegate) {
+                          OAuth2UserService<OidcUserRequest, OidcUser> delegate,
+                          OAuthIdentityLoginContextResolver contextResolver) {
         this.oauthLoginFlowService = oauthLoginFlowService;
         this.delegate = delegate;
+        this.contextResolver = contextResolver;
     }
 
     @Override
     public OidcUser loadUser(OidcUserRequest request) throws OAuth2AuthenticationException {
         String registrationId = request.getClientRegistration().getRegistrationId();
         log.debug("OIDC login initiated for registration '{}'", registrationId);
+        var loginContext = contextResolver.current();
 
         OidcUser upstreamUser = delegate.loadUser(request);
-        OAuthClaims claims = toOAuthClaims(request, upstreamUser);
-        log.debug("OIDC claims extracted - provider: {}, subject: {}, email present: {}, emailVerified: {}",
-                claims.provider(), claims.subject(), claims.email() != null, claims.emailVerified());
+        ProviderAuthenticationResult result =
+                toProviderAuthenticationResult(request, upstreamUser);
+        log.debug(
+                "OIDC identity facts extracted - registration: {}, subject type: {}",
+                registrationId,
+                result.primarySubject().type());
 
         PlatformPrincipal principal;
         try {
-            principal = oauthLoginFlowService.authenticate(claims);
+            principal = oauthLoginFlowService.authenticate(
+                    request.getClientRegistration(),
+                    result,
+                    loginContext);
         } catch (OAuth2AuthenticationException e) {
-            log.warn("OIDC authentication failed for registration '{}', subject '{}': {}",
-                    registrationId, claims.subject(), e.getMessage(), e);
+            log.warn(
+                    "OIDC authentication failed for registration '{}': {}",
+                    registrationId,
+                    e.getError().getErrorCode());
             throw e;
         }
         log.debug("OIDC authentication succeeded - userId: {}, roles: {}",
@@ -83,7 +108,9 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
         );
     }
 
-    static OAuthClaims toOAuthClaims(OidcUserRequest request, OidcUser oidcUser) {
+    static ProviderAuthenticationResult toProviderAuthenticationResult(
+            OidcUserRequest request,
+            OidcUser oidcUser) {
         Map<String, Object> claims = new HashMap<>(oidcUser.getClaims());
         String subject = asString(claims.get("sub"));
         if (subject == null || subject.isBlank()) {
@@ -92,39 +119,49 @@ public class CustomOidcUserService implements OAuth2UserService<OidcUserRequest,
         }
         String email = asString(claims.get("email"));
         boolean emailVerified = Boolean.TRUE.equals(claims.get("email_verified"));
-        if (!emailVerified) {
-            email = null;
-        }
-        String providerLogin = firstPresent(
-                asString(claims.get("preferred_username")),
-                asString(claims.get("name")),
+        Map<String, List<ProviderAttributeValue>> attributes =
+                new LinkedHashMap<>();
+        put(attributes, "preferred_username", claims.get("preferred_username"),
+                ProviderAttributeTrust.ASSERTED);
+        put(attributes, "name", claims.get("name"),
+                ProviderAttributeTrust.ASSERTED);
+        put(
+                attributes,
+                "email",
                 email,
-                subject
-        );
-        if (claims.get("picture") != null && claims.get("avatar_url") == null) {
-            claims.put("avatar_url", claims.get("picture"));
-        }
+                emailVerified
+                        ? ProviderAttributeTrust.VERIFIED
+                        : ProviderAttributeTrust.UNVERIFIED);
+        put(attributes, "sub", subject, ProviderAttributeTrust.ASSERTED);
+        put(attributes, "picture", claims.get("picture"),
+                ProviderAttributeTrust.ASSERTED);
+        put(attributes, "avatar_url", claims.get("avatar_url"),
+                ProviderAttributeTrust.ASSERTED);
 
-        return new OAuthClaims(
-                request.getClientRegistration().getRegistrationId(),
-                subject,
-                email,
-                emailVerified,
-                providerLogin,
-                claims
-        );
-    }
-
-    private static String firstPresent(String... values) {
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return null;
+        return new ProviderAuthenticationResult(
+                new SubjectCandidate("oidc_sub", subject),
+                List.of(),
+                attributes,
+                new ProtocolAuthenticationEvidence(
+                        "oidc",
+                        oidcUser.getIdToken().getIssuedAt(),
+                        Set.of("oidc_authorization_code")));
     }
 
     private static String asString(Object value) {
         return value instanceof String str ? str : null;
+    }
+
+    private static void put(
+            Map<String, List<ProviderAttributeValue>> attributes,
+            String key,
+            Object rawValue,
+            ProviderAttributeTrust trust) {
+        if (!(rawValue instanceof String value) || value.isBlank()) {
+            return;
+        }
+        attributes.put(
+                key,
+                List.of(new ProviderAttributeValue(value, trust)));
     }
 }

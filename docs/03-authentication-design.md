@@ -1,10 +1,11 @@
 # skillhub 认证与授权设计
 
 > 外部身份架构说明：LDAP、DingTalk、CAS、SAML、可信代理及其他新外部身份接入，
-> 以 [统一身份联邦设计](./21-unified-identity-federation-design.md) 为准。本文现有
-> `OAuthClaims`、`DirectAuthProvider` 和 `PassiveSessionAuthenticator` 接口描述的是
-> 当前兼容实现，不是新 Provider 的目标扩展契约；新 Provider 只能返回协议验证结果，
-> 由统一核心归一化为 `IdentityAssertion`，不得直接返回 `PlatformPrincipal`。
+> 以 [统一身份联邦设计](./21-unified-identity-federation-design.md) 为准。GitHub、
+> GitLab 和标准 OIDC 已迁入统一身份核心；`DirectAuthProvider` 和
+> `PassiveSessionAuthenticator` 仍是兼容扩展点，不是新 Provider 的目标契约。新
+> Provider 只能返回协议验证结果，由统一核心归一化为内部 `IdentityAssertion`，不得
+> 直接返回 `PlatformPrincipal`。
 
 ## 0. 身份标识约束
 
@@ -27,14 +28,14 @@
               │ OAuth2User
               ▼
 ┌─────────────────────────────┐
-│  Layer 2: Access Policy     │  准入策略判定
-│  (认证成功 ≠ 有权使用平台)    │  白名单/邮箱域名/开放注册
+│ Layer 2: Identity Core      │  受信 descriptor + Authority Lock
+│                             │  Assertion Factory + 账号状态守卫
 └─────────────┬───────────────┘
-              │ 准入通过
+              │ IdentityAssertion
               ▼
 ┌─────────────────────────────┐
-│  Layer 3: Identity Mapping  │  OAuth2 用户 → 平台用户
-│  (查询/创建 identity_binding) │  自动注册 + 信息同步
+│  Layer 3: Policy + Mapping  │  准入策略 + identity_binding
+│                             │  兼容建号与资料同步
 └─────────────┬───────────────┘
               │ PlatformPrincipal
               ▼
@@ -54,18 +55,18 @@
 OAuth 认证成功仅代表身份可信，不代表有权使用平台。准入层在认证成功后、创建平台用户前执行。
 
 ```java
-// 基于 claims 的准入策略，与 Provider 无关
+// 基于统一身份上下文的准入策略，与底层协议无关
 public interface AccessPolicy {
-    AccessDecision evaluate(OAuthClaims claims);
+    AccessDecision evaluate(IdentityAccessContext context);
 }
 
-public record OAuthClaims(
-    String provider,          // github, google, wechat
-    String subject,           // provider 唯一 ID
-    String email,             // nullable（微信等可能无邮箱）
-    boolean emailVerified,    // 是否已验证
-    String providerLogin,     // 如 GitHub login
-    Map<String, Object> extra
+public record IdentityAccessContext(
+    String providerCode,
+    String subjectType,
+    String subject,
+    Optional<String> email,
+    EmailAssurance emailAssurance,
+    IdentityLoginContext requestContext
 ) {}
 
 public enum AccessDecision {
@@ -91,9 +92,9 @@ astron:
 | 策略 | 判定依据 | 说明 |
 |------|---------|------|
 | `OPEN` | 无限制 | 所有 OAuth 登录用户自动准入 |
-| `PROVIDER_ALLOWLIST` | `claims.provider` | 仅允许指定 Provider 登录 |
-| `EMAIL_DOMAIN` | `claims.email` + `claims.emailVerified` | 仅允许已验证邮箱且域名匹配（email 为空或未验证则 DENY） |
-| `SUBJECT_WHITELIST` | `claims.provider` + `claims.subject` | 按 `provider:subject` 白名单，管理员预添加 |
+| `PROVIDER_ALLOWLIST` | `context.providerCode` | 仅允许指定 Provider 登录 |
+| `EMAIL_DOMAIN` | `context.email` + `context.emailAssurance` | 仅允许 `VERIFIED` / `AUTHORITATIVE` 邮箱且域名匹配 |
+| `SUBJECT_WHITELIST` | `context.providerCode` + `context.subject` | 按 `provider:subject` 白名单，管理员预添加 |
 
 ### 2.2 准入失败处理
 
@@ -132,14 +133,17 @@ Spring Security 自动完成:
     │
     ▼
 CustomOAuth2UserService / CustomOidcUserService:
-  ① 从 OAuth2User 提取 provider + externalId → 构建 OAuthClaims
-  ② AccessPolicy.evaluate(claims) → 准入判定
+  ① Adapter 从已验证响应提取 ProviderAuthenticationResult
+  ② 服务端路由解析 ResolvedProviderHandle
+  ③ 统一身份核心读取受信 descriptor，执行 Authority pin/复核
+  ④ Assertion Factory 固定 provider/authority/subject/属性映射
+  ⑤ AccessPolicy.evaluate(IdentityAccessContext) → 准入判定
   │
   ├── DENY → 抛出 OAuth2AccessDeniedException → failureHandler 重定向 /access-denied（不建立 Session）
   ├── PENDING_APPROVAL → 创建 PENDING 用户 → 抛出 AccountPendingException → failureHandler 重定向 /pending-approval（不建立 Session）
   └── ALLOW ↓
   │
-  ③ 查询 identity_binding 是否已绑定
+  ⑥ 查询 identity_binding 是否已绑定
   ├── 已绑定 → 加载平台用户，检查用户状态（DISABLED → 抛异常），同步最新头像/昵称
   └── 未绑定 → 创建 user_account(ACTIVE) + identity_binding
     │
@@ -151,18 +155,18 @@ AuthenticationSuccessHandler:
 
 OIDC 登录沿用同一条业务链路，但由 Spring Security 的 `oidcUserService`
 分支处理。`CustomOidcUserService` 会把标准 OIDC claims 映射为
-`OAuthClaims`：
+`ProviderAuthenticationResult`：
 
-- `provider`：Spring OAuth2 client registration id，例如 `okta`、`keycloak`
-  或 `oidc`
-- `subject`：OIDC `sub`
-- `email` / `emailVerified`：`email` 与 `email_verified`
-- `providerLogin`：优先 `preferred_username`，其次 `name`、`email`、`sub`
-- `picture` 会同步为 `avatar_url`，供现有头像同步逻辑复用
+- Subject candidate：类型固定为 `oidc_sub`，值为大小写敏感的 OIDC `sub`
+- 属性事实：`email`、`email_verified`、`preferred_username`、`name`、`picture`
+- 协议证据：只包含 `oidc`、认证时间和认证方法，不包含 token 或原始响应
+- Provider code、issuer Authority 和最终属性映射由服务端受信 descriptor 固定
 
-因此 OIDC 不需要新增数据库表；现有 `identity_binding(provider_code,
-subject)` 可以保存任意 OIDC issuer 下的稳定用户标识。不同 IdP 应使用不同
-registration id，避免多个 issuer 的 `sub` 值空间混用。
+现有 `identity_binding(provider_code, subject)` 继续保存历史和新登录绑定，不改变
+Subject 值。新增的 `identity_provider_state` 只保存 Provider code、protocol、
+canonical Authority、SHA-256 fingerprint 和状态，不保存 client secret 或 token。
+同一 registration id 切换 issuer 时进入粘性的 `AUTHORITY_MISMATCH`，不展示登录方式，
+也不接受回调；恢复旧 Authority 后仍需显式恢复操作。
 
 ### 3.1 统一 Session 建立约束
 
@@ -262,9 +266,9 @@ public class SecurityConfig {
 }
 ```
 
-### 3.6 OAuth2 Provider 扩展设计
+### 3.6 Provider 配置、启动协调和扩展边界
 
-一期只实现 GitHub，但架构支持后续扩展：
+当前静态 descriptor source 只接受已配置且可唯一解析的 GitHub、GitLab 和标准 OIDC：
 
 ```yaml
 # application.yml
@@ -285,75 +289,66 @@ spring:
           #   client-id: ...
 ```
 
-Spring Security OAuth2 Client 原生支持多 Provider 并存，新增 Provider 只需：
-1. `application.yml` 添加 registration 配置
-2. `CustomOAuth2UserService` 中按 `registrationId` 分支处理用户属性映射
-3. 前端登录页增加对应按钮（通过 `/api/v1/auth/providers` 自动发现）
+应用启动时固定执行以下顺序：
+
+1. 从唯一的受信 descriptor source 读取已启用配置。
+2. 对每个 Provider 在 PostgreSQL 中执行 Authority compare-and-set pin。
+3. 再次读取持久化状态。
+4. 登录目录每次读取时再次以持久化状态过滤；只有状态为 `READY` 且 fingerprint 与
+   当前 descriptor 一致的 Provider 才进入 `/api/v1/auth/providers` 和
+   `/api/v1/auth/methods`。
+
+配置缺失、placeholder、未知/歧义协议、Authority 无法唯一确定、未 pin 或 mismatch
+都 fail closed。授权入口和 callback 在 Spring Security 发起上游重定向、Token 交换或
+userinfo 请求前执行相同的持久化 readiness 检查；登录目录不会直接读取
+`OAuth2ClientProperties`，其他 Pod 写入的 mismatch 也不会被旧的内存投影继续展示。
+
+运维把全部 Pod 恢复为已 pin 的相同 Authority 后，由 `SUPER_ADMIN` 调用：
+
+```text
+POST /api/v1/admin/identity-providers/{providerCode}/authority/recover
+```
+
+该操作不接受新 Authority 或 fingerprint，只能在数据库仍为 `AUTHORITY_MISMATCH` 且当前
+受信 descriptor 的 fingerprint 等于已 pin 值时 compare-and-set 回 `READY`。成功变更
+写入同一事务的 `PROVIDER_AUTHORITY_RECOVERED` 审计；重复调用返回
+`recovered=false, state=READY`，不会伪造第二条恢复审计。配置仍指向新 Authority 时返回
+冲突，必须等待后续独立的 Authority 迁移设计，不能用此接口改写 pin。
+
+新增协议不能只添加 Spring registration 或在 OAuth user service 中加分支。必须按照
+[统一身份联邦设计](./21-unified-identity-federation-design.md) 实现受信 descriptor、
+协议 Adapter 和 conformance 测试；LDAP、DingTalk、CAS、SAML、SCIM 及动态 Provider
+Registry 不属于当前阶段。
 
 ## 4. 核心接口设计
 
 ```java
-// 自定义 OAuth2 用户服务，处理准入 + 用户映射
-@Service
-public class CustomOAuth2UserService extends DefaultOAuth2UserService {
-
-    @Override
-    public OAuth2User loadUser(OAuth2UserRequest request) {
-        OAuth2User oAuth2User = super.loadUser(request);
-        String registrationId = request.getClientRegistration().getRegistrationId();
-
-        // 提取标准化 claims（传入 accessToken 用于调用 Provider API，如 GitHub /user/emails）
-        OAuthClaims claims = OAuthClaimsExtractor.extract(registrationId, oAuth2User, request.getAccessToken());
-
-        // 准入策略判定（基于 claims，与 Provider 无关）
-        AccessDecision decision = accessPolicy.evaluate(claims);
-        if (decision == AccessDecision.DENY) {
-            throw new OAuth2AccessDeniedException("Access denied by policy");
-        }
-        if (decision == AccessDecision.PENDING_APPROVAL) {
-            // 创建 PENDING 用户但不返回有效 principal，不建立业务 Session
-            identityBindingService.createPendingUser(registrationId, claims);
-            throw new AccountPendingException("Account pending approval");
-        }
-
-        // 绑定或创建平台用户（仅 ALLOW 才走到这里）
-        UserAccount account = identityBindingService.bindOrCreate(registrationId, claims);
-        if (account.getStatus() == UserStatus.DISABLED) {
-            throw new AccountDisabledException("Account is disabled");
-        }
-
-        return new PlatformOAuth2User(account, oAuth2User.getAuthorities());
-    }
-}
-
-// 按 Provider 提取标准化 claims（每个 Provider 有自己的可信字段契约）
-public class OAuthClaimsExtractor {
-    public static OAuthClaims extract(String registrationId, OAuth2User user,
-                                      OAuth2AccessToken accessToken) {
-        return switch (registrationId) {
-            case "github" -> extractGitHub(user, accessToken);
-            // 后续扩展其他 Provider
-            default -> throw new OAuth2AuthenticationException("Unsupported provider: " + registrationId);
-        };
-    }
-
-    // GitHub: 公开 email 可能为空，需调用 /user/emails API 获取已验证邮箱
-    private static OAuthClaims extractGitHub(OAuth2User user, OAuth2AccessToken accessToken) {
-        String verifiedEmail = GitHubEmailFetcher.fetchVerifiedEmail(accessToken);
-        return new OAuthClaims(
-            "github",
-            String.valueOf(user.getAttribute("id")),
-            verifiedEmail,                    // 从 /user/emails 获取的已验证邮箱，可能为 null
-            verifiedEmail != null,            // 只有确认 verified 才为 true
-            user.getAttribute("login"),
-            Map.of("avatar_url", user.getAttribute("avatar_url"))
-        );
-    }
-
-    // GitHubEmailFetcher: 调用 GitHub /user/emails API，
-    // 返回 primary + verified 的邮箱，无则返回 null
+public interface ExternalIdentityLoginService {
+    IdentityLoginOutcome authenticate(
+        ResolvedProviderHandle provider,
+        ProviderAuthenticationResult result,
+        IdentityLoginContext context
+    );
 }
 ```
+
+`ResolvedProviderHandle` 只能由服务端 `ClientRegistration` 路由解析产生。
+`ProviderAuthenticationResult` 不含 Provider code、Authority、平台 userId、角色、
+Principal、Session、token、ticket、Cookie 或原始响应。核心内部按固定顺序执行：
+
+```text
+Trusted descriptor
+  → Authority Lock
+  → IdentityAssertionFactory
+  → AccessPolicy
+  → identity_binding / 兼容建号
+  → AccountLoginGuard
+  → PlatformPrincipalFactory
+  → IdentityLoginOutcome
+```
+
+只有 `IdentityLoginOutcome.Authenticated` 可以到达既有 `PlatformSessionService`。当前
+`identity_binding` 和 `PlatformPrincipal` 结构保持不变，以支持老版本升级和回滚。
 
 ### 4.1 多 Provider 账号合并策略
 
@@ -363,7 +358,7 @@ public class OAuthClaimsExtractor {
 token 直接返回给主账号会话，不能分别证明两个账号的控制权，因此不能继续作为管理员或
 用户合并入口。
 
-- 一期 GitHub-only：不需要自动合并，每个 Provider 登录独立创建用户
+- 当前阶段：不自动合并，每个 Provider 登录独立创建用户
 - 多 Provider 上线时，再引入显式 Identity Link 和安全 Account Merge
 - email、username、display name 或主账号会话拿到的 token 均不能证明次账号所有权
 - 安全 Account Merge 必须要求主、次账号分别完成 fresh reauthentication

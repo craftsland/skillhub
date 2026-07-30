@@ -20,14 +20,21 @@ import org.springframework.stereotype.Service;
 public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
 
     private final OAuthLoginFlowService oauthLoginFlowService;
+    private final OAuthIdentityLoginContextResolver contextResolver;
 
-    public CustomOAuth2UserService(OAuthLoginFlowService oauthLoginFlowService) {
+    public CustomOAuth2UserService(
+            OAuthLoginFlowService oauthLoginFlowService,
+            OAuthIdentityLoginContextResolver contextResolver) {
         this.oauthLoginFlowService = oauthLoginFlowService;
+        this.contextResolver = contextResolver;
     }
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest request) throws OAuth2AuthenticationException {
-        OAuthLoginFlowService.AuthenticatedLoginContext context = oauthLoginFlowService.loadLoginContext(request);
+        OAuthLoginFlowService.AuthenticatedLoginContext context =
+                oauthLoginFlowService.loadLoginContext(
+                        request,
+                        contextResolver.current());
         PlatformPrincipal principal = context.principal();
         var attrs = new HashMap<>(context.upstreamUser().getAttributes());
         attrs.put("platformPrincipal", principal);

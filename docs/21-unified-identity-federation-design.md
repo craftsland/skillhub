@@ -505,6 +505,18 @@ fingerprint 等于数据库已 pin 值且 state 仍为 `AUTHORITY_MISMATCH` 时 
 回 `READY`，不修改 Authority/fingerprint，并写恢复审计。若配置仍是新 fingerprint，
 只能使用待设计的显式 Authority 迁移操作。
 
+PR 1 的正式恢复入口为：
+
+```text
+POST /api/v1/admin/identity-providers/{providerCode}/authority/recover
+```
+
+入口只允许 `SUPER_ADMIN`，不接收 Authority 或 fingerprint 请求体。状态实际从
+`AUTHORITY_MISMATCH` 转为 `READY` 时，在同一数据库事务写
+`PROVIDER_AUTHORITY_RECOVERED` 审计；已是 `READY` 的重复请求按幂等结果返回但不追加伪
+恢复审计。所有 Pod 的登录目录和授权入口必须读取当前持久化状态，使一次恢复无需重启
+应用即可生效。
+
 ### 6.4 External Subject
 
 外部身份域内稳定、不可变的主体标识，由 `subjectType + subjectValue` 表达。email、

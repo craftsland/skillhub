@@ -1,73 +1,140 @@
 package com.iflytek.skillhub.auth.policy;
 
-import com.iflytek.skillhub.auth.oauth.OAuthClaims;
-import org.junit.jupiter.api.Test;
-import java.util.Map;
-import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
+
+import com.iflytek.skillhub.auth.identity.EmailAssurance;
+import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
 
 class AccessPolicyTest {
 
     @Test
     void openPolicy_alwaysAllows() {
         var policy = new OpenAccessPolicy();
-        var claims = new OAuthClaims("github", "123", "user@any.com", true, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.ALLOW);
+        assertThat(policy.evaluate(context(
+                "github",
+                "123",
+                "user@any.com",
+                EmailAssurance.UNVERIFIED)))
+                .isEqualTo(AccessDecision.ALLOW);
     }
 
     @Test
-    void emailDomainPolicy_allowsMatchingDomain() {
+    void emailDomainPolicy_allowsMatchingVerifiedDomain() {
         var policy = new EmailDomainAccessPolicy(Set.of("company.com"));
-        var claims = new OAuthClaims("github", "123", "user@company.com", true, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.ALLOW);
+        assertThat(policy.evaluate(context(
+                "github",
+                "123",
+                "user@company.com",
+                EmailAssurance.VERIFIED)))
+                .isEqualTo(AccessDecision.ALLOW);
+    }
+
+    @Test
+    void emailDomainPolicy_allowsAuthoritativeEmail() {
+        var policy = new EmailDomainAccessPolicy(Set.of("company.com"));
+        assertThat(policy.evaluate(context(
+                "github",
+                "123",
+                "user@company.com",
+                EmailAssurance.AUTHORITATIVE)))
+                .isEqualTo(AccessDecision.ALLOW);
     }
 
     @Test
     void emailDomainPolicy_deniesNonMatchingDomain() {
         var policy = new EmailDomainAccessPolicy(Set.of("company.com"));
-        var claims = new OAuthClaims("github", "123", "user@other.com", true, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.DENY);
+        assertThat(policy.evaluate(context(
+                "github",
+                "123",
+                "user@other.com",
+                EmailAssurance.VERIFIED)))
+                .isEqualTo(AccessDecision.DENY);
     }
 
     @Test
-    void emailDomainPolicy_deniesNullEmail() {
+    void emailDomainPolicy_deniesMissingEmail() {
         var policy = new EmailDomainAccessPolicy(Set.of("company.com"));
-        var claims = new OAuthClaims("github", "123", null, false, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.DENY);
+        assertThat(policy.evaluate(new IdentityAccessContext(
+                "github",
+                "github_user_id",
+                "123",
+                Optional.empty(),
+                EmailAssurance.UNVERIFIED,
+                IdentityLoginContext.empty())))
+                .isEqualTo(AccessDecision.DENY);
     }
 
     @Test
     void emailDomainPolicy_deniesUnverifiedEmailFromMatchingDomain() {
         var policy = new EmailDomainAccessPolicy(Set.of("company.com"));
-        var claims = new OAuthClaims("github", "123", "user@company.com", false, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.DENY);
+        assertThat(policy.evaluate(context(
+                "github",
+                "123",
+                "user@company.com",
+                EmailAssurance.UNVERIFIED)))
+                .isEqualTo(AccessDecision.DENY);
     }
 
     @Test
     void providerAllowlistPolicy_allowsMatchingProvider() {
         var policy = new ProviderAllowlistAccessPolicy(Set.of("github"));
-        var claims = new OAuthClaims("github", "123", "u@a.com", true, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.ALLOW);
+        assertThat(policy.evaluate(context(
+                "github",
+                "123",
+                "u@a.com",
+                EmailAssurance.VERIFIED)))
+                .isEqualTo(AccessDecision.ALLOW);
     }
 
     @Test
     void providerAllowlistPolicy_deniesNonMatchingProvider() {
         var policy = new ProviderAllowlistAccessPolicy(Set.of("github"));
-        var claims = new OAuthClaims("google", "123", "u@a.com", true, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.DENY);
+        assertThat(policy.evaluate(context(
+                "google",
+                "123",
+                "u@a.com",
+                EmailAssurance.VERIFIED)))
+                .isEqualTo(AccessDecision.DENY);
     }
 
     @Test
     void subjectWhitelistPolicy_allowsMatchingSubject() {
-        var policy = new SubjectWhitelistAccessPolicy(Set.of("github:12345"));
-        var claims = new OAuthClaims("github", "12345", "u@a.com", true, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.ALLOW);
+        var policy = new SubjectWhitelistAccessPolicy(
+                Set.of("github:12345"));
+        assertThat(policy.evaluate(context(
+                "github",
+                "12345",
+                "u@a.com",
+                EmailAssurance.VERIFIED)))
+                .isEqualTo(AccessDecision.ALLOW);
     }
 
     @Test
     void subjectWhitelistPolicy_deniesNonMatchingSubject() {
-        var policy = new SubjectWhitelistAccessPolicy(Set.of("github:12345"));
-        var claims = new OAuthClaims("github", "99999", "u@a.com", true, "user", Map.of());
-        assertThat(policy.evaluate(claims)).isEqualTo(AccessDecision.DENY);
+        var policy = new SubjectWhitelistAccessPolicy(
+                Set.of("github:12345"));
+        assertThat(policy.evaluate(context(
+                "github",
+                "99999",
+                "u@a.com",
+                EmailAssurance.VERIFIED)))
+                .isEqualTo(AccessDecision.DENY);
+    }
+
+    private static IdentityAccessContext context(
+            String provider,
+            String subject,
+            String email,
+            EmailAssurance assurance) {
+        return new IdentityAccessContext(
+                provider,
+                provider + "_user_id",
+                subject,
+                Optional.of(email),
+                assurance,
+                IdentityLoginContext.empty());
     }
 }

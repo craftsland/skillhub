@@ -5,6 +5,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -25,7 +27,7 @@ class GitLabClaimsExtractorTest {
         RestClient.Builder restClientBuilder = RestClient.builder();
         GitLabClaimsExtractor extractor = new GitLabClaimsExtractor(restClientBuilder);
 
-        OAuthClaims claims = extractor.extract(
+        ProviderAuthenticationResult result = extractor.extract(
                 userRequest(),
                 new DefaultOAuth2User(
                         java.util.List.of(),
@@ -39,9 +41,15 @@ class GitLabClaimsExtractorTest {
                 )
         );
 
-        assertThat(claims.email()).isEqualTo("alice@gitlab.example");
-        assertThat(claims.emailVerified()).isTrue();
-        assertThat(claims.providerLogin()).isEqualTo("alice");
+        assertThat(result.primarySubject().type())
+                .isEqualTo("gitlab_user_id");
+        assertThat(result.primarySubject().value()).isEqualTo("42");
+        assertThat(result.attributes().get("email").getFirst().value())
+                .isEqualTo("alice@gitlab.example");
+        assertThat(result.attributes().get("email").getFirst().trust())
+                .isEqualTo(ProviderAttributeTrust.VERIFIED);
+        assertThat(result.attributes().get("username").getFirst().value())
+                .isEqualTo("alice");
     }
 
     @Test
@@ -61,7 +69,7 @@ class GitLabClaimsExtractorTest {
                 ));
         GitLabClaimsExtractor extractor = new GitLabClaimsExtractor(restClientBuilder);
 
-        OAuthClaims claims = extractor.extract(
+        ProviderAuthenticationResult result = extractor.extract(
                 userRequest(),
                 new DefaultOAuth2User(
                         java.util.List.of(),
@@ -74,8 +82,10 @@ class GitLabClaimsExtractorTest {
                 )
         );
 
-        assertThat(claims.email()).isEqualTo("alice@gitlab.example");
-        assertThat(claims.emailVerified()).isTrue();
+        assertThat(result.attributes().get("email").getFirst().value())
+                .isEqualTo("alice@gitlab.example");
+        assertThat(result.attributes().get("email").getFirst().trust())
+                .isEqualTo(ProviderAttributeTrust.VERIFIED);
         server.verify();
     }
 
