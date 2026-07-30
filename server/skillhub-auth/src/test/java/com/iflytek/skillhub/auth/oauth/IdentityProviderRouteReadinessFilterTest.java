@@ -127,10 +127,7 @@ class IdentityProviderRouteReadinessFilterTest {
     }
 
     private static MockHttpServletRequest request(String uri) {
-        MockHttpServletRequest request =
-                new MockHttpServletRequest("GET", uri);
-        request.setServletPath(uri);
-        return request;
+        return new MockHttpServletRequest("GET", uri);
     }
 
     private static ClientRegistration registration() {
