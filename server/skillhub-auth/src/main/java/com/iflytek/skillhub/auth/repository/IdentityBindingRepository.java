@@ -18,6 +18,13 @@ import org.springframework.stereotype.Repository;
 public interface IdentityBindingRepository extends JpaRepository<IdentityBinding, Long> {
     Optional<IdentityBinding> findByProviderCodeAndSubject(String providerCode, String subject);
 
+    @Query("""
+            select distinct binding.providerCode
+            from IdentityBinding binding
+            order by binding.providerCode
+            """)
+    List<String> findDistinctProviderCodes();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select binding
