@@ -12,8 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -25,14 +23,10 @@ public final class IdentityProviderRouteReadinessFilter
 
     private static final Logger log = LoggerFactory.getLogger(
             IdentityProviderRouteReadinessFilter.class);
-    private static final String REGISTRATION_ID = "registrationId";
-
-    private final AntPathRequestMatcher authorizationMatcher =
-            new AntPathRequestMatcher(
-                    "/oauth2/authorization/{registrationId}");
-    private final AntPathRequestMatcher callbackMatcher =
-            new AntPathRequestMatcher(
-                    "/login/oauth2/code/{registrationId}");
+    private static final String AUTHORIZATION_PREFIX =
+            "/oauth2/authorization/";
+    private static final String CALLBACK_PREFIX =
+            "/login/oauth2/code/";
     private final ClientRegistrationRepository registrationRepository;
     private final IdentityProviderReadinessService readinessService;
 
@@ -45,8 +39,9 @@ public final class IdentityProviderRouteReadinessFilter
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !authorizationMatcher.matches(request)
-                && !callbackMatcher.matches(request);
+        String path = pathWithinApplication(request);
+        return !path.startsWith(AUTHORIZATION_PREFIX)
+                && !path.startsWith(CALLBACK_PREFIX);
     }
 
     @Override
@@ -90,18 +85,28 @@ public final class IdentityProviderRouteReadinessFilter
     }
 
     private String registrationId(HttpServletRequest request) {
-        String value = variable(authorizationMatcher, request);
+        String path = pathWithinApplication(request);
+        String value = pathSegment(path, AUTHORIZATION_PREFIX);
         return value != null
                 ? value
-                : variable(callbackMatcher, request);
+                : pathSegment(path, CALLBACK_PREFIX);
     }
 
-    private String variable(
-            AntPathRequestMatcher matcher,
-            HttpServletRequest request) {
-        RequestMatcher.MatchResult result = matcher.matcher(request);
-        return result.isMatch()
-                ? result.getVariables().get(REGISTRATION_ID)
-                : null;
+    private String pathWithinApplication(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        return contextPath.isEmpty()
+                ? requestUri
+                : requestUri.substring(contextPath.length());
+    }
+
+    private String pathSegment(String path, String prefix) {
+        if (!path.startsWith(prefix)) {
+            return null;
+        }
+        String value = path.substring(prefix.length());
+        return value.isEmpty() || value.indexOf('/') >= 0
+                ? null
+                : value;
     }
 }
