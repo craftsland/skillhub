@@ -33,6 +33,49 @@ class StaticTrustedProviderDescriptorSourceTest {
     }
 
     @Test
+    void attachesProviderScopedProvisioningAndProfilePolicies() {
+        ClientRegistration github = github();
+        OAuth2ClientProperties properties =
+                new OAuth2ClientProperties();
+        properties.getRegistration().put(
+                "github",
+                properties("client-id", "GitHub"));
+        IdentityProviderPolicyProperties.ProviderPolicy configured =
+                new IdentityProviderPolicyProperties.ProviderPolicy();
+        configured.setProvisioningMode(
+                ProvisioningMode.APPROVAL);
+        IdentityProviderPolicyProperties.ProfilePolicy profile =
+                new IdentityProviderPolicyProperties.ProfilePolicy();
+        profile.setDisplayName(
+                ProfileSyncMode.INITIAL_ONLY);
+        profile.setEmail(
+                ProfileSyncMode.PROVIDER_AUTHORITATIVE);
+        profile.setAvatarUrl(ProfileSyncMode.NEVER);
+        configured.setProfileSync(profile);
+        IdentityProviderPolicyProperties policies =
+                new IdentityProviderPolicyProperties();
+        policies.setProviders(Map.of("github", configured));
+        StaticTrustedProviderDescriptorSource source =
+                new StaticTrustedProviderDescriptorSource(
+                        properties,
+                        new InMemoryClientRegistrationRepository(
+                                github),
+                        Set.of("github"),
+                        policies);
+
+        ProviderDescriptor descriptor =
+                source.require(source.resolve(github));
+
+        assertThat(descriptor.provisioningMode())
+                .isEqualTo(ProvisioningMode.APPROVAL);
+        assertThat(descriptor.profileSyncPolicy())
+                .isEqualTo(new ProfileSyncPolicy(
+                        ProfileSyncMode.INITIAL_ONLY,
+                        ProfileSyncMode.PROVIDER_AUTHORITATIVE,
+                        ProfileSyncMode.NEVER));
+    }
+
+    @Test
     void rejectsReconstructedRegistrationEvenWhenVisibleFieldsMatch() {
         ClientRegistration trustedGithub = github();
         StaticTrustedProviderDescriptorSource source = source(

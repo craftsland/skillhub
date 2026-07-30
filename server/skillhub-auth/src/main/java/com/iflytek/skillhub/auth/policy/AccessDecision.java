@@ -1,9 +1,10 @@
 package com.iflytek.skillhub.auth.policy;
 
 /**
- * Possible outcomes when evaluating whether an externally authenticated user may access the
- * platform.
+ * Per-login access decision. First-login provisioning is decided separately
+ * by the provisioning policy.
  */
 public enum AccessDecision {
-    ALLOW, DENY, PENDING_APPROVAL
+    ALLOW,
+    DENY
 }

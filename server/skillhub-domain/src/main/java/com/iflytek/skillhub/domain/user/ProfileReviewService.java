@@ -30,13 +30,16 @@ public class ProfileReviewService {
 
     private final ProfileChangeRequestRepository changeRequestRepository;
     private final UserAccountRepository userAccountRepository;
+    private final UserProfileFieldSourceService fieldSourceService;
     private final AuditLogService auditLogService;
 
     public ProfileReviewService(ProfileChangeRequestRepository changeRequestRepository,
                                 UserAccountRepository userAccountRepository,
+                                UserProfileFieldSourceService fieldSourceService,
                                 AuditLogService auditLogService) {
         this.changeRequestRepository = changeRequestRepository;
         this.userAccountRepository = userAccountRepository;
+        this.fieldSourceService = fieldSourceService;
         this.auditLogService = auditLogService;
     }
 
@@ -77,7 +80,8 @@ public class ProfileReviewService {
         var request = findPendingOrThrow(requestId);
 
         // Apply field changes to user account
-        var user = userAccountRepository.findById(request.getUserId())
+        var user = userAccountRepository
+                .findByIdForUpdate(request.getUserId())
                 .orElseThrow(() -> new DomainNotFoundException("error.user.notFound"));
         applyChanges(user, parseJson(request.getChanges()));
         userAccountRepository.save(user);
@@ -137,6 +141,10 @@ public class ProfileReviewService {
     private void applyChanges(UserAccount user, Map<String, String> changes) {
         if (changes.containsKey("displayName")) {
             user.setDisplayName(changes.get("displayName"));
+            fieldSourceService.markUserProvided(
+                    user.getId(),
+                    java.util.List.of(
+                            UserProfileFieldName.DISPLAY_NAME));
         }
         // Future: avatarUrl, bio, etc.
     }

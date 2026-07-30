@@ -1,9 +1,5 @@
 package com.iflytek.skillhub.auth.identity;
 
-import com.iflytek.skillhub.auth.policy.AccessDecision;
-import com.iflytek.skillhub.auth.policy.AccessPolicy;
-import com.iflytek.skillhub.auth.policy.IdentityAccessContext;
-import com.iflytek.skillhub.domain.user.UserStatus;
 import java.sql.SQLException;
 import java.util.Objects;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -16,20 +12,20 @@ class DefaultExternalIdentityLoginService
     private final TrustedProviderDescriptorSource descriptorSource;
     private final ProviderAuthorityLockService authorityLockService;
     private final IdentityAssertionFactory assertionFactory;
-    private final AccessPolicy accessPolicy;
     private final IdentityResolutionTransaction resolutionTransaction;
+    private final IdentityLoginMetrics metrics;
 
     DefaultExternalIdentityLoginService(
             TrustedProviderDescriptorSource descriptorSource,
             ProviderAuthorityLockService authorityLockService,
             IdentityAssertionFactory assertionFactory,
-            AccessPolicy accessPolicy,
-            IdentityResolutionTransaction resolutionTransaction) {
+            IdentityResolutionTransaction resolutionTransaction,
+            IdentityLoginMetrics metrics) {
         this.descriptorSource = descriptorSource;
         this.authorityLockService = authorityLockService;
         this.assertionFactory = assertionFactory;
-        this.accessPolicy = accessPolicy;
         this.resolutionTransaction = resolutionTransaction;
+        this.metrics = metrics;
     }
 
     @Override
@@ -41,26 +37,42 @@ class DefaultExternalIdentityLoginService
         Objects.requireNonNull(result, "result");
         Objects.requireNonNull(context, "context");
 
-        ProviderDescriptor descriptor = descriptorSource.require(provider);
-        authorityLockService.requirePinnedAuthority(descriptor);
-        IdentityAssertion assertion =
-                assertionFactory.create(descriptor, result);
-        AccessDecision decision = accessPolicy.evaluate(
-                toAccessContext(assertion, context));
-        if (decision == AccessDecision.DENY) {
-            throw new IdentityCoreException(
-                    IdentityFailureCode.ACCESS_DENIED);
+        String metricProvider = "unresolved";
+        try {
+            ProviderDescriptor descriptor =
+                    descriptorSource.require(provider);
+            metricProvider = descriptor.providerCode();
+            authorityLockService.requirePinnedAuthority(descriptor);
+            IdentityAssertion assertion =
+                    assertionFactory.create(descriptor, result);
+            IdentityLoginOutcome outcome = resolveWithRetry(
+                    assertion,
+                    descriptor,
+                    context);
+            metrics.recordOutcome(
+                    descriptor.providerCode(),
+                    outcome);
+            return outcome;
+        } catch (IdentityCoreException exception) {
+            metrics.recordFailure(
+                    metricProvider,
+                    exception.getReasonCode());
+            throw exception;
+        } catch (RuntimeException exception) {
+            metrics.recordSystemError(metricProvider);
+            throw exception;
         }
+    }
 
-        UserStatus initialStatus =
-                decision == AccessDecision.PENDING_APPROVAL
-                        ? UserStatus.PENDING
-                        : UserStatus.ACTIVE;
+    private IdentityLoginOutcome resolveWithRetry(
+            IdentityAssertion assertion,
+            ProviderDescriptor descriptor,
+            IdentityLoginContext context) {
         try {
             return resolutionTransaction.resolve(
                     assertion,
-                    initialStatus,
-                    descriptor.legacyPrimarySubjectType());
+                    descriptor,
+                    context);
         } catch (DataIntegrityViolationException firstConflict) {
             if (!isUniqueConstraintViolation(firstConflict)) {
                 throw firstConflict;
@@ -68,8 +80,8 @@ class DefaultExternalIdentityLoginService
             try {
                 return resolutionTransaction.resolve(
                         assertion,
-                        initialStatus,
-                        descriptor.legacyPrimarySubjectType());
+                        descriptor,
+                        context);
             } catch (DataIntegrityViolationException repeatedConflict) {
                 if (!isUniqueConstraintViolation(repeatedConflict)) {
                     repeatedConflict.addSuppressed(firstConflict);
@@ -99,17 +111,4 @@ class DefaultExternalIdentityLoginService
         return false;
     }
 
-    private IdentityAccessContext toAccessContext(
-            IdentityAssertion assertion,
-            IdentityLoginContext context) {
-        return new IdentityAccessContext(
-                assertion.provider().providerCode(),
-                assertion.primarySubject().type(),
-                assertion.primarySubject().value(),
-                assertion.profile().email().map(EmailClaim::value),
-                assertion.profile().email()
-                        .map(EmailClaim::assurance)
-                        .orElse(EmailAssurance.UNVERIFIED),
-                context);
-    }
 }

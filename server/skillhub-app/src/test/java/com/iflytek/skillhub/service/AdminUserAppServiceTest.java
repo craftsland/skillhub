@@ -1,10 +1,12 @@
 package com.iflytek.skillhub.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iflytek.skillhub.auth.entity.Role;
 import com.iflytek.skillhub.auth.entity.UserRoleBinding;
 import com.iflytek.skillhub.auth.repository.RoleRepository;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
 import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
@@ -38,12 +40,16 @@ class AdminUserAppServiceTest {
     private final UserAccountRepository userAccountRepository = mock(UserAccountRepository.class);
     private final GlobalNamespaceMembershipService globalNamespaceMembershipService =
             mock(GlobalNamespaceMembershipService.class);
+    private final AuditLogService auditLogService =
+            mock(AuditLogService.class);
     private final AdminUserAppService service = new AdminUserAppService(
             adminUserSearchRepository,
             userAccountRepository,
             userRoleBindingRepository,
             roleRepository,
-            globalNamespaceMembershipService
+            globalNamespaceMembershipService,
+            auditLogService,
+            new ObjectMapper()
     );
 
     @Test
@@ -180,6 +186,41 @@ class AdminUserAppServiceTest {
         verify(globalNamespaceMembershipService).ensureMember("user-1");
         assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
         assertThat(response.status()).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void updateUserStatus_approvingPendingAccountRecordsAudit() {
+        UserAccount user = user(
+                "user-1",
+                "alice",
+                "alice@example.com",
+                UserStatus.PENDING);
+        when(userAccountRepository.findById("user-1"))
+                .thenReturn(Optional.of(user));
+        when(userAccountRepository.save(user)).thenReturn(user);
+
+        service.updateUserStatus(
+                "user-1",
+                "ACTIVE",
+                "admin-1",
+                new AuditRequestContext(
+                        "127.0.0.1",
+                        "test-agent"));
+
+        verify(auditLogService).record(
+                eq("admin-1"),
+                eq("IDENTITY_PROVISIONING_APPROVED"),
+                eq("USER_ACCOUNT"),
+                isNull(),
+                any(),
+                eq("127.0.0.1"),
+                eq("test-agent"),
+                argThat(detail -> detail.contains(
+                        "\"userId\":\"user-1\"")
+                        && detail.contains(
+                                "\"previousStatus\":\"PENDING\"")
+                        && detail.contains(
+                                "\"status\":\"ACTIVE\"")));
     }
 
     @Test

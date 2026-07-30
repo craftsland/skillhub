@@ -102,6 +102,12 @@ skillhub:
   auth:
     mock:
       enabled: ${SKILLHUB_AUTH_MOCK_ENABLED:false}
+    identity:
+      # Provider-specific overrides bind below providers.<registration-id>.
+      # Defaults: AUTO provisioning; PRESERVE_LOCAL displayName/avatarUrl;
+      # FILL_IF_EMPTY email. PROVIDER_AUTHORITATIVE must be enabled on the
+      # exact provider and field that owns the corresponding directory data.
+      providers: {}
     direct:
       enabled: ${SKILLHUB_AUTH_DIRECT_ENABLED:false}
     session-bootstrap:

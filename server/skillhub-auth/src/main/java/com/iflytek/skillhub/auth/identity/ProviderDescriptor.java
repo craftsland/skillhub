@@ -16,7 +16,9 @@ record ProviderDescriptor(
         List<String> displayNameAttributes,
         List<String> emailAttributes,
         List<String> avatarAttributes,
-        EmailAssurance emailAssuranceLimit
+        EmailAssurance emailAssuranceLimit,
+        ProvisioningMode provisioningMode,
+        ProfileSyncPolicy profileSyncPolicy
 ) {
     private static final Pattern PROVIDER_CODE_PATTERN =
             Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
@@ -39,6 +41,8 @@ record ProviderDescriptor(
         Objects.requireNonNull(emailAttributes, "emailAttributes");
         Objects.requireNonNull(avatarAttributes, "avatarAttributes");
         Objects.requireNonNull(emailAssuranceLimit, "emailAssuranceLimit");
+        Objects.requireNonNull(provisioningMode, "provisioningMode");
+        Objects.requireNonNull(profileSyncPolicy, "profileSyncPolicy");
 
         if (!PROVIDER_CODE_PATTERN.matcher(providerCode).matches()) {
             throw new IllegalArgumentException("Invalid provider code");
@@ -63,6 +67,34 @@ record ProviderDescriptor(
         displayNameAttributes = List.copyOf(displayNameAttributes);
         emailAttributes = List.copyOf(emailAttributes);
         avatarAttributes = List.copyOf(avatarAttributes);
+    }
+
+    ProviderDescriptor(
+            String providerCode,
+            String protocol,
+            String canonicalAuthority,
+            String displayName,
+            String primarySubjectType,
+            String legacyPrimarySubjectType,
+            Map<String, SubjectCanonicalizer> subjectCanonicalizers,
+            List<String> displayNameAttributes,
+            List<String> emailAttributes,
+            List<String> avatarAttributes,
+            EmailAssurance emailAssuranceLimit) {
+        this(
+                providerCode,
+                protocol,
+                canonicalAuthority,
+                displayName,
+                primarySubjectType,
+                legacyPrimarySubjectType,
+                subjectCanonicalizers,
+                displayNameAttributes,
+                emailAttributes,
+                avatarAttributes,
+                emailAssuranceLimit,
+                ProvisioningMode.AUTO,
+                ProfileSyncPolicy.defaults());
     }
 
     SubjectCanonicalizer canonicalizerFor(String subjectType) {

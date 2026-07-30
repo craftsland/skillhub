@@ -31,6 +31,7 @@ public class UserProfileService {
     private final ProfileModerationService moderationService;
     private final ProfileModerationConfig moderationConfig;
     private final ProfileFieldPolicyConfig fieldPolicyConfig;
+    private final UserProfileFieldSourceService fieldSourceService;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -39,6 +40,7 @@ public class UserProfileService {
                                ProfileModerationService moderationService,
                                ProfileModerationConfig moderationConfig,
                                ProfileFieldPolicyConfig fieldPolicyConfig,
+                               UserProfileFieldSourceService fieldSourceService,
                                AuditLogService auditLogService,
                                ApplicationEventPublisher eventPublisher) {
         this.userAccountRepository = userAccountRepository;
@@ -46,6 +48,7 @@ public class UserProfileService {
         this.moderationService = moderationService;
         this.moderationConfig = moderationConfig;
         this.fieldPolicyConfig = fieldPolicyConfig;
+        this.fieldSourceService = fieldSourceService;
         this.auditLogService = auditLogService;
         this.eventPublisher = eventPublisher;
     }
@@ -73,7 +76,8 @@ public class UserProfileService {
                                               String requestId,
                                               String clientIp,
                                               String userAgent) {
-        UserAccount user = userAccountRepository.findById(userId)
+        UserAccount user = userAccountRepository
+                .findByIdForUpdate(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
 
         // 1. Build snapshot of old values for audit and rollback
@@ -141,6 +145,9 @@ public class UserProfileService {
     private void applyChanges(UserAccount user, Map<String, String> changes) {
         if (changes.containsKey("displayName")) {
             user.setDisplayName(changes.get("displayName"));
+            fieldSourceService.markUserProvided(
+                    user.getId(),
+                    List.of(UserProfileFieldName.DISPLAY_NAME));
         }
         // Future: avatarUrl, etc.
         userAccountRepository.save(user);

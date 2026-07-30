@@ -1,10 +1,13 @@
 package com.iflytek.skillhub.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iflytek.skillhub.auth.entity.Role;
 import com.iflytek.skillhub.auth.entity.UserRoleBinding;
 import com.iflytek.skillhub.auth.repository.RoleRepository;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
 import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
+import com.iflytek.skillhub.domain.audit.AuditLogService;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
@@ -22,6 +25,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.slf4j.MDC;
 
 import java.util.List;
 import java.util.Locale;
@@ -46,18 +50,24 @@ public class AdminUserAppService {
     private final UserRoleBindingRepository userRoleBindingRepository;
     private final RoleRepository roleRepository;
     private final GlobalNamespaceMembershipService globalNamespaceMembershipService;
+    private final AuditLogService auditLogService;
+    private final ObjectMapper objectMapper;
 
     public AdminUserAppService(
             AdminUserSearchRepository adminUserSearchRepository,
             UserAccountRepository userAccountRepository,
             UserRoleBindingRepository userRoleBindingRepository,
             RoleRepository roleRepository,
-            GlobalNamespaceMembershipService globalNamespaceMembershipService) {
+            GlobalNamespaceMembershipService globalNamespaceMembershipService,
+            AuditLogService auditLogService,
+            ObjectMapper objectMapper) {
         this.adminUserSearchRepository = adminUserSearchRepository;
         this.userAccountRepository = userAccountRepository;
         this.userRoleBindingRepository = userRoleBindingRepository;
         this.roleRepository = roleRepository;
         this.globalNamespaceMembershipService = globalNamespaceMembershipService;
+        this.auditLogService = auditLogService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -110,9 +120,23 @@ public class AdminUserAppService {
 
     @Transactional
     public AdminUserMutationResponse updateUserStatus(String userId, String status) {
+        return updateUserStatus(
+                userId,
+                status,
+                null,
+                null);
+    }
+
+    @Transactional
+    public AdminUserMutationResponse updateUserStatus(
+            String userId,
+            String status,
+            String actorUserId,
+            AuditRequestContext auditContext) {
         UserAccount user = loadUser(userId);
         rejectSystemAccountMutation(user);
         UserStatus nextStatus = parseManageableStatus(status);
+        UserStatus previousStatus = user.getStatus();
         if (nextStatus == UserStatus.ACTIVE && user.getStatus() == UserStatus.MERGED) {
             throw new DomainBadRequestException("error.admin.user.status.mergedCannotActivate");
         }
@@ -121,7 +145,60 @@ public class AdminUserAppService {
         if (nextStatus == UserStatus.ACTIVE) {
             globalNamespaceMembershipService.ensureMember(user.getId());
         }
+        if (actorUserId != null) {
+            auditLogService.record(
+                    actorUserId,
+                    statusAuditAction(
+                            previousStatus,
+                            nextStatus),
+                    "USER_ACCOUNT",
+                    null,
+                    MDC.get("requestId"),
+                    auditContext != null
+                            ? auditContext.clientIp()
+                            : null,
+                    auditContext != null
+                            ? auditContext.userAgent()
+                            : null,
+                    statusAuditDetail(
+                            userId,
+                            previousStatus,
+                            nextStatus));
+        }
         return new AdminUserMutationResponse(user.getId(), null, nextStatus.name());
+    }
+
+    private String statusAuditAction(
+            UserStatus previousStatus,
+            UserStatus nextStatus) {
+        if (previousStatus == UserStatus.PENDING
+                && nextStatus == UserStatus.ACTIVE) {
+            return "IDENTITY_PROVISIONING_APPROVED";
+        }
+        if (previousStatus == UserStatus.PENDING
+                && nextStatus == UserStatus.DISABLED) {
+            return "IDENTITY_PROVISIONING_REJECTED";
+        }
+        return "USER_STATUS_UPDATED";
+    }
+
+    private String statusAuditDetail(
+            String userId,
+            UserStatus previousStatus,
+            UserStatus nextStatus) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "userId",
+                    userId,
+                    "previousStatus",
+                    previousStatus.name(),
+                    "status",
+                    nextStatus.name()));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException(
+                    "Failed to serialize user status audit",
+                    exception);
+        }
     }
 
     private UserStatus parseManageableStatus(String status) {
