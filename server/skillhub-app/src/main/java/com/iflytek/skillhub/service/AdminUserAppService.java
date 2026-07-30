@@ -113,6 +113,9 @@ public class AdminUserAppService {
         UserAccount user = loadUser(userId);
         rejectSystemAccountMutation(user);
         UserStatus nextStatus = parseManageableStatus(status);
+        if (nextStatus == UserStatus.ACTIVE && user.getStatus() == UserStatus.MERGED) {
+            throw new DomainBadRequestException("error.admin.user.status.mergedCannotActivate");
+        }
         user.setStatus(nextStatus);
         userAccountRepository.save(user);
         if (nextStatus == UserStatus.ACTIVE) {

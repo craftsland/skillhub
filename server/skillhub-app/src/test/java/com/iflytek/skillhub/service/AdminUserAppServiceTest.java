@@ -183,6 +183,19 @@ class AdminUserAppServiceTest {
     }
 
     @Test
+    void updateUserStatus_rejectsReactivatingMergedAccount() {
+        UserAccount user = user("user-1", "alice", "alice@example.com", UserStatus.MERGED);
+        when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
+
+        assertThrows(DomainBadRequestException.class,
+                () -> service.updateUserStatus("user-1", "ACTIVE"));
+
+        verify(userAccountRepository, never()).save(any(UserAccount.class));
+        verify(globalNamespaceMembershipService, never()).ensureMember(any());
+        assertThat(user.getStatus()).isEqualTo(UserStatus.MERGED);
+    }
+
+    @Test
     void updateUserStatus_rejectsSystemAccount() {
         when(userAccountRepository.findById("builtin-skill-publisher"))
                 .thenReturn(Optional.of(systemUser()));

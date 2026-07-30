@@ -107,6 +107,27 @@ class AdminUserApprovalIntegrationTest {
     }
 
     @Test
+    void enablingDisabledUser_createsGlobalMembership() {
+        setUserStatus(UserStatus.DISABLED);
+
+        adminUserAppService.updateUserStatus(userId, "ACTIVE");
+
+        transactionTemplate.executeWithoutResult(status -> {
+            UserAccount enabled = userAccountRepository.findAllById(List.of(userId))
+                    .stream()
+                    .findFirst()
+                    .orElseThrow();
+            Namespace global = namespaceRepository.findBySlug("global").orElseThrow();
+
+            assertThat(enabled.getStatus()).isEqualTo(UserStatus.ACTIVE);
+            assertThat(namespaceMemberRepository.findByNamespaceIdAndUserId(global.getId(), userId))
+                    .get()
+                    .extracting(member -> member.getRole())
+                    .isEqualTo(NamespaceRole.MEMBER);
+        });
+    }
+
+    @Test
     void membershipFailure_rollsBackPendingUserActivation() {
         doAnswer(invocation -> {
             userAccountRepository.flush();
@@ -127,6 +148,42 @@ class AdminUserApprovalIntegrationTest {
             assertThat(user.getStatus()).isEqualTo(UserStatus.PENDING);
             assertThat(namespaceMemberRepository.findByNamespaceIdAndUserId(global.getId(), userId))
                     .isEmpty();
+        });
+    }
+
+    @Test
+    void membershipFailure_rollsBackDisabledUserActivation() {
+        setUserStatus(UserStatus.DISABLED);
+        doAnswer(invocation -> {
+            userAccountRepository.flush();
+            throw new IllegalStateException("membership write failed");
+        }).when(globalNamespaceMembershipService).ensureMember(userId);
+
+        assertThatThrownBy(() -> adminUserAppService.updateUserStatus(userId, "ACTIVE"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("membership write failed");
+
+        transactionTemplate.executeWithoutResult(status -> {
+            UserAccount user = userAccountRepository.findAllById(List.of(userId))
+                    .stream()
+                    .findFirst()
+                    .orElseThrow();
+            Namespace global = namespaceRepository.findBySlug("global").orElseThrow();
+
+            assertThat(user.getStatus()).isEqualTo(UserStatus.DISABLED);
+            assertThat(namespaceMemberRepository.findByNamespaceIdAndUserId(global.getId(), userId))
+                    .isEmpty();
+        });
+    }
+
+    private void setUserStatus(UserStatus status) {
+        transactionTemplate.executeWithoutResult(transactionStatus -> {
+            UserAccount user = userAccountRepository.findAllById(List.of(userId))
+                    .stream()
+                    .findFirst()
+                    .orElseThrow();
+            user.setStatus(status);
+            userAccountRepository.saveAndFlush(user);
         });
     }
 
