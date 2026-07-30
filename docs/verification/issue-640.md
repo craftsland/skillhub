@@ -5,7 +5,7 @@
 - Issue: <https://github.com/iflytek/skillhub/issues/640>
 - Pull request: <https://github.com/iflytek/skillhub/pull/643>
 - Integration target: `big-main`
-- Validation environment: dedicated Hong Kong test server
+- Validation environment: isolated, production-equivalent test deployment
 - Production/default branch: not modified
 
 This record covers P1 / PR 1 from
@@ -15,7 +15,7 @@ plugins remain outside this PR.
 
 ## Automated gates
 
-The following checks ran on the Hong Kong test server:
+The following checks ran against the isolated test deployment:
 
 | Gate | Result |
 |---|---|
@@ -27,11 +27,9 @@ The following checks ran on the Hong Kong test server:
 | DCO | passed |
 | CLA | passed |
 
-The server image used for pre-integration runtime validation was
-`skillhub-server:identity-core-9818333c`, image ID
-`sha256:a9055606ad2a551f12319e66f7056e4bda072a8e14a238882cdbdbeb871cf6c8`.
 The clean PR branch was rebuilt from the latest `big-main`; its unified-identity
-file tree is identical to the validated feature tree.
+file tree is identical to the validated feature tree. Runtime artifact identity
+and operational logs are intentionally omitted from the public repository.
 
 ## PostgreSQL and runtime scenarios
 

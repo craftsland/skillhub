@@ -1629,6 +1629,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Recover an identity provider authority lock
+         * @description Restores a provider from AUTHORITY_MISMATCH only when the current trusted configuration matches its pinned authority.
+         */
         post: operations["recoverSameAuthority"];
         delete?: never;
         options?: never;
@@ -8367,7 +8371,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Provider recovered or already ready */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8375,6 +8379,27 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["ApiResponseIdentityProviderAuthorityRecoveryResponse"];
                 };
+            };
+            /** @description Caller is not a super administrator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Enabled provider configuration not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Current configuration does not match the pinned authority */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

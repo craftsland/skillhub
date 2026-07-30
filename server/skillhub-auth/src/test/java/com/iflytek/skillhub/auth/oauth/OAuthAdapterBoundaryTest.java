@@ -11,8 +11,10 @@ import org.junit.jupiter.api.Test;
 class OAuthAdapterBoundaryTest {
 
     private static final List<Class<?>> ADAPTERS = List.of(
+            OAuthClaimsExtractor.class,
             GitHubClaimsExtractor.class,
             GitLabClaimsExtractor.class,
+            CustomOAuth2UserService.class,
             CustomOidcUserService.class);
 
     private static final List<String> FORBIDDEN_DEPENDENCIES = List.of(

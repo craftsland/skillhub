@@ -7,6 +7,9 @@ import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.dto.IdentityProviderAuthorityRecoveryResponse;
 import com.iflytek.skillhub.service.AuditRequestContext;
 import com.iflytek.skillhub.service.IdentityProviderAdminAppService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,6 +34,27 @@ public class IdentityProviderAdminController extends BaseApiController {
         this.providerAdminAppService = providerAdminAppService;
     }
 
+    @Operation(
+            summary = "Recover an identity provider authority lock",
+            description = "Restores a provider from AUTHORITY_MISMATCH only when the current "
+                    + "trusted configuration matches its pinned authority.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Provider recovered or already ready"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403",
+                    description = "Caller is not a super administrator",
+                    content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Enabled provider configuration not found",
+                    content = @Content),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "409",
+                    description = "Current configuration does not match the pinned authority",
+                    content = @Content)
+    })
     @PostMapping("/{providerCode}/authority/recover")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<IdentityProviderAuthorityRecoveryResponse>
