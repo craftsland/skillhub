@@ -250,6 +250,11 @@ class ScanTaskConsumerLoggingTest {
         }
 
         @Override
+        public List<SkillVersion> findBySkillIdForUpdate(Long skillId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<SkillVersion> findBySkillIdAndStatus(Long skillId, SkillVersionStatus status) {
             throw new UnsupportedOperationException();
         }
