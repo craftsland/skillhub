@@ -37,7 +37,7 @@ class UserProfileFieldSourceMigrationPostgresTest {
                     .schemas(SCHEMA)
                     .defaultSchema(SCHEMA)
                     .createSchemas(true)
-                    .target(MigrationVersion.fromVersion("46"))
+                    .target(MigrationVersion.fromVersion("47"))
                     .load()
                     .migrate();
 
@@ -86,7 +86,7 @@ class UserProfileFieldSourceMigrationPostgresTest {
                     .schemas(SCHEMA)
                     .defaultSchema(SCHEMA)
                     .createSchemas(true)
-                    .target(MigrationVersion.fromVersion("47"))
+                    .target(MigrationVersion.fromVersion("48"))
                     .load()
                     .migrate();
 
