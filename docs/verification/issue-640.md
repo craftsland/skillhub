@@ -38,7 +38,7 @@ They did not connect to or modify the shared test-environment database.
 
 | Scenario | Observable result |
 |---|---|
-| Fresh migration | Flyway V44 applied successfully and created `identity_provider_state` |
+| Fresh migration | Flyway V45 applied successfully and created `identity_provider_state` after the reserved V44 compliance index |
 | Fixed GitHub authority vector | `oauth2-github`, `https://github.com`, fingerprint `b2a93d58465e3de9e8b6cd127ba18425ae0f80c49c85f18f76086832923ca619`, state `READY` |
 | Concurrent first pin | Two application instances converged to one READY row with the same fingerprint; no unique-constraint error |
 | Legacy OAuth binding | Existing `identity_binding` row remained byte-for-byte equivalent while the provider moved through first pin to READY |
@@ -48,8 +48,8 @@ They did not connect to or modify the shared test-environment database.
 | Stale READY mismatch window | Recovery returned 409, persisted `AUTHORITY_MISMATCH`, retained the pinned authority/fingerprint, and wrote no recovery audit |
 | Transaction rollback | A forced audit insert failure returned 500; the provider state update rolled back and no audit record was added |
 | Unknown provider routes | Authorization and callback routes returned 403 without an upstream redirect |
-| V43 to V44 upgrade | A database initialized by `v0.2.15` upgraded successfully and retained its legacy OAuth binding |
-| Mixed-version and rollback | Current and `v0.2.15` servers were simultaneously healthy against the V44 database; the old provider endpoint returned 200 |
+| V43 to V45 upgrade | A database initialized by `v0.2.15` upgraded successfully through reserved V44 and retained its legacy OAuth binding |
+| Mixed-version and rollback | Current and `v0.2.15` servers were simultaneously healthy against the V45 database; the old provider endpoint returned 200 |
 | Redis session compatibility | A local session created by `v0.2.15` was accepted by the current server for the same user |
 
 ## Remaining integration gate
@@ -60,7 +60,7 @@ the merge commit, deploy them to the shared test environment, and verify:
 1. health, login catalog, and local-password login through the configured test
    domain;
 2. unknown provider authorization/callback rejection;
-3. V44 migration and READY provider state in the shared database;
+3. reserved V44 compatibility migration, V45 identity migration, and READY provider state in the shared database;
 4. existing Redis sessions and OAuth bindings;
 5. recovery authorization and audit behavior;
 6. logs contain no credentials or unexpected identity errors.
