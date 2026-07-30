@@ -106,6 +106,20 @@ class ProviderAuthorityStateTransaction {
                 .orElse(new AuthorityLockEvaluation(
                         IdentityProviderStatus.MISCONFIGURED,
                         null));
+        if (authority.ready()
+                && !expectedFingerprint.equals(
+                        authority.persistedFingerprint())) {
+            stateRepository.markAuthorityMismatch(
+                    descriptor.providerCode(),
+                    descriptor.protocol(),
+                    expectedFingerprint);
+            authority = stateRepository
+                    .findById(descriptor.providerCode())
+                    .map(this::evaluation)
+                    .orElse(new AuthorityLockEvaluation(
+                            IdentityProviderStatus.MISCONFIGURED,
+                            null));
+        }
         boolean recovered = updated == 1
                 && authority.ready()
                 && expectedFingerprint.equals(
