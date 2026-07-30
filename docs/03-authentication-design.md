@@ -259,7 +259,7 @@ protocol、canonical Authority、SHA-256 fingerprint 和状态，不保存 clien
 public interface PassiveAuthenticationAdapter {
     ProviderInstanceDefinition provider();
     Optional<ProviderAuthenticationResult> authenticate(
-        HttpServletRequest request
+        PassiveAuthenticationRequest request
     );
 }
 ```
@@ -267,6 +267,8 @@ public interface PassiveAuthenticationAdapter {
 约束如下：
 
 - Registry 先确认 Provider `READY`，再调用 `authenticate()`
+- App 层把 Servlet 请求转换成不可变 `PassiveAuthenticationRequest`；Adapter 不能访问
+  `HttpSession`、Servlet API 或 `SecurityContext`
 - `authenticate()` 只负责验证外部被动会话并返回非敏感协议事实
 - 统一身份核心负责账号、Binding、审批和 `PlatformPrincipal`
 - 断言存在但无效、重放或上游不可用时，Adapter 抛出只含稳定失败码的

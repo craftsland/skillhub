@@ -2,6 +2,7 @@ package com.iflytek.skillhub.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -16,6 +17,7 @@ import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import com.iflytek.skillhub.auth.exception.AuthFlowException;
 import com.iflytek.skillhub.auth.provider.PassiveAuthenticationAdapter;
+import com.iflytek.skillhub.auth.provider.PassiveAuthenticationRequest;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
@@ -29,7 +31,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 class SessionBootstrapServiceTest {
 
@@ -56,13 +60,12 @@ class SessionBootstrapServiceTest {
                 null,
                 "private-sso",
                 Set.of("USER"));
-        HttpServletRequest request =
-                mock(HttpServletRequest.class);
+        HttpServletRequest request = request();
 
         when(registry.requirePassiveRoute("private-sso"))
                 .thenReturn(route);
         when(route.adapter()).thenReturn(adapter);
-        when(adapter.authenticate(request))
+        when(adapter.authenticate(any(PassiveAuthenticationRequest.class)))
                 .thenReturn(Optional.of(result));
         when(providerLogin.authenticate(
                 isNull(),
@@ -86,13 +89,23 @@ class SessionBootstrapServiceTest {
                 sessions);
         order.verify(registry)
                 .requirePassiveRoute("private-sso");
-        order.verify(adapter).authenticate(request);
+        ArgumentCaptor<PassiveAuthenticationRequest> requestCaptor =
+                ArgumentCaptor.forClass(
+                        PassiveAuthenticationRequest.class);
+        order.verify(adapter).authenticate(requestCaptor.capture());
         order.verify(providerLogin).authenticate(
                 isNull(),
                 org.mockito.ArgumentMatchers.eq(result),
                 org.mockito.ArgumentMatchers.eq(request));
         order.verify(sessions)
                 .establishSession(principal, request);
+        PassiveAuthenticationRequest captured = requestCaptor.getValue();
+        assertThat(captured.method()).isEqualTo("POST");
+        assertThat(captured.requestUri())
+                .isEqualTo("/api/v1/auth/session/bootstrap");
+        assertThat(captured.remoteAddress()).isEqualTo("203.0.113.9");
+        assertThat(captured.firstHeader("x-private-assertion"))
+                .isEqualTo("fixture-assertion");
     }
 
     @Test
@@ -108,8 +121,7 @@ class SessionBootstrapServiceTest {
                 mock(PlatformSessionService.class);
         PassiveAuthenticationAdapter adapter =
                 mock(PassiveAuthenticationAdapter.class);
-        HttpServletRequest request =
-                mock(HttpServletRequest.class);
+        HttpServletRequest request = request();
         when(registry.requirePassiveRoute("disabled"))
                 .thenThrow(new IdentityCoreException(
                         IdentityFailureCode.PROVIDER_DISABLED));
@@ -144,12 +156,12 @@ class SessionBootstrapServiceTest {
                 mock(PassiveAuthenticationAdapter.class);
         IdentityProviderRegistry.PassiveRoute route =
                 mock(IdentityProviderRegistry.PassiveRoute.class);
-        HttpServletRequest request =
-                mock(HttpServletRequest.class);
+        HttpServletRequest request = request();
         when(registry.requirePassiveRoute("broken"))
                 .thenReturn(route);
         when(route.adapter()).thenReturn(adapter);
-        when(adapter.authenticate(request)).thenReturn(null);
+        when(adapter.authenticate(any(PassiveAuthenticationRequest.class)))
+                .thenReturn(null);
         SessionBootstrapService service =
                 new SessionBootstrapService(
                         properties,
@@ -180,15 +192,15 @@ class SessionBootstrapServiceTest {
                 mock(PassiveAuthenticationAdapter.class);
         IdentityProviderRegistry.PassiveRoute route =
                 mock(IdentityProviderRegistry.PassiveRoute.class);
-        HttpServletRequest request =
-                mock(HttpServletRequest.class);
+        HttpServletRequest request = request();
         when(registry.requirePassiveRoute("private-sso"))
                 .thenReturn(route);
         when(route.adapter()).thenReturn(adapter);
-        when(adapter.authenticate(request)).thenThrow(
-                new ProviderAuthenticationException(
-                        ProviderAuthenticationFailureCode
-                                .REPLAY_DETECTED));
+        when(adapter.authenticate(any(PassiveAuthenticationRequest.class)))
+                .thenThrow(
+                        new ProviderAuthenticationException(
+                                ProviderAuthenticationFailureCode
+                                        .REPLAY_DETECTED));
         SessionBootstrapService service =
                 new SessionBootstrapService(
                         properties,
@@ -216,5 +228,16 @@ class SessionBootstrapServiceTest {
                         "private-sso",
                         Instant.parse("2026-07-30T00:00:00Z"),
                         Set.of("sso")));
+    }
+
+    private static MockHttpServletRequest request() {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/api/v1/auth/session/bootstrap");
+        request.setRemoteAddr("203.0.113.9");
+        request.addHeader(
+                "X-Private-Assertion",
+                "fixture-assertion");
+        return request;
     }
 }

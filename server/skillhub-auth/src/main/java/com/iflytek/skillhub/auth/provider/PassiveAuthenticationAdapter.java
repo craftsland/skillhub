@@ -1,13 +1,12 @@
 package com.iflytek.skillhub.auth.provider;
 
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 
 /**
  * Passive request authentication capability, for example a trusted gateway
- * assertion. Implementations may inspect the request but must not establish a
- * platform session or mutate the security context.
+ * assertion. Implementations receive an immutable request snapshot without
+ * access to the servlet session or security context.
  */
 public interface PassiveAuthenticationAdapter {
 
@@ -20,5 +19,5 @@ public interface PassiveAuthenticationAdapter {
      *         but invalid, replayed, or cannot be verified
      */
     Optional<ProviderAuthenticationResult> authenticate(
-            HttpServletRequest request);
+            PassiveAuthenticationRequest request);
 }

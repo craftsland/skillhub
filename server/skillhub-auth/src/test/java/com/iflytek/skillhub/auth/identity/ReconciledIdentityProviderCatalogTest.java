@@ -15,9 +15,9 @@ import static org.mockito.Mockito.when;
 import com.iflytek.skillhub.auth.provider.CredentialAuthenticationAdapter;
 import com.iflytek.skillhub.auth.provider.CredentialAuthenticationRequest;
 import com.iflytek.skillhub.auth.provider.PassiveAuthenticationAdapter;
+import com.iflytek.skillhub.auth.provider.PassiveAuthenticationRequest;
 import com.iflytek.skillhub.auth.provider.ProviderInstanceDefinition;
 import com.iflytek.skillhub.auth.provider.SubjectNormalization;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -159,7 +159,7 @@ class ReconciledIdentityProviderCatalogTest {
 
                     @Override
                     public Optional<ProviderAuthenticationResult> authenticate(
-                            HttpServletRequest request) {
+                            PassiveAuthenticationRequest request) {
                         throw new UnsupportedOperationException(
                                 "not called");
                     }

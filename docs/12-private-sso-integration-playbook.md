@@ -83,7 +83,9 @@ public class PrivateSsoProviderDefinition {
 ```java
 public interface PrivateSsoClient {
     PrivateSsoUser verifyPassword(String username, String password);
-    Optional<PrivateSsoUser> verifySession(HttpServletRequest request);
+    Optional<PrivateSsoUser> verifySession(
+        PassiveAuthenticationRequest request
+    );
 }
 
 public record PrivateSsoUser(
@@ -196,14 +198,15 @@ public class PrivateSsoPassiveAdapter
 
     @Override
     public Optional<ProviderAuthenticationResult> authenticate(
-            HttpServletRequest request) {
+            PassiveAuthenticationRequest request) {
         return client.verifySession(request).map(mapper::map);
     }
 }
 ```
 
-Passive Adapter 可以只读当前请求。不要重定向、写 Cookie、写 Session 或修改
-`SecurityContext`。无有效外部会话时返回 `Optional.empty()`。
+Passive Adapter 只能读取 App 层生成的不可变请求快照；该值对象不提供 Servlet、
+Session 或 `SecurityContext` 能力。不要重定向或写 Cookie。无有效外部会话时返回
+`Optional.empty()`。
 
 ## 7. 配置 Provisioning 和资料同步
 

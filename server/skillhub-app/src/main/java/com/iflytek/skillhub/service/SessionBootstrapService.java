@@ -5,6 +5,7 @@ import com.iflytek.skillhub.auth.identity.IdentityCoreException;
 import com.iflytek.skillhub.auth.identity.IdentityFailureCode;
 import com.iflytek.skillhub.auth.identity.IdentityProviderRegistry;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.provider.PassiveAuthenticationRequest;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.session.PlatformSessionService;
@@ -13,6 +14,11 @@ import com.iflytek.skillhub.exception.BadRequestException;
 import com.iflytek.skillhub.exception.ForbiddenException;
 import com.iflytek.skillhub.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -59,7 +65,9 @@ public class SessionBootstrapService {
                     "error.auth.external.providerUnavailable");
         }
 
-        var authentication = authenticate(route, request);
+        var authentication = authenticate(
+                route,
+                toPassiveRequest(request));
         if (authentication == null) {
             throw new AuthFlowException(
                     HttpStatus.UNAUTHORIZED,
@@ -78,12 +86,35 @@ public class SessionBootstrapService {
 
     private Optional<ProviderAuthenticationResult> authenticate(
             IdentityProviderRegistry.PassiveRoute route,
-            HttpServletRequest request) {
+            PassiveAuthenticationRequest request) {
         try {
             return route.adapter().authenticate(request);
         } catch (ProviderAuthenticationException exception) {
             throw ProviderAuthenticationFailureMapper.map(exception);
         }
+    }
+
+    private PassiveAuthenticationRequest toPassiveRequest(
+            HttpServletRequest request) {
+        Map<String, List<String>> headers = new LinkedHashMap<>();
+        Enumeration<String> headerNames = request.getHeaderNames();
+        if (headerNames != null) {
+            while (headerNames.hasMoreElements()) {
+                String name = headerNames.nextElement();
+                Enumeration<String> values = request.getHeaders(name);
+                headers.put(
+                        name,
+                        values == null
+                                ? List.of()
+                                : Collections.list(values));
+            }
+        }
+        return new PassiveAuthenticationRequest(
+                request.getMethod(),
+                request.getRequestURI(),
+                request.getQueryString(),
+                request.getRemoteAddr(),
+                headers);
     }
 
     public void establishSession(PlatformPrincipal principal, HttpServletRequest request) {

@@ -11,7 +11,6 @@ import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import com.iflytek.skillhub.auth.oauth.GitHubClaimsExtractor;
 import com.iflytek.skillhub.auth.oauth.GitLabClaimsExtractor;
-import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -50,6 +49,10 @@ class ProviderConformanceKitTest {
                 ProviderConformanceKit.verifyCredential(
                         adapter,
                         fixture);
+        ProviderConformanceKit.verifyStableSubjects(
+                adapter.provider(),
+                result,
+                adapter.authenticate(fixture));
 
         assertThat(result.primarySubject().value())
                 .isEqualTo("entry-123");
@@ -68,9 +71,18 @@ class ProviderConformanceKitTest {
     }
 
     @Test
-    void verifiesBrowserAndPassivePositiveFixtures() {
+    void verifiesBrowserAndPassivePositiveFixtures() throws IOException {
         ProviderInstanceDefinition provider = providerDefinition();
         ProviderAuthenticationResult result = authenticationResult();
+        PassiveAuthenticationRequest fixture =
+                new PassiveAuthenticationRequest(
+                        "POST",
+                        "/api/v1/auth/session/bootstrap",
+                        null,
+                        "127.0.0.1",
+                        Map.of(
+                                "X-Private-Assertion",
+                                List.of("fixture-assertion")));
         BrowserAuthenticationAdapter<String> browser =
                 exchange -> result;
         PassiveAuthenticationAdapter passive =
@@ -82,7 +94,8 @@ class ProviderConformanceKitTest {
 
                     @Override
                     public Optional<ProviderAuthenticationResult> authenticate(
-                            HttpServletRequest request) {
+                            PassiveAuthenticationRequest request) {
+                        assertThat(request).isEqualTo(fixture);
                         return Optional.of(result);
                     }
                 };
@@ -93,8 +106,10 @@ class ProviderConformanceKitTest {
                 "verified-exchange")).isSameAs(result);
         assertThat(ProviderConformanceKit.verifyPassive(
                 passive,
-                org.mockito.Mockito.mock(HttpServletRequest.class)))
+                fixture))
                 .isSameAs(result);
+        ProviderConformanceKit.verifyAdapterBoundary(
+                passive.getClass());
     }
 
     @Test

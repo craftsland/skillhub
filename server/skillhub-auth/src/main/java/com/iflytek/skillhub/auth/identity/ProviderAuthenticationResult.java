@@ -25,16 +25,28 @@ public record ProviderAuthenticationResult(
             Pattern.compile("[A-Za-z][A-Za-z0-9_.:-]{0,127}");
     private static final Set<String> SENSITIVE_ATTRIBUTE_NAMES = Set.of(
             "token",
-            "access_token",
-            "refresh_token",
-            "id_token",
             "password",
+            "passwd",
+            "pwd",
             "cookie",
             "ticket",
             "authorization",
             "credential",
-            "secret",
-            "raw_response");
+            "secret");
+    private static final Set<String> SENSITIVE_COMPACT_NAMES = Set.of(
+            "accesstoken",
+            "refreshtoken",
+            "idtoken",
+            "authtoken",
+            "bearertoken",
+            "clientsecret",
+            "apikey",
+            "privatekey",
+            "sessioncookie",
+            "rawresponse",
+            "clientassertion");
+    private static final Pattern LOWER_TO_UPPER_BOUNDARY =
+            Pattern.compile("([a-z0-9])([A-Z])");
 
     public ProviderAuthenticationResult {
         Objects.requireNonNull(primarySubject, "primarySubject");
@@ -63,15 +75,18 @@ public record ProviderAuthenticationResult(
     }
 
     private static boolean isSensitiveAttribute(String key) {
-        String normalized = key.toLowerCase(Locale.ROOT);
-        if (SENSITIVE_ATTRIBUTE_NAMES.contains(normalized)) {
-            return true;
-        }
+        String separated = LOWER_TO_UPPER_BOUNDARY
+                .matcher(key)
+                .replaceAll("$1_$2");
+        String normalized = separated.toLowerCase(Locale.ROOT);
         for (String segment : normalized.split("[._:-]")) {
             if (SENSITIVE_ATTRIBUTE_NAMES.contains(segment)) {
                 return true;
             }
         }
-        return false;
+        String compact = key.replaceAll("[^A-Za-z0-9]", "")
+                .toLowerCase(Locale.ROOT);
+        return SENSITIVE_COMPACT_NAMES.stream()
+                .anyMatch(compact::contains);
     }
 }

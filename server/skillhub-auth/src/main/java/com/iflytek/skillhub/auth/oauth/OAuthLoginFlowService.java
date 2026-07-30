@@ -15,12 +15,15 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -34,26 +37,40 @@ import org.springframework.stereotype.Service;
 @Service
 public class OAuthLoginFlowService {
 
-    private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
+    private final OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate;
     private final Map<String, OAuthClaimsExtractor> extractors;
     private final TrustedProviderRouteResolver providerRouteResolver;
     private final ExternalIdentityLoginService identityLoginService;
 
+    @Autowired
     public OAuthLoginFlowService(List<OAuthClaimsExtractor> extractorList,
                                  TrustedProviderRouteResolver providerRouteResolver,
                                  ExternalIdentityLoginService identityLoginService) {
+        this(
+                extractorList,
+                providerRouteResolver,
+                identityLoginService,
+                new DefaultOAuth2UserService());
+    }
+
+    OAuthLoginFlowService(
+            List<OAuthClaimsExtractor> extractorList,
+            TrustedProviderRouteResolver providerRouteResolver,
+            ExternalIdentityLoginService identityLoginService,
+            OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate) {
         this.extractors = extractorList.stream()
-                .collect(Collectors.toMap(OAuthClaimsExtractor::getProvider, Function.identity()));
+                .collect(Collectors.toMap(
+                        OAuthClaimsExtractor::getProvider,
+                        Function.identity()));
         this.providerRouteResolver = providerRouteResolver;
         this.identityLoginService = identityLoginService;
+        this.delegate = Objects.requireNonNull(delegate, "delegate");
     }
 
     public AuthenticatedLoginContext loadLoginContext(
             OAuth2UserRequest request,
             IdentityLoginContext context) {
-        OAuth2User upstreamUser = delegate.loadUser(request);
         String registrationId = request.getClientRegistration().getRegistrationId();
-
         OAuthClaimsExtractor extractor = extractors.get(registrationId);
         if (extractor == null) {
             throw new OAuth2AuthenticationException(
@@ -61,24 +78,44 @@ public class OAuthLoginFlowService {
             );
         }
 
+        ResolvedProviderHandle provider =
+                requireReadyProvider(request.getClientRegistration());
+        OAuth2User upstreamUser = delegate.loadUser(request);
         ProviderAuthenticationResult result =
                 extractor.authenticate(new OAuthAuthenticationExchange(
                         request,
                         upstreamUser));
         PlatformPrincipal principal = authenticate(
-                request.getClientRegistration(),
+                provider,
                 result,
                 context);
         return new AuthenticatedLoginContext(upstreamUser, principal);
+    }
+
+    public ResolvedProviderHandle requireReadyProvider(
+            ClientRegistration registration) {
+        try {
+            return providerRouteResolver.resolve(registration);
+        } catch (IdentityCoreException exception) {
+            throw mapIdentityFailure(exception);
+        }
     }
 
     public PlatformPrincipal authenticate(
             ClientRegistration registration,
             ProviderAuthenticationResult result,
             IdentityLoginContext context) {
+        return authenticate(
+                requireReadyProvider(registration),
+                result,
+                context);
+    }
+
+    PlatformPrincipal authenticate(
+            ResolvedProviderHandle provider,
+            ProviderAuthenticationResult result,
+            IdentityLoginContext context) {
         try {
-            ResolvedProviderHandle provider =
-                    providerRouteResolver.resolve(registration);
             IdentityLoginOutcome outcome = identityLoginService.authenticate(
                     provider,
                     result,

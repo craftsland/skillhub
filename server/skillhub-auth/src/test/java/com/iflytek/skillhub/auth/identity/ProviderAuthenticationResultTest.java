@@ -20,7 +20,18 @@ class ProviderAuthenticationResultTest {
                 "upstream:password",
                 "session.cookie",
                 "cas:ticket",
-                "raw_response")) {
+                "raw_response",
+                "clientSecret",
+                "oauth.clientSecret",
+                "clientsecret",
+                "apiKey",
+                "oauthApiKey",
+                "accessToken",
+                "refreshToken",
+                "idToken",
+                "privateKey",
+                "clientAssertion",
+                "rawResponse")) {
             assertThatThrownBy(() -> new ProviderAuthenticationResult(
                     new SubjectCandidate("oidc_sub", "subject-1"),
                     List.of(),

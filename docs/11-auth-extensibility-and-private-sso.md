@@ -135,13 +135,14 @@ public interface CredentialAuthenticationAdapter {
 public interface PassiveAuthenticationAdapter {
     ProviderInstanceDefinition provider();
     Optional<ProviderAuthenticationResult> authenticate(
-        HttpServletRequest request
+        PassiveAuthenticationRequest request
     );
 }
 ```
 
-适用于可信 Header、签名 JWT、已有企业会话和 SPNEGO。Adapter 可以只读请求，但不能写
-Session 或 Security Context。全局入口由
+适用于可信 Header、签名 JWT、已有企业会话和 SPNEGO。App 层只向 Adapter 提供不可变的
+method、request URI、query、remote address 和 Header 快照；SPI 不依赖 Servlet，
+Adapter 不能读取或写入 Session、Cookie response 或 Security Context。全局入口由
 `skillhub.auth.session-bootstrap.enabled` 控制。
 
 旧名称 `DirectAuthProvider` 和 `PassiveSessionAuthenticator` 仅保留为待删除的源码迁移

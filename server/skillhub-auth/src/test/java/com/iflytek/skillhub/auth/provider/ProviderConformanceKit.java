@@ -7,7 +7,6 @@ import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
 import com.iflytek.skillhub.auth.identity.ProviderAttributeValue;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
-import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +31,11 @@ public final class ProviderConformanceKit {
             "com/iflytek/skillhub/domain/user/UserAccount",
             "com/iflytek/skillhub/domain/namespace/",
             "jakarta/persistence/",
-            "org/springframework/data/jpa/");
+            "jakarta/servlet/",
+            "javax/servlet/",
+            "org/springframework/data/jpa/",
+            "org/springframework/security/core/context/",
+            "org/springframework/security/web/context/");
 
     private ProviderConformanceKit() {
     }
@@ -61,7 +64,7 @@ public final class ProviderConformanceKit {
 
     public static ProviderAuthenticationResult verifyPassive(
             PassiveAuthenticationAdapter adapter,
-            HttpServletRequest fixture) {
+            PassiveAuthenticationRequest fixture) {
         ProviderInstanceDefinition provider =
                 verifyDefinition(adapter.provider(), adapter.provider());
         Optional<ProviderAuthenticationResult> authentication =
@@ -73,6 +76,25 @@ public final class ProviderConformanceKit {
         ProviderAuthenticationResult result = authentication.orElseThrow();
         verifyResult(provider, result);
         return result;
+    }
+
+    /**
+     * Verifies stable subjects from two equivalent, independently valid
+     * protocol fixtures. Passive adapters should use distinct nonces or
+     * assertions so this check does not conflict with replay protection.
+     */
+    public static void verifyStableSubjects(
+            ProviderInstanceDefinition provider,
+            ProviderAuthenticationResult first,
+            ProviderAuthenticationResult second) {
+        verifyResult(provider, first);
+        verifyResult(provider, second);
+        assertThat(second.primarySubject())
+                .as("equivalent fixtures must produce a stable primary subject")
+                .isEqualTo(first.primarySubject());
+        assertThat(second.alternateSubjects())
+                .as("equivalent fixtures must produce stable alternate subjects")
+                .isEqualTo(first.alternateSubjects());
     }
 
     public static void verifyResult(
