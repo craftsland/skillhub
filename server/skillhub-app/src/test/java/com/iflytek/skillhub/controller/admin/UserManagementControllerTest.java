@@ -36,6 +36,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -168,9 +169,9 @@ class UserManagementControllerTest {
         String requestBody = "{\"status\":\"DISABLED\"}";
 
         when(adminUserAppService.updateUserStatus(
-                "user-123",
-                "DISABLED",
-                "user-42",
+                eq("user-123"),
+                eq("DISABLED"),
+                eq("user-42"),
                 any(AuditRequestContext.class)))
                 .thenReturn(new AdminUserMutationResponse("user-123", null, "DISABLED"));
 
@@ -195,9 +196,9 @@ class UserManagementControllerTest {
         );
 
         when(adminUserAppService.updateUserStatus(
-                "user-123",
-                "ACTIVE",
-                "user-42",
+                eq("user-123"),
+                eq("ACTIVE"),
+                eq("user-42"),
                 any(AuditRequestContext.class)))
                 .thenReturn(new AdminUserMutationResponse("user-123", null, "ACTIVE"));
 
@@ -210,9 +211,9 @@ class UserManagementControllerTest {
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
         verify(adminUserAppService).updateUserStatus(
-                "user-123",
-                "ACTIVE",
-                "user-42",
+                eq("user-123"),
+                eq("ACTIVE"),
+                eq("user-42"),
                 any(AuditRequestContext.class));
     }
 
@@ -226,9 +227,9 @@ class UserManagementControllerTest {
         );
 
         when(adminUserAppService.updateUserStatus(
-                "user-123",
-                "DISABLED",
-                "user-42",
+                eq("user-123"),
+                eq("DISABLED"),
+                eq("user-42"),
                 any(AuditRequestContext.class)))
                 .thenReturn(new AdminUserMutationResponse("user-123", null, "DISABLED"));
 
@@ -241,9 +242,9 @@ class UserManagementControllerTest {
                 .andExpect(jsonPath("$.data.status").value("DISABLED"));
 
         verify(adminUserAppService).updateUserStatus(
-                "user-123",
-                "DISABLED",
-                "user-42",
+                eq("user-123"),
+                eq("DISABLED"),
+                eq("user-42"),
                 any(AuditRequestContext.class));
     }
 
@@ -257,9 +258,9 @@ class UserManagementControllerTest {
         );
 
         when(adminUserAppService.updateUserStatus(
-                "user-123",
-                "ACTIVE",
-                "user-42",
+                eq("user-123"),
+                eq("ACTIVE"),
+                eq("user-42"),
                 any(AuditRequestContext.class)))
                 .thenReturn(new AdminUserMutationResponse("user-123", null, "ACTIVE"));
 
@@ -272,9 +273,9 @@ class UserManagementControllerTest {
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
         verify(adminUserAppService).updateUserStatus(
-                "user-123",
-                "ACTIVE",
-                "user-42",
+                eq("user-123"),
+                eq("ACTIVE"),
+                eq("user-42"),
                 any(AuditRequestContext.class));
     }
 
