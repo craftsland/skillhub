@@ -416,6 +416,11 @@ class ScanTaskConsumerTest {
         }
 
         @Override
+        public List<SkillVersion> findBySkillIdForUpdate(Long skillId) {
+            throw unsupported();
+        }
+
+        @Override
         public List<SkillVersion> findBySkillIdAndStatus(Long skillId, SkillVersionStatus status) {
             throw unsupported();
         }
