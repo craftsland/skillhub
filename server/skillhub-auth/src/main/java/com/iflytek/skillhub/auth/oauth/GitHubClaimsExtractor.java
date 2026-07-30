@@ -1,5 +1,10 @@
 package com.iflytek.skillhub.auth.oauth;
 
+import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
+import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
+import com.iflytek.skillhub.auth.identity.ProviderAttributeValue;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -8,8 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Provider-specific claims extractor that enriches GitHub OAuth users with their primary verified
@@ -31,20 +38,53 @@ public class GitHubClaimsExtractor implements OAuthClaimsExtractor {
     public String getProvider() { return "github"; }
 
     @Override
-    public OAuthClaims extract(OAuth2UserRequest request, OAuth2User oAuth2User) {
+    public ProviderAuthenticationResult extract(
+            OAuth2UserRequest request,
+            OAuth2User oAuth2User) {
         Map<String, Object> attrs = oAuth2User.getAttributes();
         GitHubEmail primaryEmail = loadPrimaryEmail(request);
         String email = primaryEmail != null ? primaryEmail.email() : (String) attrs.get("email");
         boolean emailVerified = primaryEmail != null && primaryEmail.verified();
 
-        return new OAuthClaims(
-            "github",
-            String.valueOf(attrs.get("id")),
-            email,
-            emailVerified,
-            (String) attrs.get("login"),
-            attrs
-        );
+        Map<String, List<ProviderAttributeValue>> attributes =
+                new LinkedHashMap<>();
+        put(attributes, "login", attrs.get("login"), ProviderAttributeTrust.ASSERTED);
+        put(
+                attributes,
+                "email",
+                email,
+                emailVerified
+                        ? ProviderAttributeTrust.VERIFIED
+                        : ProviderAttributeTrust.UNVERIFIED);
+        put(
+                attributes,
+                "avatar_url",
+                attrs.get("avatar_url"),
+                ProviderAttributeTrust.ASSERTED);
+
+        return new ProviderAuthenticationResult(
+                new SubjectCandidate(
+                        "github_user_id",
+                        String.valueOf(attrs.get("id"))),
+                List.of(),
+                attributes,
+                new ProtocolAuthenticationEvidence(
+                        "oauth2-github",
+                        request.getAccessToken().getIssuedAt(),
+                        Set.of("oauth2_authorization_code")));
+    }
+
+    private void put(
+            Map<String, List<ProviderAttributeValue>> attributes,
+            String key,
+            Object rawValue,
+            ProviderAttributeTrust trust) {
+        if (!(rawValue instanceof String value) || value.isBlank()) {
+            return;
+        }
+        attributes.put(
+                key,
+                List.of(new ProviderAttributeValue(value, trust)));
     }
 
     private GitHubEmail loadPrimaryEmail(OAuth2UserRequest request) {

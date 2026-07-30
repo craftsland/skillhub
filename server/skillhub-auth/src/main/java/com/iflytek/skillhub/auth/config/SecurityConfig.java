@@ -4,7 +4,9 @@ import com.iflytek.skillhub.auth.oauth.CustomOAuth2UserService;
 import com.iflytek.skillhub.auth.oauth.CustomOidcUserService;
 import com.iflytek.skillhub.auth.oauth.OAuth2LoginFailureHandler;
 import com.iflytek.skillhub.auth.oauth.OAuth2LoginSuccessHandler;
+import com.iflytek.skillhub.auth.oauth.IdentityProviderRouteReadinessFilter;
 import com.iflytek.skillhub.auth.oauth.SkillHubOAuth2AuthorizationRequestResolver;
+import com.iflytek.skillhub.auth.identity.IdentityProviderReadinessService;
 import com.iflytek.skillhub.auth.mock.MockAuthFilter;
 import com.iflytek.skillhub.auth.policy.RouteSecurityPolicyRegistry;
 import com.iflytek.skillhub.auth.token.ApiTokenAuthenticationFilter;
@@ -31,6 +33,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
@@ -66,6 +70,8 @@ public class SecurityConfig {
     private final AccessDeniedHandler apiAccessDeniedHandler;
     private final ObjectProvider<MockAuthFilter> mockAuthFilterProvider;
     private final RouteSecurityPolicyRegistry routeSecurityPolicyRegistry;
+    private final ClientRegistrationRepository clientRegistrationRepository;
+    private final IdentityProviderReadinessService providerReadinessService;
 
     public SecurityConfig(CustomOAuth2UserService customOAuth2UserService,
                           CustomOidcUserService customOidcUserService,
@@ -77,7 +83,9 @@ public class SecurityConfig {
                           AuthenticationEntryPoint apiAuthenticationEntryPoint,
                           AccessDeniedHandler apiAccessDeniedHandler,
                           ObjectProvider<MockAuthFilter> mockAuthFilterProvider,
-                          RouteSecurityPolicyRegistry routeSecurityPolicyRegistry) {
+                          RouteSecurityPolicyRegistry routeSecurityPolicyRegistry,
+                          ClientRegistrationRepository clientRegistrationRepository,
+                          IdentityProviderReadinessService providerReadinessService) {
         this.customOAuth2UserService = customOAuth2UserService;
         this.customOidcUserService = customOidcUserService;
         this.authorizationRequestResolver = authorizationRequestResolver;
@@ -89,6 +97,8 @@ public class SecurityConfig {
         this.apiAccessDeniedHandler = apiAccessDeniedHandler;
         this.mockAuthFilterProvider = mockAuthFilterProvider;
         this.routeSecurityPolicyRegistry = routeSecurityPolicyRegistry;
+        this.clientRegistrationRepository = clientRegistrationRepository;
+        this.providerReadinessService = providerReadinessService;
     }
 
     /**
@@ -156,6 +166,11 @@ public class SecurityConfig {
                 .invalidateHttpSession(true)
                 .deleteCookies("SESSION")
             )
+            .addFilterBefore(
+                new IdentityProviderRouteReadinessFilter(
+                    clientRegistrationRepository,
+                    providerReadinessService),
+                OAuth2AuthorizationRequestRedirectFilter.class)
             .addFilterBefore(apiTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(apiTokenScopeFilter, ApiTokenAuthenticationFilter.class);
 

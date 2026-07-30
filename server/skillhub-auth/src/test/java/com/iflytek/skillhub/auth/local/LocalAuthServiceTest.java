@@ -12,6 +12,8 @@ import static org.mockito.Mockito.verify;
 import com.iflytek.skillhub.auth.exception.AuthFlowException;
 import com.iflytek.skillhub.auth.entity.Role;
 import com.iflytek.skillhub.auth.entity.UserRoleBinding;
+import com.iflytek.skillhub.auth.identity.AccountLoginGuard;
+import com.iflytek.skillhub.auth.identity.PlatformPrincipalFactory;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
 import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
 import com.iflytek.skillhub.domain.user.UserAccount;
@@ -58,11 +60,12 @@ class LocalAuthServiceTest {
         service = new LocalAuthService(
             credentialRepository,
             userAccountRepository,
-            userRoleBindingRepository,
             globalNamespaceMembershipService,
             new PasswordPolicyValidator(),
             passwordEncoder,
-            CLOCK
+            CLOCK,
+            new AccountLoginGuard(),
+            new PlatformPrincipalFactory(userRoleBindingRepository)
         );
     }
 
@@ -213,6 +216,25 @@ class LocalAuthServiceTest {
         assertThatThrownBy(() -> service.login("alice", "Abcd123!"))
             .isInstanceOf(AuthFlowException.class)
             .hasMessageContaining("error.auth.local.accountMerged");
+    }
+
+    @Test
+    void login_withSystemAccount_fails() {
+        LocalCredential credential =
+            new LocalCredential("system_1", "system", "encoded");
+        UserAccount user = UserAccount.systemAccount(
+            "system_1", "system", null, null);
+
+        given(credentialRepository.findByUsernameIgnoreCase("system"))
+            .willReturn(Optional.of(credential));
+        given(userAccountRepository.findById("system_1"))
+            .willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> service.login("system", "Abcd123!"))
+            .isInstanceOf(AuthFlowException.class)
+            .hasMessageContaining("error.auth.local.systemAccount");
+
+        verify(passwordEncoder, never()).matches("Abcd123!", "encoded");
     }
 
     @Test

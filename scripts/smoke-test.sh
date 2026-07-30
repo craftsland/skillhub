@@ -6,13 +6,19 @@ PASS=0
 FAIL=0
 COOKIE_JAR="$(mktemp)"
 REGISTER_RESPONSE_FILE="$(mktemp)"
+AUTH_METHODS_RESPONSE_FILE="$(mktemp)"
+AUTH_PROVIDERS_RESPONSE_FILE="$(mktemp)"
 USERNAME="smoketest_$(date +%s)"
 EMAIL="${USERNAME}@example.com"
 PASSWORD="Smoke@2026"
 NEW_PASSWORD="Smoke@2027"
 
 cleanup() {
-  rm -f "$COOKIE_JAR" "$REGISTER_RESPONSE_FILE"
+  rm -f \
+    "$COOKIE_JAR" \
+    "$REGISTER_RESPONSE_FILE" \
+    "$AUTH_METHODS_RESPONSE_FILE" \
+    "$AUTH_PROVIDERS_RESPONSE_FILE"
 }
 
 trap cleanup EXIT
@@ -40,6 +46,57 @@ check "Health endpoint" "$BASE_URL/actuator/health" "200"
 check "Prometheus metrics requires auth" "$BASE_URL/actuator/prometheus" "401"
 check "Namespaces API requires auth" "$BASE_URL/api/v1/namespaces" "401"
 check "Auth required" "$BASE_URL/api/v1/auth/me" "401"
+check "Unknown OAuth provider fails before upstream redirect" \
+  "$BASE_URL/oauth2/authorization/__missing_provider__" "403"
+
+AUTH_METHODS_STATUS="$(curl --max-time 10 -s \
+  -o "$AUTH_METHODS_RESPONSE_FILE" \
+  -w "%{http_code}" \
+  "$BASE_URL/api/v1/auth/methods" || true)"
+AUTH_PROVIDERS_STATUS="$(curl --max-time 10 -s \
+  -o "$AUTH_PROVIDERS_RESPONSE_FILE" \
+  -w "%{http_code}" \
+  "$BASE_URL/api/v1/auth/providers" || true)"
+if [[ "$AUTH_METHODS_STATUS" == "200" \
+  && "$AUTH_PROVIDERS_STATUS" == "200" ]] \
+  && python3 - \
+    "$AUTH_METHODS_RESPONSE_FILE" \
+    "$AUTH_PROVIDERS_RESPONSE_FILE" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as response:
+    methods = json.load(response)["data"]
+with open(sys.argv[2], encoding="utf-8") as response:
+    providers = json.load(response)["data"]
+
+method_ids = {method["id"] for method in methods}
+oauth_methods = {
+    method["provider"]: method
+    for method in methods
+    if method["methodType"] == "OAUTH_REDIRECT"
+}
+oauth_providers = {provider["id"]: provider for provider in providers}
+
+valid = (
+    "local-password" in method_ids
+    and oauth_methods.keys() == oauth_providers.keys()
+    and all(
+        method["actionUrl"].startswith(
+            f"/oauth2/authorization/{provider_code}"
+        )
+        for provider_code, method in oauth_methods.items()
+    )
+)
+raise SystemExit(0 if valid else 1)
+PY
+then
+  echo "PASS: Authentication catalog exposes only reconciled OAuth providers"
+  PASS=$((PASS + 1))
+else
+  echo "FAIL: Authentication catalog is inconsistent (methods HTTP $AUTH_METHODS_STATUS, providers HTTP $AUTH_PROVIDERS_STATUS)"
+  FAIL=$((FAIL + 1))
+fi
 
 curl -s -c "$COOKIE_JAR" "$BASE_URL/api/v1/auth/me" >/dev/null
 CSRF_TOKEN="$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$COOKIE_JAR" | tail -n 1)"
@@ -158,6 +215,18 @@ fi
 
 # Refresh CSRF after login
 ADMIN_CSRF="$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$ADMIN_COOKIE_JAR" | tail -n 1)"
+
+UNKNOWN_RECOVERY_STATUS="$(curl --max-time 10 -s -o /dev/null -w "%{http_code}" \
+  -X POST "$BASE_URL/api/v1/admin/identity-providers/__missing_provider__/authority/recover" \
+  -b "$ADMIN_COOKIE_JAR" \
+  -H "X-XSRF-TOKEN: $ADMIN_CSRF" || true)"
+if [[ "$UNKNOWN_RECOVERY_STATUS" == "404" ]]; then
+  echo "PASS: Provider authority recovery rejects unknown provider without mutation (HTTP $UNKNOWN_RECOVERY_STATUS)"
+  PASS=$((PASS + 1))
+else
+  echo "FAIL: Provider authority recovery unknown-provider guard (expected 404, got $UNKNOWN_RECOVERY_STATUS)"
+  FAIL=$((FAIL + 1))
+fi
 
 # Exercise the administrator activation workflow over HTTP. The transactional
 # integration test covers the missing-membership precondition; this smoke path

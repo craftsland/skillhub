@@ -1,5 +1,16 @@
 package com.iflytek.skillhub.auth.oauth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
+import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import java.time.Instant;
 import java.util.List;
@@ -21,54 +32,69 @@ import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 class CustomOidcUserServiceTest {
 
     @Test
-    void loadUser_mapsOidcClaimsThroughExistingLoginFlow() {
-        OAuthLoginFlowService loginFlowService = mock(OAuthLoginFlowService.class);
+    void loadUserMapsOidcFactsThroughUnifiedLoginFlow() {
+        OAuthLoginFlowService loginFlowService =
+                mock(OAuthLoginFlowService.class);
         OAuth2UserService<OidcUserRequest, OidcUser> delegate = mock();
-        CustomOidcUserService service = new CustomOidcUserService(loginFlowService, delegate);
+        OAuthIdentityLoginContextResolver contextResolver = mock();
+        CustomOidcUserService service =
+                new CustomOidcUserService(
+                        loginFlowService,
+                        delegate,
+                        contextResolver);
         OidcUserRequest request = oidcRequest();
+        IdentityLoginContext loginContext = context();
         OidcUser upstreamUser = oidcUser(Map.of(
                 IdTokenClaimNames.SUB, "oidc-sub-1",
                 "email", "user@example.com",
                 "email_verified", true,
                 "preferred_username", "preferred-user",
                 "name", "Display User",
-                "picture", "https://idp.example/avatar.png"
-        ));
+                "picture", "https://idp.example/avatar.png"));
         PlatformPrincipal platformPrincipal = new PlatformPrincipal(
                 "usr_1",
                 "Preferred User",
                 "user@example.com",
                 "https://idp.example/avatar.png",
                 "okta",
-                Set.of("USER", "SUPER_ADMIN")
-        );
+                Set.of("USER", "SUPER_ADMIN"));
         when(delegate.loadUser(request)).thenReturn(upstreamUser);
-        when(loginFlowService.authenticate(any())).thenReturn(platformPrincipal);
+        when(contextResolver.current()).thenReturn(loginContext);
+        when(loginFlowService.authenticate(
+                eq(request.getClientRegistration()),
+                any(ProviderAuthenticationResult.class),
+                eq(loginContext)))
+                .thenReturn(platformPrincipal);
 
         OidcUser loadedUser = service.loadUser(request);
 
-        ArgumentCaptor<OAuthClaims> claimsCaptor = ArgumentCaptor.forClass(OAuthClaims.class);
-        verify(loginFlowService).authenticate(claimsCaptor.capture());
-        OAuthClaims claims = claimsCaptor.getValue();
-        assertThat(claims.provider()).isEqualTo("okta");
-        assertThat(claims.subject()).isEqualTo("oidc-sub-1");
-        assertThat(claims.email()).isEqualTo("user@example.com");
-        assertThat(claims.emailVerified()).isTrue();
-        assertThat(claims.providerLogin()).isEqualTo("preferred-user");
-        assertThat(claims.extra()).containsEntry("avatar_url", "https://idp.example/avatar.png");
+        ArgumentCaptor<ProviderAuthenticationResult> resultCaptor =
+                ArgumentCaptor.forClass(
+                        ProviderAuthenticationResult.class);
+        verify(loginFlowService).authenticate(
+                eq(request.getClientRegistration()),
+                resultCaptor.capture(),
+                eq(loginContext));
+        ProviderAuthenticationResult result = resultCaptor.getValue();
+        assertThat(result.primarySubject().type()).isEqualTo("oidc_sub");
+        assertThat(result.primarySubject().value())
+                .isEqualTo("oidc-sub-1");
+        assertThat(result.attributes().get("email").getFirst().value())
+                .isEqualTo("user@example.com");
+        assertThat(result.attributes().get("email").getFirst().trust())
+                .isEqualTo(ProviderAttributeTrust.VERIFIED);
+        assertThat(result.attributes().get("preferred_username")
+                .getFirst().value()).isEqualTo("preferred-user");
+        assertThat(result.attributes().get("picture").getFirst().value())
+                .isEqualTo("https://idp.example/avatar.png");
 
-        assertThat((Object) loadedUser.getAttribute("platformPrincipal")).isEqualTo(platformPrincipal);
-        assertThat((Object) loadedUser.getAttribute("providerLogin")).isEqualTo("usr_1");
+        assertThat((Object) loadedUser.getAttribute("platformPrincipal"))
+                .isEqualTo(platformPrincipal);
+        assertThat((Object) loadedUser.getAttribute("providerLogin"))
+                .isEqualTo("usr_1");
         assertThat(loadedUser.getName()).isEqualTo("usr_1");
         assertThat(loadedUser.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
@@ -76,116 +102,125 @@ class CustomOidcUserServiceTest {
     }
 
     @Test
-    void toOAuthClaims_fallsBackToNameWhenPreferredUsernameIsMissing() {
-        OAuthClaims claims = CustomOidcUserService.toOAuthClaims(
-                oidcRequest(),
-                oidcUser(Map.of(
-                        IdTokenClaimNames.SUB, "subject-2",
-                        "email", "fallback@example.com",
-                        "email_verified", false,
-                        "name", "Fallback Name"
-                ))
-        );
+    void conversionPreservesUnverifiedEmailAsUntrustedFact() {
+        ProviderAuthenticationResult result =
+                CustomOidcUserService.toProviderAuthenticationResult(
+                        oidcRequest(),
+                        oidcUser(Map.of(
+                                IdTokenClaimNames.SUB, "subject-3",
+                                "email", "unverified@example.com",
+                                "email_verified", false,
+                                "name", "Fallback Name")));
 
-        assertThat(claims.provider()).isEqualTo("okta");
-        assertThat(claims.subject()).isEqualTo("subject-2");
-        assertThat(claims.email()).isNull();
-        assertThat(claims.emailVerified()).isFalse();
-        assertThat(claims.providerLogin()).isEqualTo("Fallback Name");
+        assertThat(result.primarySubject().value()).isEqualTo("subject-3");
+        assertThat(result.attributes().get("email").getFirst().value())
+                .isEqualTo("unverified@example.com");
+        assertThat(result.attributes().get("email").getFirst().trust())
+                .isEqualTo(ProviderAttributeTrust.UNVERIFIED);
+        assertThat(result.attributes().get("name").getFirst().value())
+                .isEqualTo("Fallback Name");
     }
 
     @Test
-    void toOAuthClaims_nullsEmailWhenNotVerified() {
-        OAuthClaims claims = CustomOidcUserService.toOAuthClaims(
-                oidcRequest(),
-                oidcUser(Map.of(
-                        IdTokenClaimNames.SUB, "subject-3",
-                        "email", "unverified@example.com",
-                        "email_verified", false,
-                        "preferred_username", "unverified-user"
-                ))
-        );
+    void conversionTreatsAbsentEmailVerifiedAsUnverified() {
+        ProviderAuthenticationResult result =
+                CustomOidcUserService.toProviderAuthenticationResult(
+                        oidcRequest(),
+                        oidcUser(Map.of(
+                                IdTokenClaimNames.SUB,
+                                "subject-absent-verified",
+                                "email",
+                                "maybe@example.com")));
 
-        assertThat(claims.provider()).isEqualTo("okta");
-        assertThat(claims.subject()).isEqualTo("subject-3");
-        assertThat(claims.email()).isNull();
-        assertThat(claims.emailVerified()).isFalse();
-        assertThat(claims.providerLogin()).isEqualTo("unverified-user");
+        assertThat(result.attributes().get("email").getFirst().trust())
+                .isEqualTo(ProviderAttributeTrust.UNVERIFIED);
     }
 
     @Test
-    void toOAuthClaims_nullsEmailWhenEmailVerifiedClaimIsAbsent() {
-        OAuthClaims claims = CustomOidcUserService.toOAuthClaims(
-                oidcRequest(),
-                oidcUser(Map.of(
-                        IdTokenClaimNames.SUB, "subject-absent-verified",
-                        "email", "maybe@example.com",
-                        "preferred_username", "maybe-user"
-                ))
-        );
-
-        assertThat(claims.email()).isNull();
-        assertThat(claims.emailVerified()).isFalse();
-        assertThat(claims.providerLogin()).isEqualTo("maybe-user");
-    }
-
-    @Test
-    void toOAuthClaims_throwsWhenSubIsMissing() {
+    void conversionThrowsWhenSubIsMissing() {
         OidcUser user = mock(OidcUser.class);
-        when(user.getClaims()).thenReturn(Map.of("email", "no-sub@example.com"));
-        assertThatThrownBy(() -> CustomOidcUserService.toOAuthClaims(oidcRequest(), user))
+        when(user.getClaims())
+                .thenReturn(Map.of("email", "no-sub@example.com"));
+
+        assertThatThrownBy(() ->
+                CustomOidcUserService.toProviderAuthenticationResult(
+                        oidcRequest(),
+                        user))
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .hasMessageContaining("sub");
     }
 
     @Test
-    void toOAuthClaims_throwsWhenSubIsBlank() {
+    void conversionThrowsWhenSubIsBlank() {
         OidcUser user = mock(OidcUser.class);
-        when(user.getClaims()).thenReturn(Map.of(IdTokenClaimNames.SUB, "   "));
-        assertThatThrownBy(() -> CustomOidcUserService.toOAuthClaims(oidcRequest(), user))
+        when(user.getClaims())
+                .thenReturn(Map.of(IdTokenClaimNames.SUB, "   "));
+
+        assertThatThrownBy(() ->
+                CustomOidcUserService.toProviderAuthenticationResult(
+                        oidcRequest(),
+                        user))
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .hasMessageContaining("sub");
     }
 
     @Test
-    void toOAuthClaims_fallsBackToSubWhenAllOtherFieldsMissing() {
-        OAuthClaims claims = CustomOidcUserService.toOAuthClaims(
-                oidcRequest(),
-                oidcUser(Map.of(IdTokenClaimNames.SUB, "only-sub"))
-        );
+    void conversionUsesExactCaseSensitiveSubWhenProfileIsAbsent() {
+        ProviderAuthenticationResult result =
+                CustomOidcUserService.toProviderAuthenticationResult(
+                        oidcRequest(),
+                        oidcUser(Map.of(
+                                IdTokenClaimNames.SUB,
+                                "CaseSensitiveSubject")));
 
-        assertThat(claims.subject()).isEqualTo("only-sub");
-        assertThat(claims.providerLogin()).isEqualTo("only-sub");
-        assertThat(claims.email()).isNull();
-        assertThat(claims.emailVerified()).isFalse();
+        assertThat(result.primarySubject().value())
+                .isEqualTo("CaseSensitiveSubject");
+        assertThat(result.attributes().get("sub").getFirst().value())
+                .isEqualTo("CaseSensitiveSubject");
+        assertThat(result.attributes()).doesNotContainKey("email");
     }
 
     @Test
-    void loadUser_deniedWhenOidcEmailNotVerifiedAndPolicyChecksEmail() {
-        OAuthLoginFlowService loginFlowService = mock(OAuthLoginFlowService.class);
+    void deniedUnverifiedEmailStillReachesCoreWithUnverifiedTrust() {
+        OAuthLoginFlowService loginFlowService =
+                mock(OAuthLoginFlowService.class);
         OAuth2UserService<OidcUserRequest, OidcUser> delegate = mock();
-        CustomOidcUserService service = new CustomOidcUserService(loginFlowService, delegate);
+        OAuthIdentityLoginContextResolver contextResolver = mock();
+        CustomOidcUserService service =
+                new CustomOidcUserService(
+                        loginFlowService,
+                        delegate,
+                        contextResolver);
         OidcUserRequest request = oidcRequest();
+        IdentityLoginContext loginContext = context();
         OidcUser upstreamUser = oidcUser(Map.of(
                 IdTokenClaimNames.SUB, "oidc-sub-unverified",
                 "email", "user@company.com",
                 "email_verified", false,
-                "preferred_username", "unverified-user"
-        ));
+                "preferred_username", "unverified-user"));
         when(delegate.loadUser(request)).thenReturn(upstreamUser);
+        when(contextResolver.current()).thenReturn(loginContext);
 
-        ArgumentCaptor<OAuthClaims> claimsCaptor = ArgumentCaptor.forClass(OAuthClaims.class);
-        when(loginFlowService.authenticate(claimsCaptor.capture()))
+        ArgumentCaptor<ProviderAuthenticationResult> resultCaptor =
+                ArgumentCaptor.forClass(
+                        ProviderAuthenticationResult.class);
+        when(loginFlowService.authenticate(
+                eq(request.getClientRegistration()),
+                resultCaptor.capture(),
+                eq(loginContext)))
                 .thenThrow(new OAuth2AuthenticationException(
-                        new org.springframework.security.oauth2.core.OAuth2Error("access_denied")));
+                        new org.springframework.security.oauth2.core.OAuth2Error(
+                                "access_denied")));
 
         assertThatThrownBy(() -> service.loadUser(request))
                 .isInstanceOf(OAuth2AuthenticationException.class);
 
-        OAuthClaims captured = claimsCaptor.getValue();
-        assertThat(captured.email()).isNull();
-        assertThat(captured.emailVerified()).isFalse();
-        assertThat(captured.subject()).isEqualTo("oidc-sub-unverified");
+        ProviderAuthenticationResult captured = resultCaptor.getValue();
+        assertThat(captured.attributes().get("email")
+                .getFirst().trust())
+                .isEqualTo(ProviderAttributeTrust.UNVERIFIED);
+        assertThat(captured.primarySubject().value())
+                .isEqualTo("oidc-sub-unverified");
     }
 
     private static OidcUserRequest oidcRequest() {
@@ -194,15 +229,23 @@ class CustomOidcUserServiceTest {
                 "id-token",
                 issuedAt,
                 issuedAt.plusSeconds(300),
-                Map.of(IdTokenClaimNames.SUB, "request-sub")
-        );
+                Map.of(IdTokenClaimNames.SUB, "request-sub"));
         OAuth2AccessToken accessToken = new OAuth2AccessToken(
                 OAuth2AccessToken.TokenType.BEARER,
                 "access-token",
                 issuedAt,
-                issuedAt.plusSeconds(300)
-        );
-        return new OidcUserRequest(clientRegistration(), accessToken, idToken);
+                issuedAt.plusSeconds(300));
+        return new OidcUserRequest(
+                clientRegistration(),
+                accessToken,
+                idToken);
+    }
+
+    private static IdentityLoginContext context() {
+        return new IdentityLoginContext(
+                "req-123",
+                "203.0.113.9",
+                "SkillHub Browser");
     }
 
     private static OidcUser oidcUser(Map<String, Object> claims) {
@@ -211,25 +254,27 @@ class CustomOidcUserServiceTest {
                 "id-token",
                 issuedAt,
                 issuedAt.plusSeconds(300),
-                claims
-        );
+                claims);
         return new DefaultOidcUser(
                 List.of(new SimpleGrantedAuthority("OIDC_USER")),
                 idToken,
-                new OidcUserInfo(claims)
-        );
+                new OidcUserInfo(claims));
     }
 
     private static ClientRegistration clientRegistration() {
         return ClientRegistration.withRegistrationId("okta")
                 .clientId("client")
                 .clientSecret("secret")
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("https://skillhub.example/login/oauth2/code/okta")
-                .authorizationUri("https://idp.example/oauth2/v1/authorize")
+                .authorizationGrantType(
+                        AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri(
+                        "https://skillhub.example/login/oauth2/code/okta")
+                .authorizationUri(
+                        "https://idp.example/oauth2/v1/authorize")
                 .tokenUri("https://idp.example/oauth2/v1/token")
                 .jwkSetUri("https://idp.example/oauth2/v1/keys")
-                .userInfoUri("https://idp.example/oauth2/v1/userinfo")
+                .userInfoUri(
+                        "https://idp.example/oauth2/v1/userinfo")
                 .userNameAttributeName(IdTokenClaimNames.SUB)
                 .scope("openid", "profile", "email")
                 .build();
