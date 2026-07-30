@@ -1,5 +1,7 @@
 package com.iflytek.skillhub.controller;
 
+import com.iflytek.skillhub.auth.identity.IdentityProviderCatalog;
+import com.iflytek.skillhub.auth.identity.IdentityProviderLoginMethod;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.local.LocalCredentialRepository;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
@@ -7,6 +9,7 @@ import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.security.AuthFailureThrottleService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -67,6 +70,18 @@ class AuthControllerTest {
 
     @MockBean
     private LocalCredentialRepository localCredentialRepository;
+
+    @MockBean
+    private IdentityProviderCatalog identityProviderCatalog;
+
+    @BeforeEach
+    void setUpReadyIdentityProviders() {
+        given(identityProviderCatalog.listReadyProviders())
+            .willReturn(List.of(new IdentityProviderLoginMethod(
+                "github",
+                "GitHub"
+            )));
+    }
 
     @Test
     void meShouldReturnUnauthorizedForAnonymousRequest() throws Exception {
