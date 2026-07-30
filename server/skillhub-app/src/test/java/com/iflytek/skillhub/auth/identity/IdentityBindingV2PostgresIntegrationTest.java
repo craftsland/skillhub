@@ -69,9 +69,6 @@ class IdentityBindingV2PostgresIntegrationTest {
                 "spring.jpa.database-platform",
                 () -> "org.hibernate.dialect.PostgreSQLDialect");
         registry.add(
-                "spring.jpa.properties.hibernate.dialect",
-                () -> "org.hibernate.dialect.PostgreSQLDialect");
-        registry.add(
                 "spring.jpa.hibernate.ddl-auto",
                 () -> "validate");
         registry.add(
