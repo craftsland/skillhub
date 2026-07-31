@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -201,6 +203,43 @@ class RequestLoggingFilterTest {
                     .doesNotContain("ST-request-log-secret")
                     .doesNotContain("state-secret")
                     .doesNotContain("body-secret");
+        });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/api/v1/account/merge/reauthenticate/local",
+            "/api/v1/account/merge/intents/merge-intent/secondary-auth/local",
+            "/api/v1/account/merge/verify"
+    })
+    void doFilterInternal_omitsAccountMergeBody(String requestUri)
+            throws Exception {
+        RequestLoggingFilter filter = filter();
+        attachAppender();
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", requestUri);
+        request.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        request.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        request.setContent(
+                """
+                {"username":"secondary-user","password":"body-secret",
+                 "verificationToken":"verification-secret"}
+                """.getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+
+        filter.doFilter(
+                request,
+                response,
+                (req, res) -> req.getReader().lines().count());
+
+        assertThat(loggedMessages()).anySatisfy(message -> {
+            assertThat(message)
+                    .contains("POST " + requestUri)
+                    .doesNotContain("secondary-user")
+                    .doesNotContain("body-secret")
+                    .doesNotContain("verification-secret")
+                    .doesNotContain("Body:");
         });
     }
 

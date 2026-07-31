@@ -37,7 +37,8 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             "/sse"
     );
     private static final Set<String> SENSITIVE_BODY_PREFIXES = Set.of(
-            "/api/v1/auth/"
+            "/api/v1/auth/",
+            "/api/v1/account/merge"
     );
     private final SensitiveLogSanitizer sensitiveLogSanitizer;
 
