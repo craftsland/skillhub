@@ -27,6 +27,14 @@ import com.iflytek.skillhub.auth.identity.IdentityProviderRegistry;
 import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
+import com.iflytek.skillhub.auth.merge.AccountMergeProviderProofService;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
+import com.iflytek.skillhub.auth.merge.AccountMergeActor;
+import com.iflytek.skillhub.auth.merge.AccountMergeBrowserFlow;
+import com.iflytek.skillhub.auth.merge.AccountMergeIntent;
+import com.iflytek.skillhub.auth.merge.AccountMergeIntentStatus;
+import com.iflytek.skillhub.auth.merge.AccountMergePrimaryProof;
+import com.iflytek.skillhub.auth.merge.AccountMergeProviderPrimaryProof;
 import com.iflytek.skillhub.auth.provider.BrowserAuthenticationAdapter;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
@@ -40,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -149,6 +158,11 @@ class CasLoginAppServiceTest {
                 "/dashboard",
                 Duration.ofMinutes(5));
         verify(fixture.identityLinkSessionManager)
+                .activateBrowserFlow(
+                        request.getSession(),
+                        PROVIDER,
+                        STATE);
+        verify(fixture.accountMergeSessionManager)
                 .activateBrowserFlow(
                         request.getSession(),
                         PROVIDER,
@@ -330,6 +344,152 @@ class CasLoginAppServiceTest {
     }
 
     @Test
+    void completesPrimaryAccountMergeProofWithoutReplacingSession() {
+        Fixture fixture = new Fixture();
+        MockHttpServletRequest request = request();
+        CasAuthenticationExchange exchange =
+                new CasAuthenticationExchange(
+                        "user-1",
+                        Map.of(),
+                        Instant.parse(
+                                "2026-07-31T00:00:00Z"));
+        ProviderAuthenticationResult result = result();
+        AccountMergeBrowserFlow flow =
+                new AccountMergeBrowserFlow.Primary(
+                        "usr_primary",
+                        PROVIDER);
+        when(fixture.stateStore.consume(
+                request.getSession().getId(),
+                STATE)).thenReturn(consumedState());
+        when(fixture.accountMergeSessionManager
+                .consumeBrowserFlow(
+                        eq(request),
+                        eq(PROVIDER),
+                        any(IdentityLoginContext.class)))
+                .thenReturn(Optional.of(flow));
+        when(fixture.protocolClient.validate(
+                PROVIDER,
+                "ST-merge",
+                SERVICE)).thenReturn(exchange);
+        when(fixture.route.adapter())
+                .thenReturn(fixture.adapter);
+        when(fixture.adapter.authenticate(exchange))
+                .thenReturn(result);
+        when(fixture.accountMergeProviderProofService
+                .completePrimary(
+                        eq(request.getSession(false)),
+                        any(),
+                        eq(result),
+                        any(IdentityLoginContext.class)))
+                .thenReturn(
+                        new AccountMergeProviderPrimaryProof(
+                                principal(),
+                                new AccountMergePrimaryProof(
+                                        "provider:cas-main",
+                                        Instant.parse(
+                                                "2026-07-31T00:00:00Z"),
+                                        Instant.parse(
+                                                "2026-07-31T00:10:00Z"))));
+
+        assertThat(fixture.service.complete(
+                PROVIDER,
+                "ST-merge",
+                STATE,
+                request)).isEqualTo("/skills");
+
+        verify(fixture.accountMergeProviderProofService)
+                .completePrimary(
+                        eq(request.getSession(false)),
+                        any(),
+                        eq(result),
+                        any(IdentityLoginContext.class));
+        verifyNoInteractions(
+                fixture.providerLogin,
+                fixture.sessions,
+                fixture.externalIdentityLinkService);
+    }
+
+    @Test
+    void completesSecondaryAccountMergeProofWithoutReplacingSession() {
+        Fixture fixture = new Fixture();
+        MockHttpServletRequest request = request();
+        PlatformPrincipal primary = primaryPrincipal();
+        request.getSession().setAttribute(
+                "platformPrincipal",
+                primary);
+        CasAuthenticationExchange exchange =
+                new CasAuthenticationExchange(
+                        "user-2",
+                        Map.of(),
+                        Instant.parse(
+                                "2026-07-31T00:00:00Z"));
+        ProviderAuthenticationResult result = result();
+        UUID intentId = UUID.randomUUID();
+        AccountMergeActor actor = new AccountMergeActor(
+                "usr_primary",
+                "local",
+                "account-merge-session-nonce",
+                "local-password",
+                Instant.parse("2026-07-31T00:00:00Z"),
+                IdentityLoginContext.empty());
+        AccountMergeBrowserFlow.Secondary flow =
+                new AccountMergeBrowserFlow.Secondary(
+                        intentId,
+                        actor,
+                        PROVIDER);
+        when(fixture.stateStore.consume(
+                request.getSession().getId(),
+                STATE)).thenReturn(consumedState());
+        when(fixture.accountMergeSessionManager
+                .consumeBrowserFlow(
+                        eq(request),
+                        eq(PROVIDER),
+                        any(IdentityLoginContext.class)))
+                .thenReturn(Optional.of(flow));
+        when(fixture.protocolClient.validate(
+                PROVIDER,
+                "ST-merge-secondary",
+                SERVICE)).thenReturn(exchange);
+        when(fixture.route.adapter())
+                .thenReturn(fixture.adapter);
+        when(fixture.adapter.authenticate(exchange))
+                .thenReturn(result);
+        when(fixture.accountMergeProviderProofService
+                .completeSecondary(
+                        eq(actor),
+                        eq(intentId),
+                        any(),
+                        eq(result),
+                        any(IdentityLoginContext.class)))
+                .thenReturn(new AccountMergeIntent(
+                        intentId,
+                        AccountMergeIntentStatus.READY_FOR_PREVIEW,
+                        Instant.parse(
+                                "2026-07-31T00:10:00Z")));
+
+        assertThat(fixture.service.complete(
+                PROVIDER,
+                "ST-merge-secondary",
+                STATE,
+                request)).isEqualTo("/skills");
+
+        verify(fixture.accountMergeProviderProofService)
+                .completeSecondary(
+                        eq(actor),
+                        eq(intentId),
+                        any(),
+                        eq(result),
+                        any(IdentityLoginContext.class));
+        assertThat(request.getSession(false)
+                .getAttribute("platformPrincipal"))
+                .isEqualTo(primary);
+        verifyNoInteractions(
+                fixture.providerLogin,
+                fixture.sessions,
+                fixture.externalIdentityLinkService);
+    }
+
+    @Test
     void mapsCasIdentityLinkProviderFailureToResumableRedirect() {
         Fixture fixture = new Fixture();
         MockHttpServletRequest request = request();
@@ -424,6 +584,16 @@ class CasLoginAppServiceTest {
                 Set.of("USER"));
     }
 
+    private static PlatformPrincipal primaryPrincipal() {
+        return new PlatformPrincipal(
+                "usr_primary",
+                "Primary",
+                "primary@example.com",
+                null,
+                "local",
+                Set.of("USER"));
+    }
+
     private static MockHttpServletRequest request() {
         MockHttpServletRequest request =
                 new MockHttpServletRequest();
@@ -445,6 +615,12 @@ class CasLoginAppServiceTest {
         private final IdentityLinkSessionManager
                 identityLinkSessionManager =
                 mock(IdentityLinkSessionManager.class);
+        private final AccountMergeProviderProofService
+                accountMergeProviderProofService =
+                mock(AccountMergeProviderProofService.class);
+        private final AccountMergeSessionManager
+                accountMergeSessionManager =
+                mock(AccountMergeSessionManager.class);
         private final PlatformSessionService sessions =
                 mock(PlatformSessionService.class);
         private final CasLoginStateStore stateStore =
@@ -466,6 +642,8 @@ class CasLoginAppServiceTest {
                         providerLogin,
                         externalIdentityLinkService,
                         identityLinkSessionManager,
+                        accountMergeProviderProofService,
+                        accountMergeSessionManager,
                         sessions,
                         stateStore,
                         auditLogService,

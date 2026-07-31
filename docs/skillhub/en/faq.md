@@ -326,14 +326,18 @@ Since **SkillHub Server v0.2.12**, public skills support anonymous search and in
 ## Q: Why does the account merge page say that merging is temporarily unavailable?
 
 A: The legacy account merge flow could not independently prove control of the primary and
-secondary accounts, so it has been isolated as a security measure. Until the replacement
-double-reauthentication flow is available:
+secondary accounts, so it remains permanently isolated. Administrators enable the safe
+double-reauthentication flow in two stages. A temporarily unavailable page means that this
+deployment has not completed the indexed-session namespace cutover and feature-gate checks.
 
 - Continue using the two accounts separately.
 - Do not ask an administrator to edit the database or manually move identity bindings, roles,
   namespace memberships, local credentials, or API tokens.
 - Existing `account_merge_request` rows are retained but cannot be completed.
 - Authenticated API clients calling the legacy routes receive `503 Service Unavailable`.
+- Administrators must follow the
+  [secure account merge operations runbook](../../25-secure-account-merge-operations.md)
+  instead of enabling the feature flag directly.
 
 Normal login, existing identity binding lookup, namespace operations, and skill operations are not
 affected.

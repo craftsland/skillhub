@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.config;
 
+import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -18,9 +19,13 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextImpl;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,14 +104,33 @@ class RedisClusterIntegrationTest {
             SessionRepository<Session> sessionRepository = sessionRepository(repository);
             Session session = sessionRepository.createSession();
             session.setAttribute("userId", "cluster-user");
+            PlatformPrincipal principal = new PlatformPrincipal(
+                    "cluster-user",
+                    "Cluster User",
+                    "cluster@example.com",
+                    null,
+                    "local",
+                    Set.of("USER"));
+            session.setAttribute(
+                    HttpSessionSecurityContextRepository
+                            .SPRING_SECURITY_CONTEXT_KEY,
+                    new SecurityContextImpl(
+                            new UsernamePasswordAuthenticationToken(
+                                    principal,
+                                    null,
+                                    List.of())));
             sessionRepository.save(session);
 
             Session loaded = sessionRepository.findById(session.getId());
             assertThat(loaded).isNotNull();
             assertThat(loaded.<String>getAttribute("userId")).isEqualTo("cluster-user");
+            assertThat(repository.findByPrincipalName("cluster-user"))
+                    .containsKey(session.getId());
 
             sessionRepository.deleteById(session.getId());
             assertThat(sessionRepository.findById(session.getId())).isNull();
+            assertThat(repository.findByPrincipalName("cluster-user"))
+                    .isEmpty();
         } finally {
             repository.destroy();
         }

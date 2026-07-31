@@ -819,9 +819,99 @@
     }
   },
   "accounts": {
+    "title": "Merge accounts",
+    "description": "Move eligible login methods and current data from another account into this account after independently verifying both accounts.",
+    "loading": "Loading account merge capabilities...",
+    "loadingIntent": "Loading the protected merge request...",
+    "errorTitle": "Account merge could not be loaded",
     "unavailableTitle": "Account merging is temporarily unavailable",
     "unavailableDescription": "The previous flow could not independently verify control of both accounts, so it has been disabled during a security redesign.",
-    "unavailableOperatorAction": "Do not ask an administrator to complete a merge in the database. Keep using the accounts separately until the secure flow is available."
+    "unavailableOperatorAction": "Do not ask an administrator to complete a merge in the database. Keep using the accounts separately until the secure flow is available.",
+    "warningTitle": "This operation is permanent",
+    "warningDescription": "The secondary account will no longer be usable, its API tokens will be revoked, and a completed merge cannot be undone automatically.",
+    "primaryBrowserSuccess": "This account was freshly verified. Continue now to create the protected merge request.",
+    "secondaryBrowserSuccess": "The other account was independently verified. Review the migration plan before confirming.",
+    "working": "Working...",
+    "completedTitle": "Accounts merged",
+    "completedDescription": "Eligible data was moved to this account. The secondary account and its existing sessions and API tokens can no longer be used.",
+    "done": "Done",
+    "intentUnavailableTitle": "Merge request unavailable",
+    "startOver": "Start over",
+    "cancel": "Cancel merge",
+    "confirm": "Permanently merge accounts",
+    "confirmAcknowledgement": "I reviewed the migration plan and understand that this merge is permanent and revokes the secondary account's API tokens and sessions.",
+    "primary": {
+      "title": "1. Verify this account",
+      "description": "Your current session is not enough. Use one login method already linked to this account for fresh verification.",
+      "continue": "Create protected merge request",
+      "noMethods": "This account has no login method that supports fresh verification. Link a supported login method before merging."
+    },
+    "secondary": {
+      "title": "2. Independently verify the other account",
+      "description": "Sign in to the account you want to merge. Do not enter an email address, user ID, or provider subject as a substitute for authentication.",
+      "verifyLocal": "Verify other local account"
+    },
+    "authentication": {
+      "username": "Username",
+      "password": "Password",
+      "localPassword": "Local password",
+      "currentPassword": "Current password",
+      "verifyAndContinue": "Verify and continue",
+      "browserMethods": "Verify in a browser",
+      "credentialMethods": "Verify with provider credentials"
+    },
+    "preview": {
+      "title": "3. Review the migration plan",
+      "description": "The server recalculates this plan from current data. Any later change makes an earlier preview stale.",
+      "readyTitle": "The merge can be confirmed",
+      "readyDescription": "No blocking permission or ownership conflict was found. Review every item before confirming.",
+      "blockedTitle": "Resolve conflicts before merging",
+      "blockedDescription": "No data was moved. Resolve the listed conflicts, then refresh the preview.",
+      "identityProviders": "Identity providers to move",
+      "localCredential": "Local credential action",
+      "localCredentialActions": {
+        "NONE": "No local credential change",
+        "MOVE_SECONDARY": "Move the secondary local credential",
+        "KEEP_PRIMARY_DELETE_SECONDARY": "Keep this account's credential and invalidate the secondary credential"
+      },
+      "skills": "Skills changing owner",
+      "tokens": "API tokens to revoke",
+      "namespaces": "Namespace membership changes",
+      "tokensToRevoke": "Secondary API tokens that will be revoked",
+      "social": "Stars, ratings, and subscriptions",
+      "socialSummary": "{{stars}} stars, {{ratings}} ratings, and {{subscriptions}} subscriptions move; {{duplicates}} duplicate records are discarded.",
+      "discardedRatings": "Secondary ratings that will be discarded",
+      "discardedRating": "Skill #{{skillId}}: discard score {{score}} and retain this account's rating.",
+      "notifications": "Notifications and preferences",
+      "notificationSummary": "{{notifications}} notifications, {{preferences}} preferences, and {{governance}} governance notifications move; {{duplicates}} duplicate preferences are discarded.",
+      "blockedRoles": "Blocking platform roles",
+      "conflicts": "Blocking conflicts",
+      "conflictItem": "{{resource}} — {{action}}",
+      "conflictActions": {
+        "REMOVE_DUPLICATE_IDENTITY": "remove one conflicting login identity",
+        "REMOVE_SECONDARY_PLATFORM_ROLE": "remove the secondary account's elevated platform role",
+        "TRANSFER_NAMESPACE_OWNERSHIP": "transfer namespace ownership before retrying",
+        "REASSIGN_OR_RENAME_SKILL": "reassign or rename the conflicting Skill",
+        "COMPLETE_OR_CANCEL_IDENTITY_LINK": "complete or cancel the active identity-link request",
+        "COMPLETE_OR_CANCEL_PROFILE_CHANGE": "complete or cancel the pending profile change"
+      },
+      "none": "None",
+      "build": "Build migration preview",
+      "refresh": "Refresh migration preview"
+    },
+    "errors": {
+      "unavailable": "Secure account merging is not enabled on this deployment.",
+      "intentUnavailable": "This merge request expired, was cancelled, belongs to another session, or was already consumed. Start again.",
+      "authenticationFailed": "Account verification failed. Check the credentials and account status, then try again.",
+      "providerAuthenticationFailed": "The identity provider did not verify the account. No merge data was changed.",
+      "providerUnavailable": "This identity provider is not currently available for account verification.",
+      "conflict": "The accounts have a blocking permission, identity, ownership, or workflow conflict.",
+      "previewStale": "The account data changed after this preview. Build and review a new preview.",
+      "accountNotEligible": "One of the accounts is not eligible for merging.",
+      "passwordRequired": "Enter your current password.",
+      "credentialsRequired": "Enter both username and password.",
+      "default": "The account merge request could not be completed. No partial merge was applied."
+    }
   },
   "namespace": {
     "notFound": "Namespace not found",

@@ -1,12 +1,16 @@
 package com.iflytek.skillhub.exception;
 
 import com.iflytek.skillhub.auth.exception.AuthFlowException;
+import com.iflytek.skillhub.auth.config.AccountMergeRouteRequestMatcher;
 import com.iflytek.skillhub.auth.config.IdentityLinkRouteRequestMatcher;
+import com.iflytek.skillhub.auth.merge.AccountMergeException;
+import com.iflytek.skillhub.auth.merge.AccountMergeFailureCode;
 import com.iflytek.skillhub.auth.identity.IdentityLinkException;
 import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
+import com.iflytek.skillhub.dto.AccountMergeErrorResponse;
 import com.iflytek.skillhub.dto.IdentityLinkErrorResponse;
 import com.iflytek.skillhub.domain.shared.exception.LocalizedDomainException;
 import com.iflytek.skillhub.domain.shared.exception.LocalizedMessage;
@@ -110,6 +114,23 @@ public class GlobalExceptionHandler {
                         ex.messageArgs()));
     }
 
+    @ExceptionHandler(AccountMergeException.class)
+    public ResponseEntity<AccountMergeErrorResponse>
+            handleAccountMergeException(
+                    AccountMergeException ex,
+                    HttpServletRequest request) {
+        logHandledException(
+                ex.getStatus(),
+                ex.messageCode(),
+                request);
+        return ResponseEntity.status(ex.getStatus()).body(
+                apiResponseFactory.accountMergeError(
+                        ex.getStatus().value(),
+                        ex.messageCode(),
+                        ex.getReasonCode().name(),
+                        ex.messageArgs()));
+    }
+
     @ExceptionHandler(LocalizedDomainException.class)
     public ResponseEntity<ApiResponse<Void>> handleLocalizedDomainException(LocalizedDomainException ex, HttpServletRequest request) {
         return renderLocalizedError(ex, HttpStatus.valueOf(ex.statusCode()), request);
@@ -139,6 +160,24 @@ public class GlobalExceptionHandler {
                                     .INVALID_OPERATION
                                     .name()));
         }
+        if (AccountMergeRouteRequestMatcher.matches(request)) {
+            if (msg == null || msg.isBlank()) {
+                return ResponseEntity.badRequest().body(
+                        apiResponseFactory.accountMergeError(
+                                400,
+                                "error.auth.accountMerge.invalidOperation",
+                                AccountMergeFailureCode
+                                        .MERGE_REAUTH_REQUIRED
+                                        .name()));
+            }
+            return ResponseEntity.badRequest().body(
+                    apiResponseFactory.accountMergeErrorMessage(
+                            400,
+                            msg,
+                            AccountMergeFailureCode
+                                    .MERGE_REAUTH_REQUIRED
+                                    .name()));
+        }
         if (msg == null || msg.isBlank()) {
             return ResponseEntity.badRequest().body(apiResponseFactory.error(400, "error.badRequest"));
         }
@@ -159,6 +198,17 @@ public class GlobalExceptionHandler {
                                     .messageCode(),
                             IdentityLinkFailureCode
                                     .INVALID_OPERATION
+                                    .name()));
+        }
+        if (AccountMergeRouteRequestMatcher.matches(request)) {
+            return ResponseEntity.badRequest().body(
+                    apiResponseFactory.accountMergeError(
+                            400,
+                            AccountMergeFailureCode
+                                    .MERGE_REAUTH_REQUIRED
+                                    .messageCode(),
+                            AccountMergeFailureCode
+                                    .MERGE_REAUTH_REQUIRED
                                     .name()));
         }
         return ResponseEntity.badRequest().body(

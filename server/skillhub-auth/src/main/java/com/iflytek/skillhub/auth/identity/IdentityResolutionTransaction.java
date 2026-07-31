@@ -123,6 +123,70 @@ class IdentityResolutionTransaction {
                 context);
     }
 
+    /**
+     * Resolves one verified provider exchange to an existing ACTIVE account.
+     * Unlike interactive login, this path never provisions an account and
+     * never synchronizes profile fields.
+     */
+    @Transactional
+    public ExternalIdentityProof resolveExistingProof(
+            IdentityAssertion assertion,
+            ProviderDescriptor descriptor,
+            IdentityLoginContext context) {
+        ExternalSubject legacySubject =
+                assertion.requireUniqueSubject(
+                        descriptor.legacyPrimarySubjectType());
+        MatchResolution initialMatches =
+                resolveMatches(assertion, legacySubject);
+        if (initialMatches.bindingId() == null) {
+            throw accessDenied();
+        }
+
+        IdentityBinding binding = bindingRepository
+                .findByIdAndStatusForUpdate(
+                        initialMatches.bindingId(),
+                        IdentityBindingStatus.ACTIVE)
+                .orElseThrow(this::identifierConflict);
+        MatchResolution lockedMatches =
+                resolveMatches(assertion, legacySubject);
+        if (!binding.getId().equals(
+                lockedMatches.bindingId())
+                || !binding.getProviderCode().equals(
+                        assertion.provider().providerCode())
+                || !binding.getSubject().equals(
+                        legacySubject.value())) {
+            throw identifierConflict();
+        }
+
+        UserAccount user = userRepository
+                .findByIdForUpdate(binding.getUserId())
+                .orElseThrow(() ->
+                        new IllegalStateException(
+                                "User not found for identity binding"));
+        requireAllowed(accountLoginGuard.evaluateInteractive(user));
+        requireAccessAllowed(
+                assertion,
+                context,
+                IdentityAccessKind.RETURNING_IDENTITY,
+                Optional.of(user.getStatus()));
+
+        binding.recordAuthentication(
+                assertion.evidence().authenticatedAt());
+        bindingRepository.save(binding);
+        recordAudit(
+                user.getId(),
+                "IDENTITY_REAUTHENTICATION_SUCCEEDED",
+                binding.getId(),
+                assertion.provider().providerCode(),
+                "authenticated",
+                context);
+        return new ExternalIdentityProof(
+                user.getId(),
+                assertion.provider().providerCode(),
+                assertion.provider().protocol(),
+                assertion.evidence().authenticatedAt());
+    }
+
     private MatchResolution resolveMatches(
             IdentityAssertion assertion,
             ExternalSubject legacySubject) {

@@ -133,24 +133,141 @@ export type CreateNamespaceRequest = Omit<components['schemas']['NamespaceReques
   description?: string
 }
 
-export interface MergeInitiateRequest {
-  secondaryIdentifier: string
+type AccountMergeAuthenticationMethodSchema =
+  components['schemas']['AccountMergeAuthenticationMethodResponse']
+type AccountMergeCapabilitiesSchema =
+  components['schemas']['AccountMergeCapabilitiesResponse']
+type AccountMergeIntentSchema =
+  components['schemas']['AccountMergeIntentResponse']
+type AccountMergePreviewSchema =
+  components['schemas']['AccountMergePreviewResponse']
+type AccountMergeCompletionSchema =
+  components['schemas']['AccountMergeCompletionResponse']
+
+export type AccountMergeMethodType =
+  | 'LOCAL_PASSWORD'
+  | 'OAUTH_REDIRECT'
+  | 'CAS_REDIRECT'
+  | 'DIRECT_PASSWORD'
+
+export type AccountMergeIntentStatus =
+  NonNullable<AccountMergeIntentSchema['status']>
+
+export type AccountMergeAuthenticationMethod = Omit<
+  AccountMergeAuthenticationMethodSchema,
+  'providerCode' | 'displayName' | 'methodType'
+> & {
+  providerCode: string
+  displayName: string
+  methodType: AccountMergeMethodType
 }
 
-export interface MergeInitiateResponse {
-  mergeRequestId: number
-  secondaryUserId: string
-  verificationToken: string
+export type AccountMergeCapabilities = Omit<
+  AccountMergeCapabilitiesSchema,
+  'enabled' | 'primaryMethods' | 'secondaryMethods'
+> & {
+  enabled: boolean
+  primaryMethods: AccountMergeAuthenticationMethod[]
+  secondaryMethods: AccountMergeAuthenticationMethod[]
+}
+
+export type AccountMergeIntent = Omit<
+  AccountMergeIntentSchema,
+  'id' | 'status' | 'expiresAt' | 'secondaryMethods'
+> & {
+  id: string
+  status: AccountMergeIntentStatus
   expiresAt: string
+  secondaryMethods: AccountMergeAuthenticationMethod[]
 }
 
-export interface MergeVerifyRequest {
-  mergeRequestId: number
-  verificationToken: string
+export interface AccountMergeCredentialRequest {
+  username: string
+  password: string
 }
 
-export interface MergeConfirmRequest {
-  mergeRequestId: number
+export interface AccountMergeNamespaceChange {
+  namespaceId: number
+  namespaceSlug: string
+  primaryRole?: string
+  secondaryRole?: string
+  resultingRole?: string
+  blocked: boolean
+}
+
+export interface AccountMergeTokenSummary {
+  name: string
+  prefix: string
+}
+
+export interface AccountMergeSocialSummary {
+  starsMoved: number
+  duplicateStarsDiscarded: number
+  ratingsMoved: number
+  duplicateRatingsDiscarded: number
+  subscriptionsMoved: number
+  duplicateSubscriptionsDiscarded: number
+  discardedRatings: AccountMergeDiscardedRating[]
+}
+
+export interface AccountMergeDiscardedRating {
+  skillId: number
+  score: number
+}
+
+export interface AccountMergeNotificationSummary {
+  notificationsMoved: number
+  preferencesMoved: number
+  duplicatePreferencesDiscarded: number
+  governanceNotificationsMoved: number
+}
+
+export interface AccountMergeConflict {
+  code: string
+  resource: string
+  suggestedAction: string
+}
+
+export type AccountMergePreview = Omit<
+  AccountMergePreviewSchema,
+  | 'intentId'
+  | 'status'
+  | 'previewVersion'
+  | 'expiresAt'
+  | 'confirmable'
+  | 'identityProviders'
+  | 'localCredentialAction'
+  | 'blockedPlatformRoles'
+  | 'namespaceChanges'
+  | 'apiTokensToRevoke'
+  | 'skillOwnershipCount'
+  | 'social'
+  | 'notifications'
+  | 'conflicts'
+> & {
+  intentId: string
+  status: AccountMergeIntentStatus
+  previewVersion: number
+  expiresAt: string
+  confirmable: boolean
+  identityProviders: string[]
+  localCredentialAction: string
+  blockedPlatformRoles: string[]
+  namespaceChanges: AccountMergeNamespaceChange[]
+  apiTokensToRevoke: AccountMergeTokenSummary[]
+  skillOwnershipCount: number
+  social: AccountMergeSocialSummary
+  notifications: AccountMergeNotificationSummary
+  conflicts: AccountMergeConflict[]
+}
+
+export type AccountMergeCompletion = Omit<
+  AccountMergeCompletionSchema,
+  'intentId' | 'status' | 'completedAt'
+> & {
+  intentId: string
+  status: AccountMergeIntentStatus
+  completedAt: string
 }
 
 // Namespace types

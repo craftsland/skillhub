@@ -21,6 +21,11 @@ auth:
   direct:
     enabled: true
     provider: local
+  accountMerge:
+    # Enable only after every server pod uses indexed sessions and the
+    # documented legacy-session transition gate has completed.
+    enabled: false
+    sessionCutoverComplete: false
   cas:
     enabled: false
     providerCode: cas-main
@@ -82,6 +87,9 @@ s3:
 # ============================================================================
 session:
   cookieSecure: false
+  redisNamespace: skillhub:session:indexed-v1
+  repositoryType: indexed
+  configureAction: notify-keyspace-events
 
 # ============================================================================
 # Bootstrap 管理员

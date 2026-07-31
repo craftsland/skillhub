@@ -15,6 +15,7 @@ import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.IdentityProviderLoginMethodType;
 import com.iflytek.skillhub.auth.identity.IdentityProviderRegistry;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
 import com.iflytek.skillhub.auth.provider.CredentialAuthenticationRequest;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
@@ -38,16 +39,22 @@ public class IdentityLinkAppService {
     private final ExternalIdentityLinkService externalLinkService;
     private final IdentityProviderRegistry providerRegistry;
     private final IdentityLinkSessionManager sessionManager;
+    private final AccountMergeSessionManager
+            accountMergeSessionManager;
 
     public IdentityLinkAppService(
             IdentityLinkIntentService intentService,
             ExternalIdentityLinkService externalLinkService,
             IdentityProviderRegistry providerRegistry,
-            IdentityLinkSessionManager sessionManager) {
+            IdentityLinkSessionManager sessionManager,
+            AccountMergeSessionManager
+                    accountMergeSessionManager) {
         this.intentService = intentService;
         this.externalLinkService = externalLinkService;
         this.providerRegistry = providerRegistry;
         this.sessionManager = sessionManager;
+        this.accountMergeSessionManager =
+                accountMergeSessionManager;
     }
 
     public IdentityLinkAccountStateResponse accountState(
@@ -191,6 +198,7 @@ public class IdentityLinkAppService {
                         intentId,
                         providerCode,
                         browserMethod);
+        accountMergeSessionManager.clearBrowserFlow(session);
         sessionManager.prepareBrowserFlow(
                 session,
                 intentId,
@@ -222,6 +230,7 @@ public class IdentityLinkAppService {
                 actor,
                 intentId,
                 browserMethod);
+        accountMergeSessionManager.clearBrowserFlow(session);
         sessionManager.prepareBrowserFlow(
                 session,
                 intentId,

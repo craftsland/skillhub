@@ -2,6 +2,10 @@ package com.iflytek.skillhub.auth.oauth;
 
 import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
+import com.iflytek.skillhub.auth.merge.AccountMergeBrowserFlowReference;
+import com.iflytek.skillhub.auth.merge.AccountMergeBrowserPhase;
+import com.iflytek.skillhub.auth.merge.AccountMergeFailureCode;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -110,7 +114,8 @@ class OAuth2LoginHandlersTest {
         OAuthLoginFlowService oauthLoginFlowService = mock(OAuthLoginFlowService.class);
         OAuth2LoginFailureHandler handler = new OAuth2LoginFailureHandler(
                 oauthLoginFlowService,
-                mock(IdentityLinkSessionManager.class));
+                mock(IdentityLinkSessionManager.class),
+                mock(AccountMergeSessionManager.class));
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         HttpSession session = request.getSession(true);
@@ -147,7 +152,8 @@ class OAuth2LoginHandlersTest {
         OAuth2LoginFailureHandler handler =
                 new OAuth2LoginFailureHandler(
                         oauthLoginFlowService,
-                        sessionManager);
+                        sessionManager,
+                        mock(AccountMergeSessionManager.class));
         MockHttpServletRequest request =
                 new MockHttpServletRequest();
         MockHttpServletResponse response =
@@ -189,7 +195,8 @@ class OAuth2LoginHandlersTest {
         OAuth2LoginFailureHandler handler =
                 new OAuth2LoginFailureHandler(
                         oauthLoginFlowService,
-                        sessionManager);
+                        sessionManager,
+                        mock(AccountMergeSessionManager.class));
         MockHttpServletRequest request =
                 new MockHttpServletRequest();
         MockHttpServletResponse response =
@@ -234,7 +241,8 @@ class OAuth2LoginHandlersTest {
         OAuth2LoginFailureHandler handler =
                 new OAuth2LoginFailureHandler(
                         oauthLoginFlowService,
-                        sessionManager);
+                        sessionManager,
+                        mock(AccountMergeSessionManager.class));
         MockHttpServletRequest request =
                 new MockHttpServletRequest();
         MockHttpServletResponse response =
@@ -260,5 +268,61 @@ class OAuth2LoginHandlersTest {
                                 + "&reasonCode=PROVIDER_UNAVAILABLE");
         org.mockito.Mockito.verify(oauthLoginFlowService)
                 .consumeReturnTo(session);
+    }
+
+    @Test
+    void failureHandlerPreservesAccountMergeIntentAndReason()
+            throws Exception {
+        OAuthLoginFlowService oauthLoginFlowService =
+                mock(OAuthLoginFlowService.class);
+        AccountMergeSessionManager sessionManager =
+                mock(AccountMergeSessionManager.class);
+        OAuth2LoginFailureHandler handler =
+                new OAuth2LoginFailureHandler(
+                        oauthLoginFlowService,
+                        mock(IdentityLinkSessionManager.class),
+                        sessionManager);
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+        HttpSession session = request.getSession(true);
+        UUID intentId = UUID.randomUUID();
+        OAuth2AuthenticationException failure =
+                new OAuth2AuthenticationException(
+                        new OAuth2Error(
+                                "account_merge_failed",
+                                AccountMergeFailureCode
+                                        .MERGE_PROVIDER_UNAVAILABLE
+                                        .name(),
+                                null));
+        org.mockito.Mockito.when(
+                sessionManager.consumeFailedBrowserFlow(session))
+                .thenReturn(Optional.of(
+                        new AccountMergeBrowserFlowReference(
+                                AccountMergeBrowserPhase
+                                        .SECONDARY_AUTHENTICATION,
+                                intentId)));
+        org.mockito.Mockito.when(
+                oauthLoginFlowService
+                        .accountMergeFailureReasonCode(failure))
+                .thenReturn(Optional.of(
+                        AccountMergeFailureCode
+                                .MERGE_PROVIDER_UNAVAILABLE
+                                .name()));
+
+        handler.onAuthenticationFailure(
+                request,
+                response,
+                failure);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo(
+                        "/settings/accounts?accountMerge=failed"
+                                + "&phase=SECONDARY_AUTHENTICATION"
+                                + "&intentId="
+                                + intentId
+                                + "&reasonCode="
+                                + "MERGE_PROVIDER_UNAVAILABLE");
     }
 }

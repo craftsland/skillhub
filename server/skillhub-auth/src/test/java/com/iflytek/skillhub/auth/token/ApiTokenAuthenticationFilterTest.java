@@ -109,6 +109,43 @@ class ApiTokenAuthenticationFilterTest {
     }
 
     @Test
+    void shouldRejectMergedSecondaryUserTokens() throws Exception {
+        ApiToken token = new ApiToken(
+                "user-merged",
+                "cli",
+                "sk_test",
+                "hash",
+                "[\"skill:publish\"]");
+        UserAccount user = new UserAccount(
+                "user-merged",
+                "Merged",
+                "merged@example.com",
+                "");
+        user.setStatus(UserStatus.MERGED);
+        user.setMergedToUserId("user-primary");
+
+        when(apiTokenService.validateToken("raw-token"))
+                .thenReturn(Optional.of(token));
+        when(userAccountRepository.findById("user-merged"))
+                .thenReturn(Optional.of(user));
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/v1/publish");
+        request.addHeader("Authorization", "Bearer raw-token");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        assertEquals(MockHttpServletResponse.SC_UNAUTHORIZED, response.getStatus());
+        assertNull(chain.getRequest());
+        verify(roleBindingRepository, never()).findByUserId("user-merged");
+        verify(apiTokenService, never()).touchLastUsed(token);
+    }
+
+    @Test
     void shouldRejectUnknownBearerTokenOnCliReadRoutes() throws Exception {
         when(apiTokenService.validateToken("unknown-token")).thenReturn(Optional.empty());
 

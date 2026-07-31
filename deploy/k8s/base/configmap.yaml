@@ -46,6 +46,13 @@ data:
   # Session 配置
   # HTTP 环境设为 false，HTTPS 环境设为 true
   session-cookie-secure: "false"
+  # 账号合并依赖按稳定 userId 建立的 Spring Session principal index。
+  session-redis-namespace: skillhub:session:indexed-v1
+  session-repository-type: indexed
+  session-redis-configure-action: notify-keyspace-events
+  # 首次升级先保持关闭；完成 Session 索引过渡后再启用。
+  auth-account-merge-enabled: "false"
+  auth-account-merge-session-cutover-complete: "false"
 
   # CAS 2.0/3.0 登录（默认关闭）
   # service-url 必须是浏览器可访问的精确回调地址，且 provider code

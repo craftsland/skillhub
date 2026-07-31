@@ -81,6 +81,31 @@ public class SseEmitterManager {
         }
     }
 
+    /**
+     * Closes every live stream owned by one account.
+     *
+     * <p>Account merge uses this after the PostgreSQL commit so a secondary
+     * account cannot retain a long-lived notification channel while Redis
+     * session deletion is being retried.
+     */
+    public void closeAll(String userId) {
+        CopyOnWriteArrayList<TrackedEmitter> userEmitters =
+                emitters.remove(userId);
+        if (userEmitters == null) {
+            return;
+        }
+        for (TrackedEmitter trackedEmitter : userEmitters) {
+            cleanup(userId, userEmitters, trackedEmitter);
+            try {
+                trackedEmitter.emitter().complete();
+            } catch (IllegalStateException exception) {
+                log.debug(
+                        "Emitter already completed while closing user {}",
+                        userId);
+            }
+        }
+    }
+
     @Scheduled(fixedRate = HEARTBEAT_INTERVAL)
     public void heartbeat() {
         emitters.forEach((userId, userEmitters) -> {

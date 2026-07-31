@@ -16,6 +16,12 @@ import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.IdentityProviderRegistry;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.merge.AccountMergeBrowserFlow;
+import com.iflytek.skillhub.auth.merge.AccountMergeBrowserFlowReference;
+import com.iflytek.skillhub.auth.merge.AccountMergeException;
+import com.iflytek.skillhub.auth.merge.AccountMergeFailureCode;
+import com.iflytek.skillhub.auth.merge.AccountMergeProviderProofService;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
 import com.iflytek.skillhub.auth.oauth.OAuthLoginRedirectSupport;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
@@ -56,6 +62,10 @@ public class CasLoginAppService {
     private final ProviderLoginAppService providerLoginAppService;
     private final ExternalIdentityLinkService externalIdentityLinkService;
     private final IdentityLinkSessionManager identityLinkSessionManager;
+    private final AccountMergeProviderProofService
+            accountMergeProviderProofService;
+    private final AccountMergeSessionManager
+            accountMergeSessionManager;
     private final PlatformSessionService platformSessionService;
     private final CasLoginStateStore stateStore;
     private final AuditLogService auditLogService;
@@ -68,6 +78,10 @@ public class CasLoginAppService {
             ProviderLoginAppService providerLoginAppService,
             ExternalIdentityLinkService externalIdentityLinkService,
             IdentityLinkSessionManager identityLinkSessionManager,
+            AccountMergeProviderProofService
+                    accountMergeProviderProofService,
+            AccountMergeSessionManager
+                    accountMergeSessionManager,
             PlatformSessionService platformSessionService,
             CasLoginStateStore stateStore,
             AuditLogService auditLogService) {
@@ -77,6 +91,8 @@ public class CasLoginAppService {
                 providerLoginAppService,
                 externalIdentityLinkService,
                 identityLinkSessionManager,
+                accountMergeProviderProofService,
+                accountMergeSessionManager,
                 platformSessionService,
                 stateStore,
                 auditLogService,
@@ -89,6 +105,10 @@ public class CasLoginAppService {
             ProviderLoginAppService providerLoginAppService,
             ExternalIdentityLinkService externalIdentityLinkService,
             IdentityLinkSessionManager identityLinkSessionManager,
+            AccountMergeProviderProofService
+                    accountMergeProviderProofService,
+            AccountMergeSessionManager
+                    accountMergeSessionManager,
             PlatformSessionService platformSessionService,
             CasLoginStateStore stateStore,
             AuditLogService auditLogService,
@@ -98,6 +118,10 @@ public class CasLoginAppService {
         this.providerLoginAppService = providerLoginAppService;
         this.externalIdentityLinkService = externalIdentityLinkService;
         this.identityLinkSessionManager = identityLinkSessionManager;
+        this.accountMergeProviderProofService =
+                accountMergeProviderProofService;
+        this.accountMergeSessionManager =
+                accountMergeSessionManager;
         this.platformSessionService = platformSessionService;
         this.stateStore = stateStore;
         this.auditLogService = auditLogService;
@@ -108,8 +132,18 @@ public class CasLoginAppService {
             String providerCode,
             String returnTo,
             HttpServletRequest request) {
-        requireRoute(providerCode);
         HttpSession session = request.getSession(true);
+        try {
+            requireRoute(providerCode);
+        } catch (CasLoginFlowException exception) {
+            return consumePreparedFlowFailure(
+                    session,
+                    AccountMergeFailureCode
+                            .MERGE_PROVIDER_UNAVAILABLE,
+                    IdentityLinkFailureCode
+                            .PROVIDER_UNAVAILABLE)
+                    .orElseThrow(() -> exception);
+        }
         String state = stateSupplier.get();
         CasLoginInitiation initiation;
         try {
@@ -117,7 +151,18 @@ public class CasLoginAppService {
                     providerCode,
                     state);
         } catch (ProviderAuthenticationException exception) {
-            throw failure(CasLoginFailure.PROVIDER_UNAVAILABLE);
+            return consumePreparedFlowFailure(
+                    session,
+                    ProviderAuthenticationFailureMapper
+                            .mapAccountMerge(exception)
+                            .getReasonCode(),
+                    ProviderAuthenticationFailureMapper
+                            .mapIdentityLink(exception)
+                            .getReasonCode())
+                    .orElseThrow(() ->
+                            failure(
+                                    CasLoginFailure
+                                            .PROVIDER_UNAVAILABLE));
         }
 
         try {
@@ -132,8 +177,20 @@ public class CasLoginAppService {
                     session,
                     providerCode,
                     state);
+            accountMergeSessionManager.activateBrowserFlow(
+                    session,
+                    providerCode,
+                    state);
         } catch (CasLoginStateStore.CasLoginStateStoreException exception) {
-            throw failure(CasLoginFailure.INTERNAL_ERROR);
+            return consumePreparedFlowFailure(
+                    session,
+                    AccountMergeFailureCode
+                            .MERGE_PROVIDER_UNAVAILABLE,
+                    IdentityLinkFailureCode
+                            .PROVIDER_UNAVAILABLE)
+                    .orElseThrow(() ->
+                            failure(
+                                    CasLoginFailure.INTERNAL_ERROR));
         }
         return initiation.loginUri();
     }
@@ -146,6 +203,18 @@ public class CasLoginAppService {
         CasLoginStateStore.CasLoginState loginState =
                 consumeState(providerCode, state, request);
         IdentityLoginContext context = context(request);
+        Optional<AccountMergeBrowserFlow> accountMergeFlow;
+        try {
+            accountMergeFlow =
+                    accountMergeSessionManager.consumeBrowserFlow(
+                            request,
+                            providerCode,
+                            context);
+        } catch (AccountMergeException exception) {
+            return accountMergeFailureTarget(
+                    loginState.returnTo(),
+                    exception.getReasonCode());
+        }
         Optional<IdentityLinkBrowserFlow> identityLinkFlow;
         try {
             identityLinkFlow =
@@ -157,6 +226,12 @@ public class CasLoginAppService {
             throw failure(CasLoginFailure.INVALID_STATE);
         }
         if (ticket == null || ticket.isBlank()) {
+            if (accountMergeFlow.isPresent()) {
+                return accountMergeFailureTarget(
+                        accountMergeFlow.orElseThrow(),
+                        AccountMergeFailureCode
+                                .MERGE_PROVIDER_AUTHENTICATION_FAILED);
+            }
             if (identityLinkFlow.isPresent()) {
                 return identityLinkFailureTarget(
                         identityLinkFlow.orElseThrow().intentId(),
@@ -175,7 +250,14 @@ public class CasLoginAppService {
                             ticket,
                             loginState.serviceUrl());
             var result = route.adapter().authenticate(exchange);
-            if (identityLinkFlow.isPresent()) {
+            if (accountMergeFlow.isPresent()) {
+                completeAccountMerge(
+                        accountMergeFlow.orElseThrow(),
+                        route,
+                        result,
+                        request,
+                        context);
+            } else if (identityLinkFlow.isPresent()) {
                 completeIdentityLink(
                         identityLinkFlow.orElseThrow(),
                         route,
@@ -200,6 +282,13 @@ public class CasLoginAppService {
                         request,
                         "ticket");
             }
+            if (accountMergeFlow.isPresent()) {
+                return accountMergeFailureTarget(
+                        accountMergeFlow.orElseThrow(),
+                        ProviderAuthenticationFailureMapper
+                                .mapAccountMerge(exception)
+                                .getReasonCode());
+            }
             if (identityLinkFlow.isPresent()) {
                 return identityLinkFailureTarget(
                         identityLinkFlow.orElseThrow().intentId(),
@@ -208,6 +297,13 @@ public class CasLoginAppService {
                                 .getReasonCode());
             }
             throw mapProviderFailure(exception);
+        } catch (AccountMergeException exception) {
+            if (accountMergeFlow.isPresent()) {
+                return accountMergeFailureTarget(
+                        accountMergeFlow.orElseThrow(),
+                        exception.getReasonCode());
+            }
+            throw failure(CasLoginFailure.INTERNAL_ERROR);
         } catch (IdentityLinkException exception) {
             if (identityLinkFlow.isPresent()) {
                 return identityLinkFailureTarget(
@@ -216,6 +312,12 @@ public class CasLoginAppService {
             }
             throw failure(CasLoginFailure.INTERNAL_ERROR);
         } catch (IdentityCoreException exception) {
+            if (accountMergeFlow.isPresent()) {
+                return accountMergeFailureTarget(
+                        accountMergeFlow.orElseThrow(),
+                        mapAccountMergeIdentityFailure(
+                                exception));
+            }
             if (identityLinkFlow.isPresent()) {
                 return identityLinkFailureTarget(
                         identityLinkFlow.orElseThrow().intentId(),
@@ -317,6 +419,128 @@ public class CasLoginAppService {
                 "Unsupported CAS identity link outcome");
     }
 
+    private void completeAccountMerge(
+            AccountMergeBrowserFlow flow,
+            IdentityProviderRegistry.BrowserRoute
+                    <CasAuthenticationExchange> route,
+            ProviderAuthenticationResult result,
+            HttpServletRequest request,
+            IdentityLoginContext context) {
+        HttpSession session = request.getSession(false);
+        if (flow instanceof AccountMergeBrowserFlow.Primary) {
+            accountMergeProviderProofService.completePrimary(
+                    session,
+                    route.provider(),
+                    result,
+                    context);
+            return;
+        }
+        AccountMergeBrowserFlow.Secondary secondary =
+                (AccountMergeBrowserFlow.Secondary) flow;
+        accountMergeProviderProofService.completeSecondary(
+                secondary.actor(),
+                secondary.intentId(),
+                route.provider(),
+                result,
+                context);
+    }
+
+    private Optional<URI> consumePreparedFlowFailure(
+            HttpSession session,
+            AccountMergeFailureCode accountMergeReason,
+            IdentityLinkFailureCode identityLinkReason) {
+        Optional<AccountMergeBrowserFlowReference>
+                accountMergeFlow =
+                accountMergeSessionManager
+                        .consumeFailedBrowserFlow(session);
+        if (accountMergeFlow.isPresent()) {
+            return Optional.of(URI.create(
+                    accountMergeFailureTarget(
+                            accountMergeFlow.orElseThrow(),
+                            accountMergeReason)));
+        }
+        return identityLinkSessionManager
+                .consumeFailedBrowserFlow(session)
+                .map(intentId -> URI.create(
+                        identityLinkFailureTarget(
+                                intentId,
+                                identityLinkReason)));
+    }
+
+    private String accountMergeFailureTarget(
+            AccountMergeBrowserFlow flow,
+            AccountMergeFailureCode reasonCode) {
+        UUID intentId =
+                flow instanceof AccountMergeBrowserFlow.Secondary
+                        secondary
+                        ? secondary.intentId()
+                        : null;
+        return accountMergeFailureTarget(
+                flow instanceof AccountMergeBrowserFlow.Primary
+                        ? "PRIMARY_REAUTHENTICATION"
+                        : "SECONDARY_AUTHENTICATION",
+                intentId,
+                reasonCode);
+    }
+
+    private String accountMergeFailureTarget(
+            AccountMergeBrowserFlowReference flow,
+            AccountMergeFailureCode reasonCode) {
+        return accountMergeFailureTarget(
+                flow.phase().name(),
+                flow.intentId(),
+                reasonCode);
+    }
+
+    private String accountMergeFailureTarget(
+            String returnTo,
+            AccountMergeFailureCode reasonCode) {
+        return accountMergeFailureTarget(
+                "UNKNOWN",
+                intentIdFromReturnTo(returnTo).orElse(null),
+                reasonCode);
+    }
+
+    private String accountMergeFailureTarget(
+            String phase,
+            UUID intentId,
+            AccountMergeFailureCode reasonCode) {
+        return "/settings/accounts?accountMerge=failed"
+                + "&phase="
+                + phase
+                + (intentId == null
+                        ? ""
+                        : "&intentId=" + intentId)
+                + "&reasonCode="
+                + reasonCode.name();
+    }
+
+    private Optional<UUID> intentIdFromReturnTo(
+            String returnTo) {
+        if (returnTo == null
+                || !returnTo.startsWith(
+                        "/settings/accounts?")) {
+            return Optional.empty();
+        }
+        String query = returnTo.substring(
+                returnTo.indexOf('?') + 1);
+        for (String parameter : query.split("&")) {
+            int separator = parameter.indexOf('=');
+            if (separator <= 0
+                    || !"intentId".equals(
+                            parameter.substring(0, separator))) {
+                continue;
+            }
+            try {
+                return Optional.of(UUID.fromString(
+                        parameter.substring(separator + 1)));
+            } catch (IllegalArgumentException ignored) {
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
+    }
+
     private IdentityLinkFailureCode mapIdentityCoreFailure(
             IdentityCoreException exception) {
         IdentityFailureCode code = exception.getReasonCode();
@@ -335,6 +559,28 @@ public class CasLoginAppService {
                     ACCOUNT_MERGED,
                     SYSTEM_ACCOUNT_FORBIDDEN ->
                     IdentityLinkFailureCode.ACCOUNT_NOT_ELIGIBLE;
+        };
+    }
+
+    private AccountMergeFailureCode mapAccountMergeIdentityFailure(
+            IdentityCoreException exception) {
+        return switch (exception.getReasonCode()) {
+            case PROVIDER_DISABLED,
+                    PROVIDER_AUTHORITY_MISMATCH ->
+                    AccountMergeFailureCode
+                            .MERGE_PROVIDER_UNAVAILABLE;
+            case INVALID_IDENTITY_ASSERTION,
+                    IDENTITY_SUBJECT_MISSING,
+                    IDENTITY_IDENTIFIER_CONFLICT ->
+                    AccountMergeFailureCode
+                            .MERGE_PROVIDER_AUTHENTICATION_FAILED;
+            case ACCESS_DENIED,
+                    ACCOUNT_PENDING,
+                    ACCOUNT_DISABLED,
+                    ACCOUNT_MERGED,
+                    SYSTEM_ACCOUNT_FORBIDDEN ->
+                    AccountMergeFailureCode
+                            .MERGE_ACCOUNT_NOT_ELIGIBLE;
         };
     }
 

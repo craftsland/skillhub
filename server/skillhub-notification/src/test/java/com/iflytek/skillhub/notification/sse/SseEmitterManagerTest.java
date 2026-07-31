@@ -174,6 +174,41 @@ class SseEmitterManagerTest {
         assertEquals(1, manager.emittersForUser("user-2"));
     }
 
+    @Test
+    void closeAll_shouldCloseOnlyTheRequestedUsersEmitters() {
+        TestEmitter first = new TestEmitter();
+        TestEmitter second = new TestEmitter();
+        TestEmitter other = new TestEmitter();
+        emitters.add(first);
+        emitters.add(second);
+        emitters.add(other);
+        manager.register("user-merged");
+        manager.register("user-merged");
+        manager.register("user-active");
+
+        manager.closeAll("user-merged");
+
+        assertTrue(!first.isOpen());
+        assertTrue(!second.isOpen());
+        assertTrue(other.isOpen());
+        assertEquals(1, manager.totalEmitters());
+        assertEquals(0, manager.emittersForUser("user-merged"));
+        assertEquals(1, manager.emittersForUser("user-active"));
+    }
+
+    @Test
+    void closeAll_shouldBeIdempotentWhenCompletionThrows() {
+        TestEmitter emitter = new TestEmitter();
+        emitter.throwOnComplete();
+        emitters.add(emitter);
+        manager.register("user-merged");
+
+        assertDoesNotThrow(() -> manager.closeAll("user-merged"));
+        assertDoesNotThrow(() -> manager.closeAll("user-merged"));
+        assertEquals(0, manager.totalEmitters());
+        assertEquals(0, manager.emittersForUser("user-merged"));
+    }
+
     private static final class TestEmitter extends SseEmitter {
         private final AtomicInteger errorCallbacks = new AtomicInteger(0);
         private Runnable completionCallback = () -> {};

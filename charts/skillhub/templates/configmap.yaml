@@ -44,6 +44,11 @@ data:
 
   # Session
   session-cookie-secure: {{ or .Values.session.cookieSecure (not (empty .Values.ingress.tls)) .Values.ingress.certManager.enabled | quote }}
+  session-redis-namespace: {{ .Values.session.redisNamespace | quote }}
+  session-repository-type: {{ .Values.session.repositoryType | quote }}
+  session-redis-configure-action: {{ .Values.session.configureAction | quote }}
+  auth-account-merge-enabled: {{ .Values.auth.accountMerge.enabled | quote }}
+  auth-account-merge-session-cutover-complete: {{ .Values.auth.accountMerge.sessionCutoverComplete | quote }}
 
   # Public URL and authentication
   public-base-url: {{ .Values.publicBaseUrl | quote }}

@@ -15,6 +15,11 @@ import com.iflytek.skillhub.auth.identity.IdentityLoginOutcome;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
 import com.iflytek.skillhub.auth.identity.TrustedProviderRouteResolver;
+import com.iflytek.skillhub.auth.merge.AccountMergeBrowserFlow;
+import com.iflytek.skillhub.auth.merge.AccountMergeException;
+import com.iflytek.skillhub.auth.merge.AccountMergeFailureCode;
+import com.iflytek.skillhub.auth.merge.AccountMergeProviderProofService;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -54,19 +59,28 @@ public class OAuthLoginFlowService {
     private final ExternalIdentityLoginService identityLoginService;
     private final ExternalIdentityLinkService identityLinkService;
     private final IdentityLinkSessionManager identityLinkSessionManager;
+    private final AccountMergeSessionManager
+            accountMergeSessionManager;
+    private final AccountMergeProviderProofService
+            accountMergeProviderProofService;
 
     @Autowired
     public OAuthLoginFlowService(List<OAuthClaimsExtractor> extractorList,
                                  TrustedProviderRouteResolver providerRouteResolver,
                                  ExternalIdentityLoginService identityLoginService,
                                  ExternalIdentityLinkService identityLinkService,
-                                 IdentityLinkSessionManager identityLinkSessionManager) {
+                                 IdentityLinkSessionManager identityLinkSessionManager,
+                                 AccountMergeSessionManager accountMergeSessionManager,
+                                 AccountMergeProviderProofService
+                                         accountMergeProviderProofService) {
         this(
                 extractorList,
                 providerRouteResolver,
                 identityLoginService,
                 identityLinkService,
                 identityLinkSessionManager,
+                accountMergeSessionManager,
+                accountMergeProviderProofService,
                 new DefaultOAuth2UserService());
     }
 
@@ -76,6 +90,9 @@ public class OAuthLoginFlowService {
             ExternalIdentityLoginService identityLoginService,
             ExternalIdentityLinkService identityLinkService,
             IdentityLinkSessionManager identityLinkSessionManager,
+            AccountMergeSessionManager accountMergeSessionManager,
+            AccountMergeProviderProofService
+                    accountMergeProviderProofService,
             OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate) {
         this.extractors = extractorList.stream()
                 .collect(Collectors.toMap(
@@ -85,6 +102,10 @@ public class OAuthLoginFlowService {
         this.identityLoginService = identityLoginService;
         this.identityLinkService = identityLinkService;
         this.identityLinkSessionManager = identityLinkSessionManager;
+        this.accountMergeSessionManager =
+                accountMergeSessionManager;
+        this.accountMergeProviderProofService =
+                accountMergeProviderProofService;
         this.delegate = Objects.requireNonNull(delegate, "delegate");
     }
 
@@ -137,6 +158,15 @@ public class OAuthLoginFlowService {
             ProviderAuthenticationResult result,
             IdentityLoginContext context) {
         try {
+            Optional<AccountMergeBrowserFlow> accountMergeFlow =
+                    consumeAccountMergeFlow(provider, context);
+            if (accountMergeFlow.isPresent()) {
+                return authenticateAccountMergeFlow(
+                        accountMergeFlow.orElseThrow(),
+                        provider,
+                        result,
+                        context);
+            }
             Optional<IdentityLinkBrowserFlow> identityLinkFlow =
                     consumeIdentityLinkFlow(provider, context);
             if (identityLinkFlow.isPresent()) {
@@ -166,7 +196,26 @@ public class OAuthLoginFlowService {
                     "identity_link_failed",
                     exception.getReasonCode().name(),
                     exception);
+        } catch (AccountMergeException exception) {
+            throw oauthFailure(
+                    "account_merge_failed",
+                    exception.getReasonCode().name(),
+                    exception);
         }
+    }
+
+    private Optional<AccountMergeBrowserFlow>
+            consumeAccountMergeFlow(
+                    ResolvedProviderHandle provider,
+                    IdentityLoginContext context) {
+        if (!(RequestContextHolder.getRequestAttributes()
+                instanceof ServletRequestAttributes attributes)) {
+            return Optional.empty();
+        }
+        return accountMergeSessionManager.consumeBrowserFlow(
+                attributes.getRequest(),
+                provider.providerCode(),
+                context);
     }
 
     private Optional<IdentityLinkBrowserFlow> consumeIdentityLinkFlow(
@@ -214,6 +263,47 @@ public class OAuthLoginFlowService {
         }
         throw new IllegalStateException(
                 "Unsupported identity link outcome");
+    }
+
+    private PlatformPrincipal authenticateAccountMergeFlow(
+            AccountMergeBrowserFlow flow,
+            ResolvedProviderHandle provider,
+            ProviderAuthenticationResult result,
+            IdentityLoginContext context) {
+        HttpSession session = currentRequest()
+                .map(request -> request.getSession(false))
+                .orElseThrow(() ->
+                        new AccountMergeException(
+                                AccountMergeFailureCode
+                                        .MERGE_SESSION_MISMATCH));
+        if (flow instanceof AccountMergeBrowserFlow.Primary) {
+            return accountMergeProviderProofService
+                    .completePrimary(
+                            session,
+                            provider,
+                            result,
+                            context)
+                    .principal();
+        }
+        AccountMergeBrowserFlow.Secondary secondary =
+                (AccountMergeBrowserFlow.Secondary) flow;
+        accountMergeProviderProofService.completeSecondary(
+                secondary.actor(),
+                secondary.intentId(),
+                provider,
+                result,
+                context);
+        Object principalValue =
+                session.getAttribute("platformPrincipal");
+        if (!(principalValue
+                        instanceof PlatformPrincipal principal)
+                || !principal.userId().equals(
+                        flow.primaryUserId())) {
+            throw new AccountMergeException(
+                    AccountMergeFailureCode
+                            .MERGE_SESSION_MISMATCH);
+        }
+        return principal;
     }
 
     private Optional<HttpServletRequest> currentRequest() {
@@ -268,6 +358,14 @@ public class OAuthLoginFlowService {
             return "/access-denied";
         }
         if (exception instanceof OAuth2AuthenticationException oauth2Exception
+                && "account_merge_failed".equals(
+                        oauth2Exception.getError().getErrorCode())) {
+            return accountMergeFailureRedirect(
+                    returnTo,
+                    accountMergeFailureReasonCode(exception)
+                            .orElse(null));
+        }
+        if (exception instanceof OAuth2AuthenticationException oauth2Exception
                 && "identity_link_failed".equals(
                         oauth2Exception.getError().getErrorCode())) {
             return identityLinkFailureRedirect(
@@ -300,11 +398,46 @@ public class OAuthLoginFlowService {
         }
     }
 
+    public Optional<String> accountMergeFailureReasonCode(
+            AuthenticationException exception) {
+        if (!(exception
+                instanceof OAuth2AuthenticationException oauth2Exception)
+                || !"account_merge_failed".equals(
+                        oauth2Exception.getError().getErrorCode())) {
+            return Optional.empty();
+        }
+        String description =
+                oauth2Exception.getError().getDescription();
+        try {
+            return Optional.of(
+                    AccountMergeFailureCode.valueOf(
+                            description).name());
+        } catch (IllegalArgumentException | NullPointerException ignored) {
+            return Optional.empty();
+        }
+    }
+
     private String identityLinkFailureRedirect(
             String returnTo,
             String reasonCode) {
         Optional<UUID> intentId = identityLinkIntentId(returnTo);
         return "/settings/security?identityLink=failed"
+                + intentId.map(id -> "&intentId=" + id)
+                        .orElse("")
+                + (reasonCode == null
+                        ? ""
+                        : "&reasonCode="
+                                + URLEncoder.encode(
+                                reasonCode,
+                                StandardCharsets.UTF_8));
+    }
+
+    private String accountMergeFailureRedirect(
+            String returnTo,
+            String reasonCode) {
+        Optional<UUID> intentId =
+                accountMergeIntentId(returnTo);
+        return "/settings/accounts?accountMerge=failed"
                 + intentId.map(id -> "&intentId=" + id)
                         .orElse("")
                 + (reasonCode == null
@@ -320,6 +453,36 @@ public class OAuthLoginFlowService {
                 || !returnTo.startsWith("/settings/security?")) {
             return Optional.empty();
         }
+        String query = returnTo.substring(
+                returnTo.indexOf('?') + 1);
+        for (String parameter : query.split("&")) {
+            int separator = parameter.indexOf('=');
+            if (separator <= 0
+                    || !"intentId".equals(
+                            parameter.substring(0, separator))) {
+                continue;
+            }
+            try {
+                return Optional.of(UUID.fromString(
+                        parameter.substring(separator + 1)));
+            } catch (IllegalArgumentException ignored) {
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<UUID> accountMergeIntentId(
+            String returnTo) {
+        if (returnTo == null
+                || !returnTo.startsWith(
+                        "/settings/accounts?")) {
+            return Optional.empty();
+        }
+        return intentIdParameter(returnTo);
+    }
+
+    private Optional<UUID> intentIdParameter(String returnTo) {
         String query = returnTo.substring(
                 returnTo.indexOf('?') + 1);
         for (String parameter : query.split("&")) {

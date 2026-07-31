@@ -303,6 +303,15 @@ kubectl create secret docker-registry private-registry \
 | `postgresql.architecture` | 架构模式 | `standalone` |
 | `redis.enabled` | 启用内置 Redis | `true` |
 | `redis.architecture` | 架构模式 | `standalone` |
+| `session.redisNamespace` | indexed Session 的隔离 namespace；首次启用时必须与旧值不同 | `skillhub:session:indexed-v1` |
+| `session.repositoryType` | Spring Session Redis repository；账号合并要求 `indexed` | `indexed` |
+| `session.configureAction` | Redis keyspace notification 配置动作 | `notify-keyspace-events` |
+| `auth.accountMerge.enabled` | 安全账号合并功能开关；完成两阶段启用后才可打开 | `false` |
+| `auth.accountMerge.sessionCutoverComplete` | 已完成旧 Session namespace 切换的运维确认 | `false` |
+
+账号合并不能在切换到 indexed Session 的同一次滚动发布中直接启用。旧 Session 不会
+可靠补建 principal index，必须更换 namespace 使其统一失效，再确认 cutover。完整步骤见
+[`docs/25-secure-account-merge-operations.md`](../../docs/25-secure-account-merge-operations.md)。
 
 #### 数据库架构支持边界
 

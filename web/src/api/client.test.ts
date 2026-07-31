@@ -44,6 +44,7 @@ vi.mock('@/shared/lib/api-error', () => ({
 
 import {
   WEB_API_PREFIX,
+  accountApi,
   buildApiUrl,
   fetchText,
   getDirectAuthRuntimeConfig,
@@ -293,6 +294,99 @@ describe('identityLinkApi', () => {
     ).rejects.toMatchObject({
       status: 409,
       reasonCode: 'FINAL_LOGIN_METHOD',
+    })
+  })
+})
+
+describe('accountApi', () => {
+  it('normalizes account merge capabilities from generated types', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        code: 0,
+        msg: 'OK',
+        data: {
+          enabled: true,
+          primaryMethods: [{
+            providerCode: 'local',
+            displayName: 'Local password',
+            methodType: 'LOCAL_PASSWORD',
+          }],
+          secondaryMethods: [{
+            providerCode: 'github',
+            displayName: 'GitHub',
+            methodType: 'OAUTH_REDIRECT',
+          }],
+        },
+        timestamp: '2026-07-31T00:00:00Z',
+        requestId: 'req-account-merge-capabilities',
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const capabilities = await accountApi.capabilities()
+
+    expect(capabilities).toEqual({
+      enabled: true,
+      primaryMethods: [{
+        providerCode: 'local',
+        displayName: 'Local password',
+        methodType: 'LOCAL_PASSWORD',
+      }],
+      secondaryMethods: [{
+        providerCode: 'github',
+        displayName: 'GitHub',
+        methodType: 'OAUTH_REDIRECT',
+      }],
+    })
+    const request = fetchMock.mock.calls[0]?.[0] as Request
+    expect(request.url).toBe(
+      'http://localhost/api/v1/account/merge/capabilities',
+    )
+    expect(request.method).toBe('GET')
+  })
+
+  it('sends preview version with CSRF and preserves stable failures', async () => {
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      writable: true,
+      value: {
+        cookie: 'XSRF-TOKEN=account-merge-csrf',
+      },
+    })
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        code: 409,
+        msg: 'Preview changed.',
+        reasonCode: 'MERGE_PREVIEW_STALE',
+        timestamp: '2026-07-31T00:00:00Z',
+        requestId: 'req-account-merge-stale',
+      }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(accountApi.confirm(
+      '8f2bb16c-6e11-4e48-a7a4-6be46ecb0902',
+      3,
+    )).rejects.toMatchObject({
+      status: 409,
+      reasonCode: 'MERGE_PREVIEW_STALE',
+    })
+
+    const request = fetchMock.mock.calls[0]?.[0] as Request
+    expect(request.url).toBe(
+      'http://localhost/api/v1/account/merge/intents/'
+      + '8f2bb16c-6e11-4e48-a7a4-6be46ecb0902/confirm',
+    )
+    expect(request.headers.get('X-XSRF-TOKEN'))
+      .toBe('account-merge-csrf')
+    await expect(request.clone().json()).resolves.toEqual({
+      previewVersion: 3,
     })
   })
 })
