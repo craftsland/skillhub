@@ -5,22 +5,28 @@
 适用场景：
 
 - 希望 SkillHub 新部署实例默认带有一批官方内置 Skills。
-- 不希望把完整 Skill 包目录长期放在代码仓库和镜像中。
+- 希望内置内容的来源、许可证和修改可以在开源仓库中审查。
 - 内置 Skill 包已经上传到官方可控的云存储域名。
 
 ## 1. 方案概览
 
-内置 Skills 不再以本地目录包的形式直接随仓库维护。当前方案只在仓库中维护一个 manifest 文件，应用启动时根据 manifest 中的云存储 URL 下载 zip 包，并通过 SkillHub 现有发布链路发布到 `@global`。
+内置 Skill 的审查后源码维护在仓库的 `builtin-skills/skills/` 中，但运行时不直接读取这些
+目录。发布流程先生成确定性 zip 并上传云存储；应用启动时根据 manifest 中的 URL 下载制品，
+再通过 SkillHub 现有发布链路发布到 `@global`。
 
 流程：
 
 ```text
-维护 manifest -> 构建/部署 SkillHub 镜像 -> 应用 ready -> 后台读取 manifest -> 下载云存储 zip 包 -> 校验包内容 -> 发布到 @global -> 对所有用户公开可见
+维护审查后源码 -> 校验与打包 -> 上传不可变制品 -> 更新 manifest -> 构建/部署 SkillHub 镜像 -> 应用 ready -> 下载并校验 zip -> 发布到 @global
 ```
 
 核心文件：
 
 ```text
+builtin-skills/catalog.json
+builtin-skills/evals.json
+builtin-skills/skills/<slug>/
+scripts/build-builtin-skills.py
 server/skillhub-app/src/main/resources/builtin-skills/manifest.json
 ```
 
@@ -94,7 +100,8 @@ manifest 中的 `url` 必须指向 zip 包。zip 包需要满足 SkillHub Skill 
 ```text
 skillhub-hello-1.0.0.zip
 ├── SKILL.md
-├── README.md
+├── LICENSE.txt
+├── NOTICE.md
 └── scripts/
     └── check.js
 ```
@@ -105,7 +112,8 @@ skillhub-hello-1.0.0.zip
 skillhub-hello-1.0.0.zip
 └── skillhub-hello/
     ├── SKILL.md
-    └── README.md
+    ├── LICENSE.txt
+    └── NOTICE.md
 ```
 
 如果 zip 中存在多个顶层目录，或在多个目录中同时出现 `SKILL.md`，同步器会跳过该项并记录错误，避免误选入口。
@@ -210,12 +218,12 @@ SKILLHUB_BUILTIN_SKILLS_ENABLED=false
 
 新增一个内置 Skill 的推荐步骤：
 
-1. 准备 Skill 包，并确认 zip 根目录直接包含 `SKILL.md`，或只有一个顶层 Skill 目录且该目录包含 `SKILL.md`。
-2. 检查 `SKILL.md` 中的 `name` 和 `version`。
-3. 上传 zip 到 `bjcdn.openstorage.cn` 或其子域名下的官方云存储路径。
-4. 在 `server/skillhub-app/src/main/resources/builtin-skills/manifest.json` 中新增一项。
-5. 确保 manifest 中的 `slug` 等于 `SKILL.md name` 归一化后的 slug。
-6. 确保 manifest 中的 `version` 等于 `SKILL.md version`。
+1. 将固定到上游 commit 的审查后源码加入 `builtin-skills/skills/<slug>/`。
+2. 在包内保留 `LICENSE.txt`、`NOTICE.md`，在 catalog 和 evals 中登记元数据与回归用例。
+3. 运行 `make test-builtin-skills`，确认包结构、来源、许可证和确定性构建门禁通过。
+4. 运行 `make build-builtin-skills`，从 `builtin-skills/dist/artifacts.json` 读取制品哈希。
+5. 上传 zip 到 `bjcdn.openstorage.cn` 或其子域名下的不可变路径。
+6. 在 `server/skillhub-app/src/main/resources/builtin-skills/manifest.json` 中新增一项。
 7. 本地或测试环境启动 SkillHub，查看后端日志确认同步结果。
 8. 在 Web UI 或 API 中确认 `@global/{slug}` 已公开可见。
 
@@ -258,6 +266,7 @@ SKILLHUB_BUILTIN_SKILLS_ENABLED=false
 
 配置或新增内置 Skill 后，建议至少完成以下检查：
 
+- `make test-builtin-skills` 通过，且 15 个回归用例都有对应包。
 - manifest JSON 格式合法。
 - 每个 item 都包含 `slug`、`version`、`url`。
 - URL 使用 `https://bjcdn.openstorage.cn/...` 或可信子域名。

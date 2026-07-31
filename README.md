@@ -46,6 +46,20 @@ firewall, with the same polish you'd expect from a public registry.
 
 > ⭐ If SkillHub fits your team, **star** the repo to help other teams find it, and **Watch → Custom → Releases** to get notified when a new version ships.
 
+## Share Great Skills
+
+Great Skills become more valuable when they are shared. If you have a Skill that has
+proved useful in real work or everyday life, share it with the SkillHub community and
+help grow an open, practical Skill ecosystem. We welcome Skills for daily life, office
+work, learning and research, travel and events, content creation, data analysis, and
+software development—not only engineering workflows.
+
+High-quality community contributions may join the curated starter collection, making new
+SkillHub deployments useful from day one. You do not need to finish the full adaptation
+before joining in: [open an issue](https://github.com/iflytek/skillhub/issues/new/choose)
+with the Skill's source and the problem it solves, or submit a PR by following the
+[Skill sharing guide](./builtin-skills/README.md).
+
 ## Documentation
 
 - 📖 **[User Guide](https://iflytek.github.io/skillhub/)** — Skill publishing, search, CLI usage and other user guides

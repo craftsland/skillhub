@@ -35,6 +35,17 @@ SkillHub 是一个自托管平台，为团队提供私有的、受治理的智�
 
 > ⭐ 如果 SkillHub 适合你的团队，欢迎 **Star** 本仓库帮助更多团队发现它；点 **Watch → Custom → Releases** 可在新版本发布时收到通知。
 
+## 分享优秀 Skill
+
+优秀的 Skill 在分享中产生更大价值。如果你有一个在真实工作或生活场景中反复打磨、确实好用的
+Skill，欢迎分享给 SkillHub 社区，与大家一起丰富开放、实用的 Skill 生态。无论是日常生活、
+办公协作、学习研究、旅行活动、内容创作、数据分析还是软件开发，都可以成为有价值的分享。
+
+经过验证的社区贡献还有机会进入精选 Skill 集合，让每个新部署的 SkillHub 开箱即用。不必完成
+全部适配后才能参与：你可以先[创建 issue](https://github.com/iflytek/skillhub/issues/new/choose)，
+说明 Skill 的来源和它解决的问题；也可以按照[Skill 分享指南](./builtin-skills/README.md)
+直接提交 PR。
+
 ## 文档
 
 - 📖 **[用户指南](https://iflytek.github.io/skillhub/)** — 技能发布、搜索、CLI 使用等用户操作指南

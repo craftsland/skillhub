@@ -67,6 +67,9 @@ jobs:
       - name: Ensure Maven wrapper is executable
         run: chmod +x server/mvnw
 
+      - name: Validate built-in Skill packages
+        run: make test-builtin-skills
+
       - name: Run backend unit tests
         run: make test-backend
 
