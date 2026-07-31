@@ -1364,6 +1364,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/identity-link-intents/{intentId}/unlink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete unlink after fresh reauthentication */
+        post: operations["completeUnlink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/identity-link-intents/{intentId}/reauthenticate/local": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Freshly reauthenticate with the local password */
+        post: operations["reauthenticateLocal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/identity-link-intents/{intentId}/reauthenticate/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Freshly reauthenticate with a credential provider */
+        post: operations["reauthenticateCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/identity-link-intents/{intentId}/reauthenticate/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start browser-provider fresh reauthentication */
+        post: operations["prepareBrowserReauthentication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/identity-link-intents/{intentId}/link/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Authenticate and link a credential-provider identity */
+        post: operations["linkCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/identity-link-intents/{intentId}/link/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start browser authentication for the target identity */
+        post: operations["prepareBrowserLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/identity-link-intents/unlink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create an external identity unlink intent */
+        post: operations["createUnlinkIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/identity-link-intents/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create an external identity link intent */
+        post: operations["createLinkIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/direct/login": {
         parameters: {
             query?: never;
@@ -3064,6 +3200,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/identity-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List linked and available login methods
+         * @description Returns active external bindings and providers that can be linked.
+         */
+        get: operations["accountState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/identity-link-intents/{intentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an identity link intent */
+        get: operations["getIntent"];
+        put?: never;
+        post?: never;
+        /** Cancel an identity link intent */
+        delete: operations["cancel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -3899,6 +4073,72 @@ export interface components {
         ChangePasswordRequest: {
             currentPassword: string;
             newPassword: string;
+        };
+        IdentityLinkErrorResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            /** @enum {string} */
+            reasonCode: "INTENT_NOT_FOUND" | "REAUTHENTICATION_REQUIRED" | "SESSION_MISMATCH" | "INTENT_EXPIRED" | "ALREADY_CONSUMED" | "ACTIVE_INTENT_EXISTS" | "ACCOUNT_NOT_ELIGIBLE" | "PROVIDER_UNAVAILABLE" | "PROVIDER_AUTHENTICATION_FAILED" | "ALREADY_LINKED" | "IDENTITY_IN_USE" | "FINAL_LOGIN_METHOD" | "INVALID_OPERATION";
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        ApiResponseIdentityLinkIntentResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["IdentityLinkIntentResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        IdentityLinkIntentResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            operation?: "LINK" | "UNLINK";
+            /** @enum {string} */
+            status?: "PENDING_REAUTHENTICATION" | "READY" | "COMPLETED" | "EXPIRED" | "CANCELLED";
+            providerCode?: string;
+            /** Format: int64 */
+            targetBindingId?: number;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
+        IdentityLinkLocalReauthenticationRequest: {
+            password: string;
+        };
+        IdentityLinkCredentialRequest: {
+            providerCode: string;
+            username: string;
+            password: string;
+        };
+        IdentityLinkBrowserStartRequest: {
+            providerCode: string;
+        };
+        ApiResponseIdentityLinkBrowserStartResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["IdentityLinkBrowserStartResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        IdentityLinkBrowserStartResponse: {
+            actionUrl?: string;
+        };
+        IdentityLinkTargetCredentialRequest: {
+            username: string;
+            password: string;
+        };
+        CreateIdentityUnlinkRequest: {
+            /** Format: int64 */
+            bindingId: number;
+        };
+        CreateIdentityLinkRequest: {
+            providerCode: string;
         };
         DirectLoginRequest: {
             provider: string;
@@ -4885,6 +5125,34 @@ export interface components {
             provider?: string;
             displayName?: string;
             actionUrl?: string;
+        };
+        ApiResponseIdentityLinkAccountStateResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["IdentityLinkAccountStateResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        IdentityLinkAccountStateResponse: {
+            localPasswordEnabled?: boolean;
+            linkedProviders?: components["schemas"]["IdentityLinkBindingResponse"][];
+            availableProviders?: components["schemas"]["IdentityLinkProviderResponse"][];
+        };
+        IdentityLinkBindingResponse: {
+            /** Format: int64 */
+            bindingId?: number;
+            providerCode?: string;
+            displayName?: string;
+            methodTypes?: ("OAUTH_REDIRECT" | "DIRECT_PASSWORD" | "SESSION_BOOTSTRAP")[];
+            usable?: boolean;
+            canUnlink?: boolean;
+        };
+        IdentityLinkProviderResponse: {
+            providerCode?: string;
+            displayName?: string;
+            methodTypes?: ("OAUTH_REDIRECT" | "DIRECT_PASSWORD" | "SESSION_BOOTSTRAP")[];
         };
         AdminUserSummaryResponse: {
             id?: string;
@@ -7966,6 +8234,706 @@ export interface operations {
             };
         };
     };
+    completeUnlink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkIntentResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    reauthenticateLocal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityLinkLocalReauthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkIntentResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    reauthenticateCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityLinkCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkIntentResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    prepareBrowserReauthentication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityLinkBrowserStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkBrowserStartResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    linkCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityLinkTargetCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkIntentResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    prepareBrowserLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkBrowserStartResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    createUnlinkIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIdentityUnlinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkIntentResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    createLinkIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIdentityLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkIntentResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
     directLogin: {
         parameters: {
             query?: never;
@@ -10620,6 +11588,259 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseAuthMeResponse"];
+                };
+            };
+        };
+    };
+    accountState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkAccountStateResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    getIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkIntentResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseIdentityLinkIntentResponse"];
+                };
+            };
+            /** @description Invalid identity link operation */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Fresh reauthentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity Link intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity conflict, consumed intent, or final login method */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
+                };
+            };
+            /** @description Identity provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["IdentityLinkErrorResponse"];
                 };
             };
         };

@@ -17,6 +17,7 @@ export class ApiError extends Error {
     public status: number,
     public serverMessage?: string,
     public serverMessageKey?: string,
+    public reasonCode?: string,
   ) {
     super(resolveLocalizedMessage(message) || message)
     this.name = 'ApiError'

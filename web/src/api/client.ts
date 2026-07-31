@@ -1,5 +1,5 @@
 import createClient from 'openapi-fetch'
-import type { paths } from './generated/schema'
+import type { components, paths } from './generated/schema'
 import type {
   ChangePasswordRequest,
   PasswordResetConfirmRequest,
@@ -29,6 +29,12 @@ import type {
   PagedResponse,
   ReportDisposition,
   AuthMethod,
+  IdentityLinkAccountState,
+  IdentityLinkBinding,
+  IdentityLinkCredentialRequest,
+  IdentityLinkIntent,
+  IdentityLinkProvider,
+  IdentityProviderLoginMethodType,
   OAuthProvider,
   User,
   ManagedNamespace,
@@ -85,6 +91,22 @@ function getApiBaseUrl(): string {
   return getRuntimeConfig().apiBaseUrl ?? ''
 }
 
+function getOpenApiBaseUrl(): string {
+  const configured = getApiBaseUrl()
+  if (/^https?:\/\//i.test(configured)) {
+    return configured
+  }
+  if (
+    typeof window !== 'undefined'
+    && typeof window.location?.origin === 'string'
+  ) {
+    return configured
+      ? prependApiBaseUrl(window.location.origin, configured)
+      : window.location.origin
+  }
+  return configured || 'http://localhost'
+}
+
 function parseBooleanFlag(value: string | undefined): boolean {
   if (!value) {
     return false
@@ -92,7 +114,10 @@ function parseBooleanFlag(value: string | undefined): boolean {
   return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase())
 }
 
-const client = createClient<paths>({ baseUrl: getApiBaseUrl() })
+const client = createClient<paths>({
+  baseUrl: getOpenApiBaseUrl(),
+  fetch: (request) => globalThis.fetch(request),
+})
 
 function getCsrfToken(): string | null {
   const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/)
@@ -170,6 +195,7 @@ type ApiEnvelope<T> = {
   code: number
   msg: string
   data: T
+  reasonCode?: string
   timestamp: string
   requestId: string
 }
@@ -412,6 +438,352 @@ export const authApi = {
         password: request.password,
       }),
     })
+  },
+}
+
+type IdentityLinkIntentSchema = components['schemas']['IdentityLinkIntentResponse']
+type IdentityLinkAccountStateSchema =
+  components['schemas']['IdentityLinkAccountStateResponse']
+type IdentityLinkBindingSchema = components['schemas']['IdentityLinkBindingResponse']
+type IdentityLinkProviderSchema = components['schemas']['IdentityLinkProviderResponse']
+type IdentityLinkBrowserStartSchema =
+  components['schemas']['IdentityLinkBrowserStartResponse']
+type IdentityLinkErrorSchema =
+  components['schemas']['IdentityLinkErrorResponse']
+
+function normalizeIdentityLinkMethodTypes(
+  methodTypes: IdentityLinkBindingSchema['methodTypes']
+    | IdentityLinkProviderSchema['methodTypes'],
+): IdentityProviderLoginMethodType[] {
+  return methodTypes ? [...methodTypes] : []
+}
+
+function normalizeIdentityLinkBinding(
+  binding: IdentityLinkBindingSchema,
+): IdentityLinkBinding {
+  if (
+    binding.bindingId === undefined
+    || !binding.providerCode
+    || !binding.displayName
+    || binding.usable === undefined
+    || binding.canUnlink === undefined
+  ) {
+    throw new ApiError('apiError.invalidResponse', 500)
+  }
+  return {
+    ...binding,
+    bindingId: binding.bindingId,
+    providerCode: binding.providerCode,
+    displayName: binding.displayName,
+    methodTypes: normalizeIdentityLinkMethodTypes(binding.methodTypes),
+    usable: binding.usable,
+    canUnlink: binding.canUnlink,
+  }
+}
+
+function normalizeIdentityLinkProvider(
+  provider: IdentityLinkProviderSchema,
+): IdentityLinkProvider {
+  if (!provider.providerCode || !provider.displayName) {
+    throw new ApiError('apiError.invalidResponse', 500)
+  }
+  return {
+    ...provider,
+    providerCode: provider.providerCode,
+    displayName: provider.displayName,
+    methodTypes: normalizeIdentityLinkMethodTypes(provider.methodTypes),
+  }
+}
+
+function normalizeIdentityLinkIntent(
+  intent: IdentityLinkIntentSchema,
+): IdentityLinkIntent {
+  if (
+    !intent.id
+    || !intent.operation
+    || !intent.status
+    || !intent.providerCode
+    || !intent.expiresAt
+  ) {
+    throw new ApiError('apiError.invalidResponse', 500)
+  }
+  return {
+    ...intent,
+    id: intent.id,
+    operation: intent.operation,
+    status: intent.status,
+    providerCode: intent.providerCode,
+    targetBindingId: intent.targetBindingId,
+    expiresAt: intent.expiresAt,
+  }
+}
+
+function normalizeIdentityLinkAccountState(
+  state: IdentityLinkAccountStateSchema,
+): IdentityLinkAccountState {
+  return {
+    localPasswordEnabled: state.localPasswordEnabled === true,
+    linkedProviders: (state.linkedProviders ?? []).map(
+      normalizeIdentityLinkBinding,
+    ),
+    availableProviders: (state.availableProviders ?? []).map(
+      normalizeIdentityLinkProvider,
+    ),
+  }
+}
+
+function requireIdentityLinkActionUrl(
+  response: IdentityLinkBrowserStartSchema,
+): string {
+  if (!response.actionUrl) {
+    throw new ApiError('apiError.invalidResponse', 500)
+  }
+  return response.actionUrl
+}
+
+type GeneratedApiEnvelope<T> = {
+  code?: number
+  msg?: string
+  data?: T
+}
+
+type OpenApiEnvelopeResult<T> = {
+  data?: GeneratedApiEnvelope<T>
+  error?: unknown
+  response: Response
+}
+
+function isApiFailureEnvelope(
+  value: unknown,
+): value is IdentityLinkErrorSchema {
+  return typeof value === 'object'
+    && value !== null
+    && ('msg' in value || 'reasonCode' in value)
+}
+
+function unwrapOpenApiEnvelope<T>(
+  result: OpenApiEnvelopeResult<T>,
+): T {
+  const failure = isApiFailureEnvelope(result.error)
+    ? result.error
+    : undefined
+  const envelope = result.data
+  if (
+    !result.response.ok
+    || result.error !== undefined
+    || envelope?.code !== 0
+    || envelope?.data === undefined
+  ) {
+    const message = failure?.msg
+      || envelope?.msg
+      || `HTTP ${result.response.status}`
+    throw new ApiError(
+      message,
+      result.response.status,
+      failure?.msg,
+      failure?.msg,
+      failure?.reasonCode,
+    )
+  }
+  return envelope.data
+}
+
+export const identityLinkApi = {
+  async getAccountState(): Promise<IdentityLinkAccountState> {
+    const result = await client.GET(
+      '/api/v1/auth/identity-links',
+      {
+        headers: withRequestHeaders(),
+      },
+    )
+    return normalizeIdentityLinkAccountState(
+      unwrapOpenApiEnvelope<IdentityLinkAccountStateSchema>(
+        result,
+      ),
+    )
+  },
+
+  async getIntent(intentId: string): Promise<IdentityLinkIntent> {
+    const result = await client.GET(
+      '/api/v1/auth/identity-link-intents/{intentId}',
+      {
+        params: {
+          path: { intentId },
+        },
+        headers: withRequestHeaders(),
+      },
+    )
+    return normalizeIdentityLinkIntent(
+      unwrapOpenApiEnvelope<IdentityLinkIntentSchema>(
+        result,
+      ),
+    )
+  },
+
+  async createLinkIntent(providerCode: string): Promise<IdentityLinkIntent> {
+    const result = await client.POST(
+      '/api/v1/auth/identity-link-intents/link',
+      {
+        headers: await ensureCsrfHeaders(),
+        body: { providerCode },
+      },
+    )
+    return normalizeIdentityLinkIntent(
+      unwrapOpenApiEnvelope<IdentityLinkIntentSchema>(
+        result,
+      ),
+    )
+  },
+
+  async createUnlinkIntent(bindingId: number): Promise<IdentityLinkIntent> {
+    const result = await client.POST(
+      '/api/v1/auth/identity-link-intents/unlink',
+      {
+        headers: await ensureCsrfHeaders(),
+        body: { bindingId },
+      },
+    )
+    return normalizeIdentityLinkIntent(
+      unwrapOpenApiEnvelope<IdentityLinkIntentSchema>(
+        result,
+      ),
+    )
+  },
+
+  async cancel(intentId: string): Promise<IdentityLinkIntent> {
+    const result = await client.DELETE(
+      '/api/v1/auth/identity-link-intents/{intentId}',
+      {
+        params: {
+          path: { intentId },
+        },
+        headers: await ensureCsrfHeaders(),
+      },
+    )
+    return normalizeIdentityLinkIntent(
+      unwrapOpenApiEnvelope<IdentityLinkIntentSchema>(
+        result,
+      ),
+    )
+  },
+
+  async reauthenticateLocal(
+    intentId: string,
+    password: string,
+  ): Promise<IdentityLinkIntent> {
+    const result = await client.POST(
+      '/api/v1/auth/identity-link-intents/{intentId}/reauthenticate/local',
+      {
+        params: {
+          path: { intentId },
+        },
+        headers: await ensureCsrfHeaders(),
+        body: { password },
+      },
+    )
+    return normalizeIdentityLinkIntent(
+      unwrapOpenApiEnvelope<IdentityLinkIntentSchema>(
+        result,
+      ),
+    )
+  },
+
+  async prepareBrowserReauthentication(
+    intentId: string,
+    providerCode: string,
+  ): Promise<string> {
+    const result = await client.POST(
+      '/api/v1/auth/identity-link-intents/{intentId}/reauthenticate/browser',
+      {
+        params: {
+          path: { intentId },
+        },
+        headers: await ensureCsrfHeaders(),
+        body: { providerCode },
+      },
+    )
+    return requireIdentityLinkActionUrl(
+      unwrapOpenApiEnvelope<IdentityLinkBrowserStartSchema>(
+        result,
+      ),
+    )
+  },
+
+  async reauthenticateCredential(
+    intentId: string,
+    providerCode: string,
+    credentials: IdentityLinkCredentialRequest,
+  ): Promise<IdentityLinkIntent> {
+    const result = await client.POST(
+      '/api/v1/auth/identity-link-intents/{intentId}/reauthenticate/credential',
+      {
+        params: {
+          path: { intentId },
+        },
+        headers: await ensureCsrfHeaders(),
+        body: { providerCode, ...credentials },
+      },
+    )
+    return normalizeIdentityLinkIntent(
+      unwrapOpenApiEnvelope<IdentityLinkIntentSchema>(
+        result,
+      ),
+    )
+  },
+
+  async prepareBrowserLink(intentId: string): Promise<string> {
+    const result = await client.POST(
+      '/api/v1/auth/identity-link-intents/{intentId}/link/browser',
+      {
+        params: {
+          path: { intentId },
+        },
+        headers: await ensureCsrfHeaders(),
+      },
+    )
+    return requireIdentityLinkActionUrl(
+      unwrapOpenApiEnvelope<IdentityLinkBrowserStartSchema>(
+        result,
+      ),
+    )
+  },
+
+  async linkCredential(
+    intentId: string,
+    credentials: IdentityLinkCredentialRequest,
+  ): Promise<IdentityLinkIntent> {
+    const result = await client.POST(
+      '/api/v1/auth/identity-link-intents/{intentId}/link/credential',
+      {
+        params: {
+          path: { intentId },
+        },
+        headers: await ensureCsrfHeaders(),
+        body: credentials,
+      },
+    )
+    return normalizeIdentityLinkIntent(
+      unwrapOpenApiEnvelope<IdentityLinkIntentSchema>(
+        result,
+      ),
+    )
+  },
+
+  async completeUnlink(intentId: string): Promise<IdentityLinkIntent> {
+    const result = await client.POST(
+      '/api/v1/auth/identity-link-intents/{intentId}/unlink',
+      {
+        params: {
+          path: { intentId },
+        },
+        headers: await ensureCsrfHeaders(),
+      },
+    )
+    return normalizeIdentityLinkIntent(
+      unwrapOpenApiEnvelope<IdentityLinkIntentSchema>(
+        result,
+      ),
+    )
   },
 }
 

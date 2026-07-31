@@ -1,9 +1,13 @@
 package com.iflytek.skillhub.exception;
 
 import com.iflytek.skillhub.auth.exception.AuthFlowException;
+import com.iflytek.skillhub.auth.config.IdentityLinkRouteRequestMatcher;
+import com.iflytek.skillhub.auth.identity.IdentityLinkException;
+import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
+import com.iflytek.skillhub.dto.IdentityLinkErrorResponse;
 import com.iflytek.skillhub.domain.shared.exception.LocalizedDomainException;
 import com.iflytek.skillhub.domain.shared.exception.LocalizedMessage;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
@@ -44,13 +48,63 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(LocalizedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleLocalizedError(LocalizedException ex, HttpServletRequest request) {
+    public ResponseEntity<?> handleLocalizedError(
+            LocalizedException ex,
+            HttpServletRequest request) {
+        if (IdentityLinkRouteRequestMatcher.matches(request)
+                && ex.status() == HttpStatus.UNAUTHORIZED) {
+            logHandledException(
+                    ex.status(),
+                    ex.messageCode(),
+                    request);
+            return ResponseEntity.status(ex.status()).body(
+                    apiResponseFactory.identityLinkError(
+                            ex.status().value(),
+                            ex.messageCode(),
+                            IdentityLinkFailureCode
+                                    .REAUTHENTICATION_REQUIRED
+                                    .name(),
+                            ex.messageArgs()));
+        }
         return renderLocalizedError(ex, ex.status(), request);
     }
 
     @ExceptionHandler(AuthFlowException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAuthFlowException(AuthFlowException ex, HttpServletRequest request) {
+    public ResponseEntity<?> handleAuthFlowException(
+            AuthFlowException ex,
+            HttpServletRequest request) {
+        if (IdentityLinkRouteRequestMatcher.matches(request)) {
+            IdentityLinkFailureCode reasonCode =
+                    ex.getStatus() == HttpStatus.BAD_REQUEST
+                            ? IdentityLinkFailureCode
+                                    .INVALID_OPERATION
+                            : IdentityLinkFailureCode
+                                    .REAUTHENTICATION_REQUIRED;
+            logHandledException(
+                    ex.getStatus(),
+                    ex.messageCode(),
+                    request);
+            return ResponseEntity.status(ex.getStatus()).body(
+                    apiResponseFactory.identityLinkError(
+                            ex.getStatus().value(),
+                            ex.messageCode(),
+                            reasonCode.name(),
+                            ex.messageArgs()));
+        }
         return renderLocalizedError(ex, ex.getStatus(), request);
+    }
+
+    @ExceptionHandler(IdentityLinkException.class)
+    public ResponseEntity<IdentityLinkErrorResponse> handleIdentityLinkException(
+            IdentityLinkException ex,
+            HttpServletRequest request) {
+        logHandledException(ex.getStatus(), ex.messageCode(), request);
+        return ResponseEntity.status(ex.getStatus()).body(
+                apiResponseFactory.identityLinkError(
+                        ex.getStatus().value(),
+                        ex.messageCode(),
+                        ex.getReasonCode().name(),
+                        ex.messageArgs()));
     }
 
     @ExceptionHandler(LocalizedDomainException.class)
@@ -59,7 +113,9 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    public ResponseEntity<?> handleValidation(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
         String msg = ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(FieldError::getDefaultMessage)
@@ -68,6 +124,18 @@ public class GlobalExceptionHandler {
                         .map(error -> error.getDefaultMessage())
                         .orElse(null));
         logHandledException(HttpStatus.BAD_REQUEST, "validation.request.invalid", request);
+        if (IdentityLinkRouteRequestMatcher.matches(request)) {
+            String message = msg == null || msg.isBlank()
+                    ? "Invalid identity link operation"
+                    : msg;
+            return ResponseEntity.badRequest().body(
+                    apiResponseFactory.identityLinkErrorMessage(
+                            400,
+                            message,
+                            IdentityLinkFailureCode
+                                    .INVALID_OPERATION
+                                    .name()));
+        }
         if (msg == null || msg.isBlank()) {
             return ResponseEntity.badRequest().body(apiResponseFactory.error(400, "error.badRequest"));
         }
@@ -75,8 +143,21 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBadRequest(IllegalArgumentException ex, HttpServletRequest request) {
+    public ResponseEntity<?> handleBadRequest(
+            IllegalArgumentException ex,
+            HttpServletRequest request) {
         logHandledException(HttpStatus.BAD_REQUEST, "error.badRequest", request);
+        if (IdentityLinkRouteRequestMatcher.matches(request)) {
+            return ResponseEntity.badRequest().body(
+                    apiResponseFactory.identityLinkError(
+                            400,
+                            IdentityLinkFailureCode
+                                    .INVALID_OPERATION
+                                    .messageCode(),
+                            IdentityLinkFailureCode
+                                    .INVALID_OPERATION
+                                    .name()));
+        }
         return ResponseEntity.badRequest().body(
                 apiResponseFactory.error(400, "error.badRequest"));
     }

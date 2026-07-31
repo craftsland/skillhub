@@ -36,6 +36,10 @@ vi.mock('@/features/auth/use-auth', () => ({
   useAuth: useAuthMock,
 }))
 
+vi.mock('@/features/auth/identity-link-manager', () => ({
+  IdentityLinkManager: () => <div>identity-link-manager</div>,
+}))
+
 vi.mock('@/shared/lib/error-display', () => ({
   truncateErrorMessage: (v: string) => v,
 }))
@@ -93,6 +97,7 @@ describe('SecuritySettingsPage', () => {
   it('renders the password form when password changes are allowed', () => {
     const html = renderToStaticMarkup(<SecuritySettingsPage />)
 
+    expect(html).toContain('identity-link-manager')
     expect(html).toContain('security.currentPassword')
     expect(html).toContain('security.newPassword')
     expect(html).toContain('security.submit')

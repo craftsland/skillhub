@@ -1,8 +1,15 @@
 package com.iflytek.skillhub.auth.oauth;
 
 import com.iflytek.skillhub.auth.identity.ExternalIdentityLoginService;
+import com.iflytek.skillhub.auth.identity.ExternalIdentityLinkService;
 import com.iflytek.skillhub.auth.identity.IdentityCoreException;
 import com.iflytek.skillhub.auth.identity.IdentityFailureCode;
+import com.iflytek.skillhub.auth.identity.IdentityLinkBrowserFlow;
+import com.iflytek.skillhub.auth.identity.IdentityLinkBrowserPhase;
+import com.iflytek.skillhub.auth.identity.IdentityLinkException;
+import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
+import com.iflytek.skillhub.auth.identity.IdentityLinkOutcome;
+import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.IdentityLoginOutcome;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
@@ -16,6 +23,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +37,8 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Flow owner for browser OAuth login. It centralizes the stages of remembering
@@ -41,15 +52,21 @@ public class OAuthLoginFlowService {
     private final Map<String, OAuthClaimsExtractor> extractors;
     private final TrustedProviderRouteResolver providerRouteResolver;
     private final ExternalIdentityLoginService identityLoginService;
+    private final ExternalIdentityLinkService identityLinkService;
+    private final IdentityLinkSessionManager identityLinkSessionManager;
 
     @Autowired
     public OAuthLoginFlowService(List<OAuthClaimsExtractor> extractorList,
                                  TrustedProviderRouteResolver providerRouteResolver,
-                                 ExternalIdentityLoginService identityLoginService) {
+                                 ExternalIdentityLoginService identityLoginService,
+                                 ExternalIdentityLinkService identityLinkService,
+                                 IdentityLinkSessionManager identityLinkSessionManager) {
         this(
                 extractorList,
                 providerRouteResolver,
                 identityLoginService,
+                identityLinkService,
+                identityLinkSessionManager,
                 new DefaultOAuth2UserService());
     }
 
@@ -57,6 +74,8 @@ public class OAuthLoginFlowService {
             List<OAuthClaimsExtractor> extractorList,
             TrustedProviderRouteResolver providerRouteResolver,
             ExternalIdentityLoginService identityLoginService,
+            ExternalIdentityLinkService identityLinkService,
+            IdentityLinkSessionManager identityLinkSessionManager,
             OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate) {
         this.extractors = extractorList.stream()
                 .collect(Collectors.toMap(
@@ -64,6 +83,8 @@ public class OAuthLoginFlowService {
                         Function.identity()));
         this.providerRouteResolver = providerRouteResolver;
         this.identityLoginService = identityLoginService;
+        this.identityLinkService = identityLinkService;
+        this.identityLinkSessionManager = identityLinkSessionManager;
         this.delegate = Objects.requireNonNull(delegate, "delegate");
     }
 
@@ -116,6 +137,14 @@ public class OAuthLoginFlowService {
             ProviderAuthenticationResult result,
             IdentityLoginContext context) {
         try {
+            Optional<IdentityLinkBrowserFlow> identityLinkFlow =
+                    consumeIdentityLinkFlow(provider, context);
+            if (identityLinkFlow.isPresent()) {
+                return authenticateIdentityLinkFlow(
+                        identityLinkFlow.get(),
+                        provider,
+                        result);
+            }
             IdentityLoginOutcome outcome = identityLoginService.authenticate(
                     provider,
                     result,
@@ -132,7 +161,67 @@ public class OAuthLoginFlowService {
                     null));
         } catch (IdentityCoreException exception) {
             throw mapIdentityFailure(exception);
+        } catch (IdentityLinkException exception) {
+            throw oauthFailure(
+                    "identity_link_failed",
+                    exception.getReasonCode().name(),
+                    exception);
         }
+    }
+
+    private Optional<IdentityLinkBrowserFlow> consumeIdentityLinkFlow(
+            ResolvedProviderHandle provider,
+            IdentityLoginContext context) {
+        if (!(RequestContextHolder.getRequestAttributes()
+                instanceof ServletRequestAttributes attributes)) {
+            return Optional.empty();
+        }
+        return identityLinkSessionManager.consumeBrowserFlow(
+                attributes.getRequest(),
+                provider.providerCode(),
+                context);
+    }
+
+    private PlatformPrincipal authenticateIdentityLinkFlow(
+            IdentityLinkBrowserFlow flow,
+            ResolvedProviderHandle provider,
+            ProviderAuthenticationResult result) {
+        IdentityLinkOutcome outcome;
+        if (flow.phase()
+                == IdentityLinkBrowserPhase.REAUTHENTICATE) {
+            outcome = identityLinkService.reauthenticate(
+                    flow.actor(),
+                    flow.intentId(),
+                    provider,
+                    result);
+        } else {
+            outcome = identityLinkService.link(
+                    flow.actor(),
+                    flow.intentId(),
+                    provider,
+                    result);
+        }
+        if (outcome
+                instanceof IdentityLinkOutcome.Reauthenticated completed) {
+            return completed.principal();
+        }
+        if (outcome instanceof IdentityLinkOutcome.Linked linked) {
+            currentRequest().ifPresent(request ->
+                    identityLinkSessionManager.remove(
+                            request.getSession(false),
+                            flow.intentId()));
+            return linked.principal();
+        }
+        throw new IllegalStateException(
+                "Unsupported identity link outcome");
+    }
+
+    private Optional<HttpServletRequest> currentRequest() {
+        if (RequestContextHolder.getRequestAttributes()
+                instanceof ServletRequestAttributes attributes) {
+            return Optional.of(attributes.getRequest());
+        }
+        return Optional.empty();
     }
 
     public void rememberReturnTo(HttpServletRequest request) {
@@ -178,10 +267,76 @@ public class OAuthLoginFlowService {
                         oauth2Exception.getError().getErrorCode()))) {
             return "/access-denied";
         }
+        if (exception instanceof OAuth2AuthenticationException oauth2Exception
+                && "identity_link_failed".equals(
+                        oauth2Exception.getError().getErrorCode())) {
+            return identityLinkFailureRedirect(
+                    returnTo,
+                    identityLinkFailureReasonCode(exception)
+                            .orElse(null));
+        }
         if (returnTo != null) {
             return "/login?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8);
         }
         return null;
+    }
+
+    public Optional<String> identityLinkFailureReasonCode(
+            AuthenticationException exception) {
+        if (!(exception
+                instanceof OAuth2AuthenticationException oauth2Exception)
+                || !"identity_link_failed".equals(
+                        oauth2Exception.getError().getErrorCode())) {
+            return Optional.empty();
+        }
+        String description =
+                oauth2Exception.getError().getDescription();
+        try {
+            return Optional.of(
+                    IdentityLinkFailureCode.valueOf(
+                            description).name());
+        } catch (IllegalArgumentException | NullPointerException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private String identityLinkFailureRedirect(
+            String returnTo,
+            String reasonCode) {
+        Optional<UUID> intentId = identityLinkIntentId(returnTo);
+        return "/settings/security?identityLink=failed"
+                + intentId.map(id -> "&intentId=" + id)
+                        .orElse("")
+                + (reasonCode == null
+                        ? ""
+                        : "&reasonCode="
+                                + URLEncoder.encode(
+                                        reasonCode,
+                                        StandardCharsets.UTF_8));
+    }
+
+    private Optional<UUID> identityLinkIntentId(String returnTo) {
+        if (returnTo == null
+                || !returnTo.startsWith("/settings/security?")) {
+            return Optional.empty();
+        }
+        String query = returnTo.substring(
+                returnTo.indexOf('?') + 1);
+        for (String parameter : query.split("&")) {
+            int separator = parameter.indexOf('=');
+            if (separator <= 0
+                    || !"intentId".equals(
+                            parameter.substring(0, separator))) {
+                continue;
+            }
+            try {
+                return Optional.of(UUID.fromString(
+                        parameter.substring(separator + 1)));
+            } catch (IllegalArgumentException ignored) {
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
     }
 
     public record AuthenticatedLoginContext(OAuth2User upstreamUser, PlatformPrincipal principal) {

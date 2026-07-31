@@ -61,6 +61,57 @@ export interface ChangePasswordRequest {
   newPassword: string
 }
 
+type IdentityLinkIntentSchema = components['schemas']['IdentityLinkIntentResponse']
+type IdentityLinkBindingSchema = components['schemas']['IdentityLinkBindingResponse']
+type IdentityLinkProviderSchema = components['schemas']['IdentityLinkProviderResponse']
+
+export type IdentityLinkOperation = NonNullable<IdentityLinkIntentSchema['operation']>
+export type IdentityLinkIntentStatus = NonNullable<IdentityLinkIntentSchema['status']>
+export type IdentityProviderLoginMethodType =
+  NonNullable<IdentityLinkBindingSchema['methodTypes']>[number]
+
+export type IdentityLinkIntent = Omit<
+  IdentityLinkIntentSchema,
+  'id' | 'operation' | 'status' | 'providerCode' | 'expiresAt'
+> & {
+  id: string
+  operation: IdentityLinkOperation
+  status: IdentityLinkIntentStatus
+  providerCode: string
+  targetBindingId?: number
+  expiresAt: string
+}
+
+export type IdentityLinkBinding = Omit<
+  IdentityLinkBindingSchema,
+  'bindingId' | 'providerCode' | 'displayName' | 'methodTypes' | 'usable' | 'canUnlink'
+> & {
+  bindingId: number
+  providerCode: string
+  displayName: string
+  methodTypes: IdentityProviderLoginMethodType[]
+  usable: boolean
+  canUnlink: boolean
+}
+
+export type IdentityLinkProvider = Omit<
+  IdentityLinkProviderSchema,
+  'providerCode' | 'displayName' | 'methodTypes'
+> & {
+  providerCode: string
+  displayName: string
+  methodTypes: IdentityProviderLoginMethodType[]
+}
+
+export interface IdentityLinkAccountState {
+  localPasswordEnabled: boolean
+  linkedProviders: IdentityLinkBinding[]
+  availableProviders: IdentityLinkProvider[]
+}
+
+export type IdentityLinkCredentialRequest =
+  components['schemas']['IdentityLinkTargetCredentialRequest']
+
 export interface PasswordResetRequest {
   email: string
 }

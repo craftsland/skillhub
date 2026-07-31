@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { ApiError, authApi } from '@/api/client'
+import { IdentityLinkManager } from '@/features/auth/identity-link-manager'
 import { useAuth } from '@/features/auth/use-auth'
 import { clearSessionScopedQueries } from '@/features/notification/notification-session'
 import { truncateErrorMessage } from '@/shared/lib/error-display'
@@ -20,9 +21,9 @@ function canUsePasswordChangeForm(user?: PasswordChangeCapabilityUser | null) {
 }
 
 /**
- * Security settings page for password changes. After a successful change the
- * user is logged out so all existing authenticated state is re-established with
- * the new credential.
+ * Security settings page for login methods and password changes. After a
+ * successful password change the user is logged out so all existing
+ * authenticated state is re-established with the new credential.
  */
 export function SecuritySettingsPage() {
   const { t } = useTranslation()
@@ -87,7 +88,8 @@ export function SecuritySettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-3xl space-y-6">
+      <IdentityLinkManager />
       <Card className="glass-strong">
         <CardHeader>
           <CardTitle>{t('security.title')}</CardTitle>

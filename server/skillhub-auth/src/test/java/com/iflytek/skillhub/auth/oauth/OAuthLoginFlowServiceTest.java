@@ -13,10 +13,16 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.iflytek.skillhub.auth.identity.ExternalIdentityLoginService;
+import com.iflytek.skillhub.auth.identity.ExternalIdentityLinkService;
 import com.iflytek.skillhub.auth.identity.IdentityCoreException;
 import com.iflytek.skillhub.auth.identity.IdentityFailureCode;
+import com.iflytek.skillhub.auth.identity.IdentityLinkActor;
+import com.iflytek.skillhub.auth.identity.IdentityLinkBrowserFlow;
+import com.iflytek.skillhub.auth.identity.IdentityLinkBrowserPhase;
+import com.iflytek.skillhub.auth.identity.IdentityLinkOutcome;
 import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.IdentityLoginOutcome;
+import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
@@ -29,6 +35,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -39,8 +48,15 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 class OAuthLoginFlowServiceTest {
+
+    @AfterEach
+    void resetRequestContext() {
+        RequestContextHolder.resetRequestAttributes();
+    }
 
     @Test
     void resolvesReadyRouteBeforeOAuthUpstreamAndAdapterCalls() {
@@ -74,6 +90,8 @@ class OAuthLoginFlowServiceTest {
                         List.of(extractor),
                         resolver,
                         identityLoginService,
+                        mock(ExternalIdentityLinkService.class),
+                        mock(IdentityLinkSessionManager.class),
                         delegate);
         clearInvocations(extractor);
 
@@ -114,6 +132,8 @@ class OAuthLoginFlowServiceTest {
                         List.of(extractor),
                         resolver,
                         identityLoginService,
+                        mock(ExternalIdentityLinkService.class),
+                        mock(IdentityLinkSessionManager.class),
                         delegate);
         clearInvocations(extractor);
 
@@ -139,7 +159,9 @@ class OAuthLoginFlowServiceTest {
                 new OAuthLoginFlowService(
                         List.of(),
                         resolver,
-                        identityLoginService);
+                        identityLoginService,
+                        mock(ExternalIdentityLinkService.class),
+                        mock(IdentityLinkSessionManager.class));
         PlatformPrincipal principal = principal();
         when(identityLoginService.authenticate(any(), any(), any()))
                 .thenReturn(new IdentityLoginOutcome.Authenticated(
@@ -170,7 +192,9 @@ class OAuthLoginFlowServiceTest {
                 new OAuthLoginFlowService(
                         List.of(),
                         resolver,
-                        identityLoginService);
+                        identityLoginService,
+                        mock(ExternalIdentityLinkService.class),
+                        mock(IdentityLinkSessionManager.class));
         when(identityLoginService.authenticate(any(), any(), any()))
                 .thenReturn(new IdentityLoginOutcome.PendingApproval(
                         "ACCOUNT_PENDING"));
@@ -193,7 +217,9 @@ class OAuthLoginFlowServiceTest {
                 new OAuthLoginFlowService(
                         List.of(),
                         resolver,
-                        identityLoginService);
+                        identityLoginService,
+                        mock(ExternalIdentityLinkService.class),
+                        mock(IdentityLinkSessionManager.class));
         when(identityLoginService.authenticate(any(), any(), any()))
                 .thenReturn(new IdentityLoginOutcome.LinkRequired(
                         "EMAIL_COLLISION"));
@@ -228,7 +254,9 @@ class OAuthLoginFlowServiceTest {
                 new OAuthLoginFlowService(
                         List.of(),
                         resolver,
-                        identityLoginService);
+                        identityLoginService,
+                        mock(ExternalIdentityLinkService.class),
+                        mock(IdentityLinkSessionManager.class));
         when(identityLoginService.authenticate(any(), any(), any()))
                 .thenThrow(new IdentityCoreException(
                         IdentityFailureCode.PROVIDER_AUTHORITY_MISMATCH));
@@ -244,6 +272,68 @@ class OAuthLoginFlowServiceTest {
                                 exception.getError().getErrorCode())
                                 .isEqualTo(
                                         "provider_authority_mismatch"));
+    }
+
+    @Test
+    void browserLinkFlowDoesNotRunNormalLoginOrReplacePrimaryAccount() {
+        TrustedProviderRouteResolver resolver =
+                mock(TrustedProviderRouteResolver.class);
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        ExternalIdentityLinkService identityLinkService =
+                mock(ExternalIdentityLinkService.class);
+        IdentityLinkSessionManager sessionManager =
+                mock(IdentityLinkSessionManager.class);
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(),
+                        resolver,
+                        identityLoginService,
+                        identityLinkService,
+                        sessionManager);
+        ResolvedProviderHandle provider =
+                ResolvedProviderHandleTestFixture.handle("github");
+        UUID intentId = UUID.randomUUID();
+        IdentityLinkActor actor = new IdentityLinkActor(
+                "usr_1",
+                "local",
+                "high-entropy-session-nonce",
+                context());
+        MockHttpServletRequest request =
+                new MockHttpServletRequest(
+                        "GET",
+                        "/login/oauth2/code/github");
+        request.getSession(true);
+        RequestContextHolder.setRequestAttributes(
+                new ServletRequestAttributes(request));
+        when(sessionManager.consumeBrowserFlow(
+                request,
+                "github",
+                context()))
+                .thenReturn(Optional.of(
+                        new IdentityLinkBrowserFlow(
+                                intentId,
+                                IdentityLinkBrowserPhase.LINK,
+                                actor)));
+        when(identityLinkService.link(
+                actor,
+                intentId,
+                provider,
+                result()))
+                .thenReturn(new IdentityLinkOutcome.Linked(
+                        principal(),
+                        42L));
+
+        PlatformPrincipal linked = service.authenticate(
+                provider,
+                result(),
+                context());
+
+        assertThat(linked.userId()).isEqualTo("usr_1");
+        verifyNoInteractions(identityLoginService);
+        verify(sessionManager).remove(
+                request.getSession(false),
+                intentId);
     }
 
     @Test
@@ -271,6 +361,46 @@ class OAuthLoginFlowServiceTest {
                 "/settings/accounts");
 
         assertThat(redirect).isEqualTo("/access-denied");
+    }
+
+    @Test
+    void identityLinkFailureRedirectPreservesResumableIntent() {
+        UUID intentId = UUID.randomUUID();
+
+        String redirect = service().resolveFailureRedirect(
+                new OAuth2AuthenticationException(
+                        new OAuth2Error("identity_link_failed")),
+                "/settings/security?identityLink=linked"
+                        + "&intentId="
+                        + intentId);
+
+        assertThat(redirect)
+                .isEqualTo(
+                        "/settings/security?identityLink=failed"
+                                + "&intentId="
+                                + intentId);
+    }
+
+    @Test
+    void identityLinkFailureRedirectIncludesStableReasonCode() {
+        UUID intentId = UUID.randomUUID();
+
+        String redirect = service().resolveFailureRedirect(
+                new OAuth2AuthenticationException(
+                        new OAuth2Error(
+                                "identity_link_failed",
+                                "PROVIDER_UNAVAILABLE",
+                                null)),
+                "/settings/security?identityLink=linked"
+                        + "&intentId="
+                        + intentId);
+
+        assertThat(redirect)
+                .isEqualTo(
+                        "/settings/security?identityLink=failed"
+                                + "&intentId="
+                                + intentId
+                                + "&reasonCode=PROVIDER_UNAVAILABLE");
     }
 
     @Test
@@ -308,7 +438,9 @@ class OAuthLoginFlowServiceTest {
         return new OAuthLoginFlowService(
                 List.of(),
                 mock(TrustedProviderRouteResolver.class),
-                mock(ExternalIdentityLoginService.class));
+                mock(ExternalIdentityLoginService.class),
+                mock(ExternalIdentityLinkService.class),
+                mock(IdentityLinkSessionManager.class));
     }
 
     private static ProviderAuthenticationResult result() {
