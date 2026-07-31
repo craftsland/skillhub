@@ -19,8 +19,9 @@ import org.springframework.stereotype.Component;
 /**
  * Owns the raw, high-entropy session state used by Identity Link workflows.
  *
- * <p>Only a SHA-256 digest is stored outside the session. Raw nonces and OAuth
- * state values are never returned by API DTOs or written to the database.
+ * <p>Only a SHA-256 digest is stored outside the session. Raw nonces and
+ * browser-protocol state values are never returned by API DTOs or written to
+ * the database.
  */
 @Component
 public class IdentityLinkSessionManager {
@@ -132,14 +133,14 @@ public class IdentityLinkSessionManager {
     }
 
     /**
-     * Binds a prepared link flow to the OAuth authorization request generated
-     * by Spring Security. The raw OAuth state remains in Spring Security's
-     * authorization request repository; only its digest is copied here.
+     * Binds a prepared link flow to the browser protocol's authorization
+     * request. OAuth keeps the raw state in Spring Security and CAS keeps it
+     * in the CAS state store; only its digest is copied here.
      */
     public void activateBrowserFlow(
             HttpSession session,
             String providerCode,
-            String oauthState) {
+            String browserState) {
         if (session == null) {
             return;
         }
@@ -149,8 +150,8 @@ public class IdentityLinkSessionManager {
         if (!(value instanceof PendingBrowserFlow pending)
                 || pending.expiresAt().isBefore(now())
                 || !pending.providerCode().equals(providerCode)
-                || oauthState == null
-                || oauthState.isBlank()) {
+                || browserState == null
+                || browserState.isBlank()) {
             return;
         }
         session.setAttribute(
@@ -159,7 +160,7 @@ public class IdentityLinkSessionManager {
                         pending.intentId(),
                         pending.phase(),
                         pending.providerCode(),
-                        stateHasher.hash(oauthState),
+                        stateHasher.hash(browserState),
                         pending.expiresAt()));
     }
 
@@ -182,7 +183,7 @@ public class IdentityLinkSessionManager {
                 || !active.providerCode().equals(providerCode)
                 || !stateHasher.matches(
                         callbackState,
-                        active.oauthStateHash())) {
+                        active.browserStateHash())) {
             throw new IdentityLinkException(
                     IdentityLinkFailureCode.SESSION_MISMATCH);
         }
@@ -277,7 +278,7 @@ public class IdentityLinkSessionManager {
             UUID intentId,
             IdentityLinkBrowserPhase phase,
             String providerCode,
-            String oauthStateHash,
+            String browserStateHash,
             Instant expiresAt
     ) implements Serializable {
         @Serial

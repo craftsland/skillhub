@@ -59,16 +59,30 @@ class RouteSecurityPolicyRegistryTest {
     }
 
     @Test
-    void authorizationPolicies_shouldAllowCasBrowserFlowAnonymously() {
-        boolean matched = registry.authorizationPolicies().stream()
+    void authorizationPolicies_shouldAllowOnlyCasBrowserEndpointsAnonymously() {
+        boolean loginMatched = registry.authorizationPolicies().stream()
                 .anyMatch(policy -> policy.method() == HttpMethod.GET
-                        && "/api/v1/auth/cas/**".equals(
+                        && "/api/v1/auth/cas/*/login".equals(
                                 policy.pattern())
                         && policy.accessLevel()
                                 == RouteSecurityPolicyRegistry
                                         .AccessLevel.PERMIT_ALL);
+        boolean callbackMatched = registry.authorizationPolicies().stream()
+                .anyMatch(policy -> policy.method() == HttpMethod.GET
+                        && "/api/v1/auth/cas/*/callback".equals(
+                                policy.pattern())
+                        && policy.accessLevel()
+                                == RouteSecurityPolicyRegistry
+                                        .AccessLevel.PERMIT_ALL);
+        boolean broadWildcardPresent =
+                registry.authorizationPolicies().stream()
+                        .anyMatch(policy ->
+                                "/api/v1/auth/cas/**".equals(
+                                        policy.pattern()));
 
-        assertTrue(matched);
+        assertTrue(loginMatched);
+        assertTrue(callbackMatched);
+        assertFalse(broadWildcardPresent);
     }
 
     @Test

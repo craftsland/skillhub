@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.filter;
 
+import com.iflytek.skillhub.security.SensitiveLogSanitizer;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +36,15 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     private static final Set<String> SKIP_SUFFIXES = Set.of(
             "/sse"
     );
+    private static final Set<String> SENSITIVE_BODY_PREFIXES = Set.of(
+            "/api/v1/auth/"
+    );
+    private final SensitiveLogSanitizer sensitiveLogSanitizer;
+
+    public RequestLoggingFilter(
+            SensitiveLogSanitizer sensitiveLogSanitizer) {
+        this.sensitiveLogSanitizer = sensitiveLogSanitizer;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -66,15 +76,14 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     }
 
     private void logRequest(ContentCachingRequestWrapper request, ContentCachingResponseWrapper response, long duration) {
-        String requestUri = request.getRequestURI();
-        String queryString = request.getQueryString();
-        String fullUrl = queryString != null ? requestUri + "?" + queryString : requestUri;
+        String requestTarget =
+                sensitiveLogSanitizer.sanitizeRequestTarget(request);
 
         String contentType = request.getContentType();
         String userAgent = request.getHeader("User-Agent");
 
         StringBuilder sb = new StringBuilder();
-        sb.append(request.getMethod()).append(" ").append(fullUrl);
+        sb.append(request.getMethod()).append(" ").append(requestTarget);
         sb.append(" | ").append(response.getStatus());
         sb.append(" | ").append(duration).append("ms");
         sb.append(" | ").append(request.getRemoteAddr());
@@ -85,7 +94,9 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             sb.append(" | UA: ").append(truncate(userAgent, 80));
         }
 
-        String requestBody = getRequestBody(request);
+        String requestBody = shouldLogBody(request.getRequestURI())
+                ? getRequestBody(request)
+                : null;
         if (requestBody != null && !requestBody.isBlank()) {
             sb.append(" | Body: ").append(requestBody);
         }
@@ -105,6 +116,11 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             }
         }
         return false;
+    }
+
+    private boolean shouldLogBody(String uri) {
+        return SENSITIVE_BODY_PREFIXES.stream()
+                .noneMatch(uri::startsWith);
     }
 
     private boolean isNotificationSse(String uri) {

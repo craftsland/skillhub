@@ -132,9 +132,18 @@ attribute，并为该属性选择稳定的 `subject-type`。属性缺失、多�
    第二个 Session。
 5. 检查应用日志中不包含 `ST-` Ticket、validation URL、上游完整响应或用户属性。
 6. 禁用 Provider 后，方法目录不再显示 CAS，且点击旧 URL 不应连接 CAS Server。
+7. 在账号安全页验证 CAS Identity Link：已绑定 CAS 可以完成 fresh reauthentication，
+   READY intent 可以通过目标 CAS 创建 Binding；失败后应回到同一 intent，成功后不能重放。
 
 建议分别验证 CAS 2 XML、CAS 3 JSON、CAS 3 XML fallback、无效 Ticket、错误 Service、
 超时、TLS 失败、XXE、超大响应和 Redis 不可用。
+
+CAS callback 按协议会在 query string 中携带一次性 `ticket` 和 `state`。官方 Web
+镜像不记录 query string 或 Referer，应用请求日志会对它们进行隐藏；如果前面还有
+Ingress、负载均衡、WAF、APM 或其他反向代理，必须将该 callback 路径的 query string
+和 Referer 关闭记录或至少对 `ticket`、`state` 脱敏。上线前应使用唯一测试 Ticket
+检查完整日志链路，确认没有原文残留。重复 state 会分类为 `REPLAY_DETECTED` 并写入
+不含 state/Ticket 的安全审计。
 
 ## 5. 升级与回滚
 

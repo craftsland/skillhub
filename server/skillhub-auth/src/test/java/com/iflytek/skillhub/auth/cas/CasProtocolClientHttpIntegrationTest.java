@@ -13,6 +13,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -151,7 +152,48 @@ class CasProtocolClientHttpIntegrationTest {
                         .UPSTREAM_INVALID_RESPONSE);
     }
 
+    @Test
+    void requestTimeoutIncludesSlowResponseBodyConsumption() {
+        server.createContext(
+                "/cas/p3/serviceValidate",
+                exchange -> {
+                    exchange.sendResponseHeaders(200, 0);
+                    try (var body = exchange.getResponseBody()) {
+                        body.write('{');
+                        body.flush();
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                        body.write('}');
+                    }
+                });
+
+        CasProtocolClient client = client(
+                1024,
+                Duration.ofMillis(100));
+
+        assertThatThrownBy(() -> client.validate(
+                "cas-main",
+                "ST-slow-body",
+                client.begin("cas-main", STATE).serviceUrl()))
+                .isInstanceOf(ProviderAuthenticationException.class)
+                .extracting("reasonCode")
+                .isEqualTo(ProviderAuthenticationFailureCode
+                        .UPSTREAM_UNAVAILABLE);
+    }
+
     private CasProtocolClient client(int maximumResponseBytes) {
+        return client(
+                maximumResponseBytes,
+                Duration.ofSeconds(10));
+    }
+
+    private CasProtocolClient client(
+            int maximumResponseBytes,
+            Duration readTimeout) {
         CasProperties properties =
                 CasTestConfiguration.validProperties();
         properties.setAllowInsecureForTesting(true);
@@ -162,6 +204,7 @@ class CasProtocolClientHttpIntegrationTest {
         properties.setServiceUrl(
                 "http://skillhub.test/api/v1/auth/cas/cas-main/callback");
         properties.setMaxResponseBytes(maximumResponseBytes);
+        properties.setReadTimeout(readTimeout);
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("test");
         return new CasProtocolClient(

@@ -496,12 +496,10 @@ class IdentityLinkTransaction {
                                 !linkedProviderCodes.contains(
                                         provider.providerCode()))
                         .filter(provider ->
-                                provider.methodTypes().contains(
-                                        IdentityProviderLoginMethodType
-                                                .OAUTH_REDIRECT)
-                                || provider.methodTypes().contains(
-                                        IdentityProviderLoginMethodType
-                                                .DIRECT_PASSWORD))
+                                provider.methodTypes().stream()
+                                        .anyMatch(
+                                                IdentityLinkTransaction
+                                                        ::isLinkableMethod))
                         .sorted(Comparator.comparing(
                                 ReadyProvider::providerCode))
                         .map(provider ->
@@ -655,13 +653,23 @@ class IdentityLinkTransaction {
         }
         ReadyProvider provider = readyProviders().get(providerCode);
         if (provider == null
-                || (provider.methodTypes().stream().noneMatch(type ->
-                        type == IdentityProviderLoginMethodType.OAUTH_REDIRECT
-                        || type == IdentityProviderLoginMethodType
-                                .DIRECT_PASSWORD))) {
+                || provider.methodTypes().stream()
+                        .noneMatch(
+                                IdentityLinkTransaction
+                                        ::isLinkableMethod)) {
             throw failure(
                     IdentityLinkFailureCode.PROVIDER_UNAVAILABLE);
         }
+    }
+
+    private static boolean isLinkableMethod(
+            IdentityProviderLoginMethodType methodType) {
+        return methodType
+                == IdentityProviderLoginMethodType.OAUTH_REDIRECT
+                || methodType
+                == IdentityProviderLoginMethodType.CAS_REDIRECT
+                || methodType
+                == IdentityProviderLoginMethodType.DIRECT_PASSWORD;
     }
 
     private void requireProviderCapability(

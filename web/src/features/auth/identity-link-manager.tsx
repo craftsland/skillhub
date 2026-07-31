@@ -106,9 +106,16 @@ function errorMessage(error: unknown, fallback: string) {
 
 function hasMethod(
   provider: IdentityLinkBinding | IdentityLinkProvider,
-  method: 'OAUTH_REDIRECT' | 'DIRECT_PASSWORD',
+  method: 'OAUTH_REDIRECT' | 'CAS_REDIRECT' | 'DIRECT_PASSWORD',
 ) {
   return provider.methodTypes.includes(method)
+}
+
+function hasBrowserMethod(
+  provider: IdentityLinkBinding | IdentityLinkProvider,
+) {
+  return hasMethod(provider, 'OAUTH_REDIRECT')
+    || hasMethod(provider, 'CAS_REDIRECT')
 }
 
 function CredentialFields({
@@ -413,7 +420,7 @@ export function IdentityLinkManager() {
     )
     : undefined
   const browserReauthenticationProviders = linkedProviders.filter(
-    (provider) => provider.usable && hasMethod(provider, 'OAUTH_REDIRECT'),
+    (provider) => provider.usable && hasBrowserMethod(provider),
   )
   const credentialReauthenticationProviders = linkedProviders.filter(
     (provider) => provider.usable && hasMethod(provider, 'DIRECT_PASSWORD'),
@@ -696,7 +703,7 @@ export function IdentityLinkManager() {
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
                 {t('security.identityLinks.reauthenticated')}
               </div>
-              {targetProvider && hasMethod(targetProvider, 'OAUTH_REDIRECT') ? (
+              {targetProvider && hasBrowserMethod(targetProvider) ? (
                 <Button
                   type="button"
                   className="w-full"

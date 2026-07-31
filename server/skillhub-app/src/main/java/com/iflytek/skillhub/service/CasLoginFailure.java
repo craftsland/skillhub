@@ -5,6 +5,7 @@ package com.iflytek.skillhub.service;
  */
 public enum CasLoginFailure {
     INVALID_STATE,
+    REPLAY_DETECTED,
     TICKET_MISSING,
     VALIDATION_FAILED,
     PROVIDER_UNAVAILABLE,

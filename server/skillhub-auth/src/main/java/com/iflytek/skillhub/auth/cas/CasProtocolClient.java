@@ -5,15 +5,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.StringReader;
-import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.http.HttpTimeoutException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -21,6 +19,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLException;
 import javax.xml.XMLConstants;
@@ -598,33 +602,36 @@ public final class CasProtocolClient implements CasBrowserClient {
                     .header("Accept", "application/json, application/xml")
                     .GET()
                     .build();
+            CompletableFuture<HttpResponse<byte[]>> exchange =
+                    client.sendAsync(
+                            request,
+                            responseInfo ->
+                                    new LimitedBodySubscriber(
+                                            maximumResponseBytes));
             try {
-                HttpResponse<InputStream> response = client.send(
-                        request,
-                        HttpResponse.BodyHandlers.ofInputStream());
-                try (InputStream body = response.body()) {
-                    byte[] bytes = body.readNBytes(
-                            maximumResponseBytes + 1);
-                    if (bytes.length > maximumResponseBytes) {
-                        throw new CasTransportFailure(
-                                ProviderAuthenticationFailureCode
-                                        .UPSTREAM_INVALID_RESPONSE);
-                    }
-                    return new CasValidationResponse(
-                            response.statusCode(),
-                            new String(
-                                    bytes,
-                                    StandardCharsets.UTF_8));
-                }
-            } catch (CasTransportFailure failure) {
-                throw failure;
-            } catch (HttpTimeoutException
-                    | ConnectException exception) {
+                HttpResponse<byte[]> response = exchange.get(
+                        readTimeout.toNanos(),
+                        TimeUnit.NANOSECONDS);
+                return new CasValidationResponse(
+                        response.statusCode(),
+                        new String(
+                                response.body(),
+                                StandardCharsets.UTF_8));
+            } catch (TimeoutException exception) {
+                exchange.cancel(true);
                 throw new CasTransportFailure(
                         ProviderAuthenticationFailureCode
                                 .UPSTREAM_UNAVAILABLE);
-            } catch (IOException exception) {
-                if (hasTlsCause(exception)) {
+            } catch (ExecutionException exception) {
+                Throwable cause = exception.getCause();
+                if (hasCause(
+                        cause,
+                        ResponseTooLargeException.class)) {
+                    throw new CasTransportFailure(
+                            ProviderAuthenticationFailureCode
+                                    .UPSTREAM_INVALID_RESPONSE);
+                }
+                if (hasTlsCause(cause)) {
                     throw new CasTransportFailure(
                             ProviderAuthenticationFailureCode
                                     .TLS_VALIDATION_FAILED);
@@ -641,14 +648,93 @@ public final class CasProtocolClient implements CasBrowserClient {
         }
 
         private static boolean hasTlsCause(Throwable failure) {
+            return hasCause(failure, SSLException.class);
+        }
+
+        private static boolean hasCause(
+                Throwable failure,
+                Class<? extends Throwable> type) {
             for (Throwable current = failure;
                     current != null;
                     current = current.getCause()) {
-                if (current instanceof SSLException) {
+                if (type.isInstance(current)) {
                     return true;
                 }
             }
             return false;
+        }
+
+        private static final class LimitedBodySubscriber
+                implements HttpResponse.BodySubscriber<byte[]> {
+
+            private final int maximumResponseBytes;
+            private final ByteArrayOutputStream output =
+                    new ByteArrayOutputStream();
+            private final CompletableFuture<byte[]> body =
+                    new CompletableFuture<>();
+            private Flow.Subscription subscription;
+
+            private LimitedBodySubscriber(
+                    int maximumResponseBytes) {
+                this.maximumResponseBytes =
+                        maximumResponseBytes;
+            }
+
+            @Override
+            public CompletionStage<byte[]> getBody() {
+                return body;
+            }
+
+            @Override
+            public void onSubscribe(
+                    Flow.Subscription nextSubscription) {
+                if (subscription != null) {
+                    nextSubscription.cancel();
+                    return;
+                }
+                subscription = nextSubscription;
+                nextSubscription.request(1);
+            }
+
+            @Override
+            public void onNext(List<ByteBuffer> buffers) {
+                if (body.isDone()) {
+                    return;
+                }
+                for (ByteBuffer buffer : buffers) {
+                    long nextSize = (long) output.size()
+                            + buffer.remaining();
+                    if (nextSize > maximumResponseBytes) {
+                        subscription.cancel();
+                        body.completeExceptionally(
+                                new ResponseTooLargeException());
+                        return;
+                    }
+                    byte[] chunk =
+                            new byte[buffer.remaining()];
+                    buffer.get(chunk);
+                    output.writeBytes(chunk);
+                }
+                subscription.request(1);
+            }
+
+            @Override
+            public void onError(Throwable failure) {
+                body.completeExceptionally(failure);
+            }
+
+            @Override
+            public void onComplete() {
+                body.complete(output.toByteArray());
+            }
+        }
+
+        private static final class ResponseTooLargeException
+                extends RuntimeException {
+
+            private ResponseTooLargeException() {
+                super("CAS_RESPONSE_TOO_LARGE");
+            }
         }
     }
 

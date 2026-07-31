@@ -3,6 +3,9 @@ package com.iflytek.skillhub.controller;
 import com.iflytek.skillhub.service.CasLoginAppService;
 import com.iflytek.skillhub.service.CasLoginFailure;
 import com.iflytek.skillhub.service.CasLoginFlowException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import org.slf4j.Logger;
@@ -35,6 +38,12 @@ public class CasLoginController {
     }
 
     @GetMapping("/login")
+    @Operation(summary = "Start a CAS browser login")
+    @ApiResponses({
+        @ApiResponse(
+                responseCode = "302",
+                description = "Redirect to the configured CAS login endpoint")
+    })
     public ResponseEntity<Void> login(
             @PathVariable String providerCode,
             @RequestParam(required = false) String returnTo,
@@ -54,6 +63,12 @@ public class CasLoginController {
     }
 
     @GetMapping("/callback")
+    @Operation(summary = "Complete a CAS browser login")
+    @ApiResponses({
+        @ApiResponse(
+                responseCode = "302",
+                description = "Redirect to the authenticated target or login failure page")
+    })
     public ResponseEntity<Void> callback(
             @PathVariable String providerCode,
             @RequestParam(required = false) String ticket,
@@ -88,6 +103,8 @@ public class CasLoginController {
                     URI.create("/login?reason=linkRequired");
             case INVALID_STATE ->
                     URI.create("/login?reason=casInvalidState");
+            case REPLAY_DETECTED ->
+                    URI.create("/login?reason=casReplayDetected");
             case TICKET_MISSING ->
                     URI.create("/login?reason=casTicketMissing");
             case VALIDATION_FAILED ->

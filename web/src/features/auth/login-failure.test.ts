@@ -9,6 +9,8 @@ describe('login failure messages', () => {
       .toBe('login.failure.casValidationFailed')
     expect(loginFailureMessageKey('casUnavailable'))
       .toBe('login.failure.casUnavailable')
+    expect(loginFailureMessageKey('casReplayDetected'))
+      .toBe('login.failure.casReplayDetected')
   })
 
   it('does not render untrusted reason text', () => {

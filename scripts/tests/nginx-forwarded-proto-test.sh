@@ -98,4 +98,16 @@ done
 assert_proto "$TRUSTED_PROXY" http
 assert_proto "$TRUSTED_PROXY" http "https,http"
 
+LOG_TICKET="ST-nginx-log-secret-$$"
+LOG_STATE="nginx-state-secret-$$"
+docker exec "$DEFAULT_PROXY" wget -qO- \
+  --header="Referer: https://skillhub.test/api/v1/auth/cas/cas-main/callback?ticket=$LOG_TICKET&state=$LOG_STATE" \
+  "http://127.0.0.1/api/proto?ticket=$LOG_TICKET&state=$LOG_STATE" \
+  >/dev/null
+NGINX_ACCESS_LOG="$(docker logs "$DEFAULT_PROXY" 2>&1)"
+[[ "$NGINX_ACCESS_LOG" != *"$LOG_TICKET"* ]] \
+  || fail "nginx access log exposed a CAS ticket"
+[[ "$NGINX_ACCESS_LOG" != *"$LOG_STATE"* ]] \
+  || fail "nginx access log exposed a CAS state"
+
 echo "nginx-forwarded-proto-test passed"

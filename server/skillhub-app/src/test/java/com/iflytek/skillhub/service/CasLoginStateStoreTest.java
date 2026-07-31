@@ -2,7 +2,9 @@ package com.iflytek.skillhub.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,10 +14,12 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
 class CasLoginStateStoreTest {
 
@@ -64,20 +68,32 @@ class CasLoginStateStoreTest {
                 .startsWith("skillhub:auth:cas:state:")
                 .doesNotContain(SESSION_ID)
                 .doesNotContain(STATE);
+        assertThat(serialized.getValue()).startsWith("P:");
 
-        when(values.getAndDelete(key.getValue()))
+        when(redis.execute(
+                org.mockito.ArgumentMatchers
+                        .<RedisScript<String>>any(),
+                eq(List.of(key.getValue()))))
                 .thenReturn(serialized.getValue())
+                .thenReturn("R")
                 .thenReturn((String) null);
 
-        assertThat(store.consume(SESSION_ID, STATE))
-                .get()
+        CasLoginStateStore.ConsumeResult consumed =
+                store.consume(SESSION_ID, STATE);
+        assertThat(consumed.status())
+                .isEqualTo(
+                        CasLoginStateStore.ConsumeStatus.CONSUMED);
+        assertThat(consumed.state())
                 .extracting(
                         CasLoginStateStore.CasLoginState::providerCode,
                         CasLoginStateStore.CasLoginState::returnTo)
                 .containsExactly("cas-main", "/dashboard");
-        assertThat(store.consume(SESSION_ID, STATE)).isEmpty();
-        verify(values, org.mockito.Mockito.times(2))
-                .getAndDelete(key.getValue());
+        assertThat(store.consume(SESSION_ID, STATE).status())
+                .isEqualTo(
+                        CasLoginStateStore.ConsumeStatus.REPLAYED);
+        assertThat(store.consume(SESSION_ID, STATE).status())
+                .isEqualTo(
+                        CasLoginStateStore.ConsumeStatus.NOT_FOUND);
     }
 
     @Test
@@ -100,11 +116,20 @@ class CasLoginStateStoreTest {
                         "https://skill.example/callback",
                         null,
                         NOW.minusSeconds(1)));
-        when(values.getAndDelete(anyString()))
-                .thenReturn(expired);
+        when(redis.execute(
+                org.mockito.ArgumentMatchers
+                        .<RedisScript<String>>any(),
+                anyList()))
+                .thenReturn("P:" + expired);
 
-        assertThat(store.consume(SESSION_ID, STATE)).isEmpty();
-        assertThat(store.consume(SESSION_ID, "not valid")).isEmpty();
+        assertThat(store.consume(SESSION_ID, STATE).status())
+                .isEqualTo(
+                        CasLoginStateStore.ConsumeStatus.NOT_FOUND);
+        assertThat(store.consume(
+                SESSION_ID,
+                "not valid").status())
+                .isEqualTo(
+                        CasLoginStateStore.ConsumeStatus.NOT_FOUND);
     }
 
     @Test
@@ -139,7 +164,10 @@ class CasLoginStateStoreTest {
                         CasLoginStateStore
                                 .CasLoginStateStoreException.class);
 
-        when(values.getAndDelete(anyString()))
+        when(redis.execute(
+                org.mockito.ArgumentMatchers
+                        .<RedisScript<String>>any(),
+                anyList()))
                 .thenThrow(new IllegalStateException(
                         "redis unavailable"));
         assertThatThrownBy(

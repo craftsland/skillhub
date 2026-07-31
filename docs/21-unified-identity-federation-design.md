@@ -1633,10 +1633,12 @@ Provider capability 检查、Binding/Subject 唯一性、账号资格和审计�
 - 操作类型、目标 Provider、可选目标 Binding；
 - 固定过期时间和一次性状态。
 
-当前账号证明与目标 Provider 证明必须分开。Browser Provider 使用现有 OAuth state
-校验并保留主 Platform Session；Credential Provider 只在 Adapter 中校验凭据，
-只把 `ProviderAuthenticationResult` 交给核心。密码、OAuth code/token、ticket、
-Cookie、原始 Session ID/nonce 和 proof 不进入 DTO、数据库、审计或日志。
+当前账号证明与目标 Provider 证明必须分开。Browser Provider 使用协议自身的一次性
+state 校验并保留主 Platform Session：OAuth 复用 Spring Security authorization request
+state，CAS 使用 Redis 原子消费 state 并把 Ticket 绑定到精确 service URL。Credential
+Provider 只在 Adapter 中校验凭据，只把 `ProviderAuthenticationResult` 交给核心。
+密码、OAuth code/token、CAS ticket、Cookie、原始 Session ID/nonce 和 proof 不进入
+DTO、数据库、审计或日志。
 
 公开 API：
 
@@ -1918,6 +1920,8 @@ GET login start
   必须在设计和协议测试中记录证据。
 - Ticket validation 必须绑定发起时精确 service URL。
 - state 和 Ticket 一次性消费。
+- CAS Browser Flow 必须接入统一 Identity Link intent，支持当前账号重新认证和目标
+  Provider 绑定；不得在 CAS Adapter 内直接写 Binding。
 - CAS 2 XML 禁止 XXE。
 - CAS 3 JSON/XML 错误正确分类。
 - principal 或 immutable attribute 必须明确配置为稳定 Subject。

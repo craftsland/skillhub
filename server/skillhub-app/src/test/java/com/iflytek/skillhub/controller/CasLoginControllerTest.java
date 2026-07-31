@@ -68,4 +68,30 @@ class CasLoginControllerTest {
                 .doesNotContain("ST-secret")
                 .doesNotContain("state-secret");
     }
+
+    @Test
+    void callbackMapsReplayToDedicatedCredentialFreeReason() {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+        when(loginAppService.complete(
+                "cas-main",
+                "ST-replayed",
+                "state-replayed",
+                request)).thenThrow(
+                        new CasLoginFlowException(
+                                CasLoginFailure.REPLAY_DETECTED));
+
+        var response = controller.callback(
+                "cas-main",
+                "ST-replayed",
+                "state-replayed",
+                request);
+
+        assertThat(response.getHeaders().getLocation())
+                .hasToString(
+                        "/login?reason=casReplayDetected");
+        assertThat(response.getHeaders().getLocation().toString())
+                .doesNotContain("ST-replayed")
+                .doesNotContain("state-replayed");
+    }
 }

@@ -228,6 +228,7 @@
     "failure": {
       "linkRequired": "该外部身份需要先关联已有账号，暂时不能直接登录。",
       "casInvalidState": "本次 CAS 登录请求已过期或已被使用，请重新发起登录。",
+      "casReplayDetected": "本次 CAS 登录请求已被使用，系统已拒绝重复请求，请重新发起登录。",
       "casTicketMissing": "CAS 服务没有返回服务票据，请重新发起登录。",
       "casValidationFailed": "CAS 未能验证本次登录，请重试或联系管理员。",
       "casUnavailable": "CAS 登录暂时不可用，请稍后重试或联系管理员。",
