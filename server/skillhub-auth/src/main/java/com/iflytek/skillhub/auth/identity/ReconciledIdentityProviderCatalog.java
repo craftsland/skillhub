@@ -1,5 +1,7 @@
 package com.iflytek.skillhub.auth.identity;
 
+import com.iflytek.skillhub.auth.provider.BrowserAuthenticationAdapter;
+import com.iflytek.skillhub.auth.provider.BrowserAuthenticationMethod;
 import com.iflytek.skillhub.auth.provider.CredentialAuthenticationAdapter;
 import com.iflytek.skillhub.auth.provider.PassiveAuthenticationAdapter;
 import com.iflytek.skillhub.auth.provider.ProviderInstanceDefinition;
@@ -42,6 +44,7 @@ class ReconciledIdentityProviderCatalog
     private final ProviderAuthorityLockService authorityLockService;
     private final IdentityBindingPreflightService bindingPreflightService;
     private final IdentityProviderPolicyProperties policyProperties;
+    private final List<BrowserAuthenticationAdapter<?>> browserAdapters;
     private final List<CredentialAuthenticationAdapter> credentialAdapters;
     private final List<PassiveAuthenticationAdapter> passiveAdapters;
     private final AtomicReference<RegistrySnapshot> snapshot =
@@ -52,12 +55,14 @@ class ReconciledIdentityProviderCatalog
             ProviderAuthorityLockService authorityLockService,
             IdentityBindingPreflightService bindingPreflightService,
             IdentityProviderPolicyProperties policyProperties,
+            List<BrowserAuthenticationAdapter<?>> browserAdapters,
             List<CredentialAuthenticationAdapter> credentialAdapters,
             List<PassiveAuthenticationAdapter> passiveAdapters) {
         this.descriptorSource = descriptorSource;
         this.authorityLockService = authorityLockService;
         this.bindingPreflightService = bindingPreflightService;
         this.policyProperties = policyProperties;
+        this.browserAdapters = List.copyOf(browserAdapters);
         this.credentialAdapters = List.copyOf(credentialAdapters);
         this.passiveAdapters = List.copyOf(passiveAdapters);
     }
@@ -97,7 +102,9 @@ class ReconciledIdentityProviderCatalog
     private RegistrySnapshot assembleSnapshot() {
         Map<String, ProviderDescriptor> descriptors =
                 new LinkedHashMap<>();
-        Set<String> browserProviders = new HashSet<>();
+        Set<String> oauthBrowserProviders = new HashSet<>();
+        Map<String, BrowserRegistration<?>> browsers =
+                new LinkedHashMap<>();
         Map<String, CredentialRegistration> credentials =
                 new LinkedHashMap<>();
         Map<String, PassiveRegistration> passives =
@@ -111,7 +118,7 @@ class ReconciledIdentityProviderCatalog
                         descriptors,
                         invalidProviders,
                         descriptor);
-                browserProviders.add(descriptor.providerCode());
+                oauthBrowserProviders.add(descriptor.providerCode());
             }
         } catch (RuntimeException exception) {
             log.error(
@@ -119,6 +126,37 @@ class ReconciledIdentityProviderCatalog
             log.debug(
                     "Configured browser provider discovery failure type: {}",
                     exception.getClass().getSimpleName());
+        }
+
+        for (BrowserAuthenticationAdapter<?> adapter
+                : browserAdapters) {
+            try {
+                ProviderInstanceDefinition definition =
+                        adapter.provider();
+                if (!definition.enabled()) {
+                    continue;
+                }
+                ProviderDescriptor descriptor =
+                        descriptorFrom(definition);
+                registerDescriptor(
+                        descriptors,
+                        invalidProviders,
+                        descriptor);
+                BrowserRegistration<?> previous = browsers.putIfAbsent(
+                        descriptor.providerCode(),
+                        new BrowserRegistration<>(
+                                adapter,
+                                definition.displayName()));
+                if (previous != null) {
+                    invalidProviders.add(descriptor.providerCode());
+                }
+            } catch (RuntimeException exception) {
+                log.warn(
+                        "Browser provider adapter is hidden because its trusted definition is invalid");
+                log.debug(
+                        "Browser provider definition failure type: {}",
+                        exception.getClass().getSimpleName());
+            }
         }
 
         for (CredentialAuthenticationAdapter adapter
@@ -184,7 +222,8 @@ class ReconciledIdentityProviderCatalog
 
         for (String providerCode : invalidProviders) {
             descriptors.remove(providerCode);
-            browserProviders.remove(providerCode);
+            oauthBrowserProviders.remove(providerCode);
+            browsers.remove(providerCode);
             credentials.remove(providerCode);
             passives.remove(providerCode);
             log.error(
@@ -194,7 +233,8 @@ class ReconciledIdentityProviderCatalog
 
         return new RegistrySnapshot(
                 Map.copyOf(descriptors),
-                Set.copyOf(browserProviders),
+                Set.copyOf(oauthBrowserProviders),
+                Map.copyOf(browsers),
                 Map.copyOf(credentials),
                 Map.copyOf(passives));
     }
@@ -269,7 +309,7 @@ class ReconciledIdentityProviderCatalog
         return current.descriptors().values().stream()
                 .sorted(Comparator.comparing(
                         ProviderDescriptor::providerCode))
-                .filter(descriptor -> current.browserProviders()
+                .filter(descriptor -> current.oauthBrowserProviders()
                         .contains(descriptor.providerCode()))
                 .filter(this::isCurrentlyReady)
                 .map(descriptor -> loginMethod(
@@ -294,11 +334,19 @@ class ReconciledIdentityProviderCatalog
                 continue;
             }
             String providerCode = descriptor.providerCode();
-            if (current.browserProviders().contains(providerCode)) {
+            if (current.oauthBrowserProviders().contains(providerCode)) {
                 methods.add(loginMethod(
                         providerCode,
                         descriptor.displayName(),
                         IdentityProviderLoginMethodType.OAUTH_REDIRECT));
+            }
+            BrowserRegistration<?> browser =
+                    current.browsers().get(providerCode);
+            if (browser != null) {
+                methods.add(loginMethod(
+                        providerCode,
+                        browser.displayName(),
+                        methodType(browser.adapter().loginMethod())));
             }
             CredentialRegistration credential =
                     current.credentials().get(providerCode);
@@ -318,6 +366,24 @@ class ReconciledIdentityProviderCatalog
             }
         }
         return List.copyOf(methods);
+    }
+
+    @Override
+    public <T> BrowserRoute<T> requireBrowserRoute(
+            String providerCode,
+            Class<T> exchangeType) {
+        RegistrySnapshot current = snapshot.get();
+        ProviderDescriptor descriptor =
+                requireReadyDescriptor(current, providerCode);
+        BrowserRegistration<?> registration =
+                current.browsers().get(providerCode);
+        if (registration == null
+                || !registration.adapter()
+                        .exchangeType()
+                        .equals(exchangeType)) {
+            throw providerDisabled();
+        }
+        return browserRoute(descriptor, registration, exchangeType);
     }
 
     @Override
@@ -359,7 +425,7 @@ class ReconciledIdentityProviderCatalog
         String providerCode =
                 descriptorSource.resolveBrowserProviderCode(registration);
         RegistrySnapshot current = snapshot.get();
-        if (!current.browserProviders().contains(providerCode)) {
+        if (!current.oauthBrowserProviders().contains(providerCode)) {
             throw providerDisabled();
         }
         ProviderDescriptor descriptor =
@@ -418,6 +484,32 @@ class ReconciledIdentityProviderCatalog
                 methodType);
     }
 
+    private IdentityProviderLoginMethodType methodType(
+            BrowserAuthenticationMethod method) {
+        return switch (method) {
+            case OAUTH_REDIRECT ->
+                    IdentityProviderLoginMethodType.OAUTH_REDIRECT;
+            case CAS_REDIRECT ->
+                    IdentityProviderLoginMethodType.CAS_REDIRECT;
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> BrowserRoute<T> browserRoute(
+            ProviderDescriptor descriptor,
+            BrowserRegistration<?> registration,
+            Class<T> exchangeType) {
+        BrowserAuthenticationAdapter<?> adapter =
+                registration.adapter();
+        if (!adapter.exchangeType().equals(exchangeType)) {
+            throw providerDisabled();
+        }
+        return new BrowserRoute<>(
+                new DefaultResolvedProviderHandle(
+                        descriptor.providerCode()),
+                (BrowserAuthenticationAdapter<T>) adapter);
+    }
+
     private boolean isCurrentlyReady(ProviderDescriptor descriptor) {
         try {
             authorityLockService.requirePinnedAuthority(descriptor);
@@ -436,6 +528,11 @@ class ReconciledIdentityProviderCatalog
                 IdentityFailureCode.PROVIDER_DISABLED);
     }
 
+    private record BrowserRegistration<T>(
+            BrowserAuthenticationAdapter<T> adapter,
+            String displayName) {
+    }
+
     private record CredentialRegistration(
             CredentialAuthenticationAdapter adapter,
             String displayName) {
@@ -448,7 +545,8 @@ class ReconciledIdentityProviderCatalog
 
     private record RegistrySnapshot(
             Map<String, ProviderDescriptor> descriptors,
-            Set<String> browserProviders,
+            Set<String> oauthBrowserProviders,
+            Map<String, BrowserRegistration<?>> browsers,
             Map<String, CredentialRegistration> credentials,
             Map<String, PassiveRegistration> passives
     ) {
@@ -456,6 +554,7 @@ class ReconciledIdentityProviderCatalog
             return new RegistrySnapshot(
                     Map.of(),
                     Set.of(),
+                    Map.of(),
                     Map.of(),
                     Map.of());
         }

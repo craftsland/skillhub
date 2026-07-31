@@ -11,6 +11,12 @@ import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
  */
 public interface BrowserAuthenticationAdapter<T> {
 
+    ProviderInstanceDefinition provider();
+
+    Class<T> exchangeType();
+
+    BrowserAuthenticationMethod loginMethod();
+
     /**
      * @throws ProviderAuthenticationException when the verified exchange
      *         cannot be accepted or its upstream is unavailable

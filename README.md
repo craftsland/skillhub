@@ -50,6 +50,7 @@ firewall, with the same polish you'd expect from a public registry.
 
 - 📖 **[User Guide](https://iflytek.github.io/skillhub/)** — Skill publishing, search, CLI usage and other user guides
 - 🛠️ **[Developer Docs](https://zread.ai/iflytek/skillhub)** — Architecture, API reference, local development, deployment and operations
+- 🔐 **[CAS 2.0/3.0 Integration](./docs/23-cas-integration.md)** — Provider configuration, identity mapping, deployment and verification
 
 ## Highlights
 

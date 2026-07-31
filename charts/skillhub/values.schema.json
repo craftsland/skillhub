@@ -21,7 +21,7 @@
     "auth": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["direct"],
+      "required": ["direct", "cas"],
       "properties": {
         "direct": {
           "type": "object",
@@ -30,6 +30,36 @@
           "properties": {
             "enabled": { "type": "boolean" },
             "provider": { "type": "string" }
+          }
+        },
+        "cas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "providerCode", "displayName", "authority", "serverUrl", "serviceUrl", "protocolVersion", "subjectType", "connectTimeout", "readTimeout", "stateTtl", "maxResponseBytes", "attributes"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "providerCode": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+            "displayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "authority": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$" },
+            "serverUrl": { "type": "string" },
+            "serviceUrl": { "type": "string" },
+            "protocolVersion": { "enum": ["2.0", "3.0"] },
+            "subjectType": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+            "connectTimeout": { "type": "string", "minLength": 1 },
+            "readTimeout": { "type": "string", "minLength": 1 },
+            "stateTtl": { "type": "string", "minLength": 1 },
+            "maxResponseBytes": { "type": "integer", "minimum": 1024, "maximum": 1048576 },
+            "attributes": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["subject", "displayName", "email", "avatarUrl"],
+              "properties": {
+                "subject": { "type": "string" },
+                "displayName": { "type": "string" },
+                "email": { "type": "string" },
+                "avatarUrl": { "type": "string" }
+              }
+            }
           }
         }
       }

@@ -83,7 +83,7 @@ public class AuthMethodCatalog {
 
     private boolean isMethodEnabled(IdentityProviderLoginMethod method) {
         return switch (method.methodType()) {
-            case OAUTH_REDIRECT -> true;
+            case OAUTH_REDIRECT, CAS_REDIRECT -> true;
             case DIRECT_PASSWORD -> directAuthProperties.isEnabled();
             case SESSION_BOOTSTRAP -> sessionBootstrapProperties.isEnabled();
         };
@@ -100,6 +100,13 @@ public class AuthMethodCatalog {
                 providerCode,
                 method.displayName(),
                 buildAuthorizationUrl(providerCode, returnTo)
+            );
+            case CAS_REDIRECT -> new AuthMethodResponse(
+                "cas-" + providerCode,
+                IdentityProviderLoginMethodType.CAS_REDIRECT.name(),
+                providerCode,
+                method.displayName(),
+                buildCasAuthorizationUrl(providerCode, returnTo)
             );
             case DIRECT_PASSWORD -> new AuthMethodResponse(
                 "direct-" + providerCode,
@@ -124,5 +131,19 @@ public class AuthMethodCatalog {
             return baseUrl;
         }
         return baseUrl + "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8);
+    }
+
+    private String buildCasAuthorizationUrl(
+            String providerCode,
+            String returnTo) {
+        String baseUrl = "/api/v1/auth/cas/"
+                + providerCode
+                + "/login";
+        if (returnTo == null) {
+            return baseUrl;
+        }
+        return baseUrl + "?returnTo=" + URLEncoder.encode(
+                returnTo,
+                StandardCharsets.UTF_8);
     }
 }

@@ -68,6 +68,16 @@ cp secret.yaml.example secret.yaml
 | skill-scanner-llm-base-url | 本地/自定义 LLM 服务地址 | 否 |
 | skill-scanner-llm-model | Scanner 使用的 LLM 模型名 | 否 |
 
+CAS 2.0/3.0 不需要额外 Secret。启用时修改 `base/configmap.yaml` 中的
+`auth-cas-*` 配置；`auth-cas-service-url` 必须是精确 callback：
+
+```text
+https://<skillhub-host>/api/v1/auth/cas/<provider-code>/callback
+```
+
+完整字段、身份映射和验证步骤见
+[`docs/23-cas-integration.md`](../../docs/23-cas-integration.md)。
+
 ### 3. 选择部署方式
 
 **方式一：完整部署（包含 PostgreSQL + Redis）**

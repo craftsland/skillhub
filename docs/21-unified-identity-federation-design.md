@@ -1794,7 +1794,10 @@ GET login start
 
 要求：
 
-- 使用成熟 CAS Client 或 Spring Security CAS 集成，不自行维护不安全 XML parser。
+- 优先使用成熟 CAS Client 或 Spring Security CAS 集成；如果兼容性与安全 spike 证明
+  其违反本文更高优先级的不变量（例如记录 Ticket/完整响应，或 XML parser 不能
+  fail closed），可以使用最小、受限且经过安全 Review 的内部 transport/parser，并
+  必须在设计和协议测试中记录证据。
 - Ticket validation 必须绑定发起时精确 service URL。
 - state 和 Ticket 一次性消费。
 - CAS 2 XML 禁止 XXE。
@@ -1802,6 +1805,22 @@ GET login start
 - principal 或 immutable attribute 必须明确配置为稳定 Subject。
 - CAS email attribute 默认不是 verified。
 - 强制 HTTPS 的规则要支持明确的本地测试例外，生产 fail closed。
+
+当前 Spring Boot 3.2 / Java 21 兼容性 spike 的结论：
+
+- Spring Security CAS 使用 Apereo Java CAS Client 的 `TicketValidator`。
+- Apereo Java CAS Client 4.1.1 的 `AbstractUrlBasedTicketValidator` 在 DEBUG 记录包含
+  Ticket 的完整 validation URL 和完整上游响应，违反 7.6 和 17.2 节。
+- 同版本 `Cas20ServiceTicketValidator.extractCustomAttributes` 的独立 SAX 路径没有显式
+  关闭全部外部实体能力，不能作为本项目 CAS 2 属性解析的安全边界。
+- 因此 PR 9 使用 JDK `HttpClient` 的受限 transport 和显式 hardening 的 JSON/XML parser：
+  禁止 redirect、限制连接/请求超时与响应大小、XML 禁止 DOCTYPE/外部实体/DTD/schema，
+  且 Ticket、URL、完整响应和属性不进入日志或异常。
+
+参考：
+
+- [Apereo validator logging](https://github.com/apereo/java-cas-client/blob/cas-client-4.1.1/cas-client-core/src/main/java/org/apereo/cas/client/validation/AbstractUrlBasedTicketValidator.java)
+- [Apereo CAS 2 attribute parser](https://github.com/apereo/java-cas-client/blob/cas-client-4.1.1/cas-client-core/src/main/java/org/apereo/cas/client/validation/Cas20ServiceTicketValidator.java)
 
 ### 14.5 SAML 2.0
 
@@ -2424,7 +2443,8 @@ DingTalk 的目标支持等级是 Native Tier 1。实现可以来自社区，但
 #### PR 9：CAS Adapter
 
 - 从 #464 复用协议和测试思路。
-- 使用成熟 CAS Client。
+- 按 14.4 节 spike 结论使用成熟 Client，或使用经过安全 Review、不会泄露 Ticket 且对
+  XML/响应边界 fail closed 的最小内部 Client。
 - 不复用仅把 `OAuthClaims` 泛化为浅 `IdentityClaims` 的核心方式。
 
 LDAP 和 DingTalk 不要求必须由维护者亲自编码。更准确的规则是：

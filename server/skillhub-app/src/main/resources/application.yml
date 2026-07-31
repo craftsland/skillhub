@@ -112,6 +112,25 @@ skillhub:
       enabled: ${SKILLHUB_AUTH_DIRECT_ENABLED:false}
     session-bootstrap:
       enabled: ${SKILLHUB_AUTH_SESSION_BOOTSTRAP_ENABLED:false}
+    cas:
+      enabled: ${SKILLHUB_AUTH_CAS_ENABLED:false}
+      provider-code: ${SKILLHUB_AUTH_CAS_PROVIDER_CODE:cas}
+      display-name: ${SKILLHUB_AUTH_CAS_DISPLAY_NAME:CAS}
+      authority: ${SKILLHUB_AUTH_CAS_AUTHORITY:}
+      server-url: ${SKILLHUB_AUTH_CAS_SERVER_URL:}
+      service-url: ${SKILLHUB_AUTH_CAS_SERVICE_URL:}
+      protocol-version: ${SKILLHUB_AUTH_CAS_PROTOCOL_VERSION:3.0}
+      subject-type: ${SKILLHUB_AUTH_CAS_SUBJECT_TYPE:cas_principal}
+      allow-insecure-for-testing: ${SKILLHUB_AUTH_CAS_ALLOW_INSECURE_FOR_TESTING:false}
+      connect-timeout: ${SKILLHUB_AUTH_CAS_CONNECT_TIMEOUT:PT5S}
+      read-timeout: ${SKILLHUB_AUTH_CAS_READ_TIMEOUT:PT10S}
+      state-ttl: ${SKILLHUB_AUTH_CAS_STATE_TTL:PT5M}
+      max-response-bytes: ${SKILLHUB_AUTH_CAS_MAX_RESPONSE_BYTES:1048576}
+      attributes:
+        subject: ${SKILLHUB_AUTH_CAS_ATTRIBUTES_SUBJECT:}
+        display-name: ${SKILLHUB_AUTH_CAS_ATTRIBUTES_DISPLAY_NAME:}
+        email: ${SKILLHUB_AUTH_CAS_ATTRIBUTES_EMAIL:}
+        avatar-url: ${SKILLHUB_AUTH_CAS_ATTRIBUTES_AVATAR_URL:}
     password-reset:
       code-expiry: ${SKILLHUB_AUTH_PASSWORD_RESET_CODE_EXPIRY:PT10M}
       email-from-address: ${SKILLHUB_AUTH_PASSWORD_RESET_FROM_ADDRESS:noreply@skillhub.local}

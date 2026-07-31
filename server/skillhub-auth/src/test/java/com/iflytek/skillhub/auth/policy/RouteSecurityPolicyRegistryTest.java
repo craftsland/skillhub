@@ -59,6 +59,19 @@ class RouteSecurityPolicyRegistryTest {
     }
 
     @Test
+    void authorizationPolicies_shouldAllowCasBrowserFlowAnonymously() {
+        boolean matched = registry.authorizationPolicies().stream()
+                .anyMatch(policy -> policy.method() == HttpMethod.GET
+                        && "/api/v1/auth/cas/**".equals(
+                                policy.pattern())
+                        && policy.accessLevel()
+                                == RouteSecurityPolicyRegistry
+                                        .AccessLevel.PERMIT_ALL);
+
+        assertTrue(matched);
+    }
+
+    @Test
     void authorizationPolicies_shouldRequireAuthenticationForNamespaceDiscovery() {
         boolean matchedV1 = registry.authorizationPolicies().stream()
                 .anyMatch(policy -> policy.method() == HttpMethod.GET

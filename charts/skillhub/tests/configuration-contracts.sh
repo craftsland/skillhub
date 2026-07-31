@@ -192,6 +192,16 @@ render device "$CHART_DIR" \
   --show-only templates/configmap.yaml >"$TMP_DIR/device.yaml"
 grep -Fq 'device-auth-verification-uri: "https://skills.example.com/cli/auth"' "$TMP_DIR/device.yaml"
 
+render cas "$CHART_DIR" \
+  --set auth.cas.enabled=true \
+  --set auth.cas.serverUrl=https://cas.example.com/cas \
+  --set auth.cas.serviceUrl=https://skills.example.com/api/v1/auth/cas/cas-main/callback \
+  --show-only templates/configmap.yaml \
+  --show-only templates/server-deployment.yaml >"$TMP_DIR/cas.yaml"
+grep -Fq 'auth-cas-enabled: "true"' "$TMP_DIR/cas.yaml"
+grep -Fq 'auth-cas-server-url: "https://cas.example.com/cas"' "$TMP_DIR/cas.yaml"
+grep -Fq 'name: SKILLHUB_AUTH_CAS_SERVICE_URL' "$TMP_DIR/cas.yaml"
+
 render tls "$CHART_DIR" \
   --set ingress.enabled=true \
   --set-json 'ingress.tls=[{"hosts":["skills.example.com"],"secretName":"skills-tls"}]' \
@@ -265,6 +275,17 @@ assert_rejected server-off --set server.enabled=false
 assert_rejected direct-auth-without-provider \
   --set auth.direct.enabled=true \
   --set-string auth.direct.provider=
+assert_rejected cas-without-server \
+  --set auth.cas.enabled=true \
+  --set auth.cas.serviceUrl=https://skills.example.com/api/v1/auth/cas/cas-main/callback
+assert_rejected cas-with-insecure-server \
+  --set auth.cas.enabled=true \
+  --set auth.cas.serverUrl=http://cas.example.com/cas \
+  --set auth.cas.serviceUrl=https://skills.example.com/api/v1/auth/cas/cas-main/callback
+assert_rejected cas-with-wrong-callback \
+  --set auth.cas.enabled=true \
+  --set auth.cas.serverUrl=https://cas.example.com/cas \
+  --set auth.cas.serviceUrl=https://skills.example.com/api/v1/auth/cas/other/callback
 assert_rejected ingress-without-server-service --set ingress.enabled=true --set server.service.enabled=false
 assert_rejected ingress-without-web-service --set ingress.enabled=true --set web.service.enabled=false
 assert_rejected multi-without-rwx --set server.replicaCount=2

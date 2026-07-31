@@ -157,6 +157,34 @@ redis:
 
 ## 配置参考
 
+### CAS 2.0/3.0
+
+```yaml
+auth:
+  cas:
+    enabled: true
+    providerCode: cas-main
+    displayName: Corporate CAS
+    authority: corp-cas
+    serverUrl: https://cas.example.com/cas
+    serviceUrl: https://skills.example.com/api/v1/auth/cas/cas-main/callback
+    protocolVersion: "3.0"
+    subjectType: cas_principal
+    connectTimeout: PT5S
+    readTimeout: PT10S
+    stateTtl: PT5M
+    maxResponseBytes: 1048576
+    attributes:
+      subject: ""
+      displayName: displayName
+      email: mail
+      avatarUrl: ""
+```
+
+`serviceUrl` 必须使用 HTTPS，并以当前 `providerCode` 对应的精确 callback 结尾。
+普通 CAS email attribute 只按 asserted 处理。完整说明见
+[`docs/23-cas-integration.md`](../../docs/23-cas-integration.md)。
+
 ### 副本数配置
 
 | 参数 | 描述 | 默认值 |

@@ -54,4 +54,20 @@ data:
   device-auth-verification-uri: {{ $deviceAuthVerificationUri | quote }}
   auth-direct-enabled: {{ .Values.auth.direct.enabled | quote }}
   auth-direct-provider: {{ .Values.auth.direct.provider | quote }}
+  auth-cas-enabled: {{ .Values.auth.cas.enabled | quote }}
+  auth-cas-provider-code: {{ .Values.auth.cas.providerCode | quote }}
+  auth-cas-display-name: {{ .Values.auth.cas.displayName | quote }}
+  auth-cas-authority: {{ .Values.auth.cas.authority | quote }}
+  auth-cas-server-url: {{ .Values.auth.cas.serverUrl | quote }}
+  auth-cas-service-url: {{ .Values.auth.cas.serviceUrl | quote }}
+  auth-cas-protocol-version: {{ .Values.auth.cas.protocolVersion | quote }}
+  auth-cas-subject-type: {{ .Values.auth.cas.subjectType | quote }}
+  auth-cas-connect-timeout: {{ .Values.auth.cas.connectTimeout | quote }}
+  auth-cas-read-timeout: {{ .Values.auth.cas.readTimeout | quote }}
+  auth-cas-state-ttl: {{ .Values.auth.cas.stateTtl | quote }}
+  auth-cas-max-response-bytes: {{ .Values.auth.cas.maxResponseBytes | quote }}
+  auth-cas-attribute-subject: {{ .Values.auth.cas.attributes.subject | quote }}
+  auth-cas-attribute-display-name: {{ .Values.auth.cas.attributes.displayName | quote }}
+  auth-cas-attribute-email: {{ .Values.auth.cas.attributes.email | quote }}
+  auth-cas-attribute-avatar-url: {{ .Values.auth.cas.attributes.avatarUrl | quote }}
   builtin-skills-enabled: {{ .Values.builtinSkills.enabled | quote }}

@@ -21,6 +21,24 @@ auth:
   direct:
     enabled: true
     provider: local
+  cas:
+    enabled: false
+    providerCode: cas-main
+    displayName: "Corporate CAS"
+    authority: corp-cas
+    serverUrl: ""
+    serviceUrl: ""
+    protocolVersion: "3.0"
+    subjectType: cas_principal
+    connectTimeout: PT5S
+    readTimeout: PT10S
+    stateTtl: PT5M
+    maxResponseBytes: 1048576
+    attributes:
+      subject: ""
+      displayName: displayName
+      email: mail
+      avatarUrl: ""
 
 builtinSkills:
   enabled: true
