@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import com.iflytek.skillhub.security.SensitiveLogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
@@ -40,11 +41,18 @@ class GlobalExceptionHandlerTest {
     void setUp() {
         StaticMessageSource messageSource = new StaticMessageSource();
         messageSource.addMessage("error.request.timeout", java.util.Locale.getDefault(), "Request timed out");
+        RequestIdAccessor requestIdAccessor = new RequestIdAccessor();
         ApiResponseFactory responseFactory = new ApiResponseFactory(
                 messageSource,
-                Clock.fixed(Instant.parse("2026-03-20T00:00:00Z"), ZoneOffset.UTC)
+                Clock.fixed(Instant.parse("2026-03-20T00:00:00Z"), ZoneOffset.UTC),
+                requestIdAccessor
         );
-        handler = new GlobalExceptionHandler(responseFactory, sensitiveLogSanitizer, metrics);
+        handler = new GlobalExceptionHandler(
+                responseFactory,
+                sensitiveLogSanitizer,
+                metrics,
+                requestIdAccessor
+        );
     }
 
     @Test

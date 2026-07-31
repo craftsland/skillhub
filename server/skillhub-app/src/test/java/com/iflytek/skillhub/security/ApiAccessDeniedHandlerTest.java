@@ -9,6 +9,7 @@ import com.iflytek.skillhub.auth.token.ApiTokenScopeService;
 import com.iflytek.skillhub.auth.policy.RouteSecurityPolicyRegistry;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import jakarta.servlet.FilterChain;
 import java.time.Clock;
 import java.time.Instant;
@@ -19,7 +20,6 @@ import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.MDC;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -33,28 +33,32 @@ class ApiAccessDeniedHandlerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private ApiAccessDeniedHandler handler;
+    private RequestIdAccessor.Scope requestIdScope;
 
     @BeforeEach
     void setUp() {
         ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
         messageSource.setBasename("messages");
         messageSource.setDefaultEncoding("UTF-8");
+        RequestIdAccessor requestIdAccessor = new RequestIdAccessor();
         ApiResponseFactory responseFactory = new ApiResponseFactory(
                 messageSource,
-                Clock.fixed(Instant.parse("2026-07-28T00:00:00Z"), ZoneOffset.UTC)
+                Clock.fixed(Instant.parse("2026-07-28T00:00:00Z"), ZoneOffset.UTC),
+                requestIdAccessor
         );
         handler = new ApiAccessDeniedHandler(
                 objectMapper,
                 responseFactory,
-                new SensitiveLogSanitizer()
+                new SensitiveLogSanitizer(),
+                requestIdAccessor
         );
-        MDC.put("requestId", "req-610");
+        requestIdScope = requestIdAccessor.open("req-610");
         LocaleContextHolder.setLocale(Locale.ENGLISH);
     }
 
     @AfterEach
     void tearDown() {
-        MDC.clear();
+        requestIdScope.close();
         LocaleContextHolder.resetLocaleContext();
         SecurityContextHolder.clearContext();
     }

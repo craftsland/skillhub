@@ -7,12 +7,12 @@ import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.domain.shared.exception.LocalizedDomainException;
 import com.iflytek.skillhub.domain.shared.exception.LocalizedMessage;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import com.iflytek.skillhub.security.SensitiveLogSanitizer;
 import com.iflytek.skillhub.storage.StorageAccessException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -34,13 +34,16 @@ public class GlobalExceptionHandler {
     private final ApiResponseFactory apiResponseFactory;
     private final SensitiveLogSanitizer sensitiveLogSanitizer;
     private final SkillHubMetrics metrics;
+    private final RequestIdAccessor requestIdAccessor;
 
     public GlobalExceptionHandler(ApiResponseFactory apiResponseFactory,
                                   SensitiveLogSanitizer sensitiveLogSanitizer,
-                                  SkillHubMetrics metrics) {
+                                  SkillHubMetrics metrics,
+                                  RequestIdAccessor requestIdAccessor) {
         this.apiResponseFactory = apiResponseFactory;
         this.sensitiveLogSanitizer = sensitiveLogSanitizer;
         this.metrics = metrics;
+        this.requestIdAccessor = requestIdAccessor;
     }
 
     @ExceptionHandler(LocalizedException.class)
@@ -111,7 +114,7 @@ public class GlobalExceptionHandler {
         metrics.incrementStorageAccessFailure(ex.getOperation());
         logger.warn(
                 "Object storage unavailable [requestId={}, method={}, path={}, userId={}, operation={}, key={}]",
-                MDC.get("requestId"),
+                requestIdAccessor.current(),
                 request.getMethod(),
                 sensitiveLogSanitizer.sanitizeRequestTarget(request),
                 resolveUserId(request),
@@ -127,7 +130,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleAsyncRequestTimeout(AsyncRequestTimeoutException ex, HttpServletRequest request) {
         String path = request.getRequestURI();
         if (path != null && path.endsWith("/sse")) {
-            logger.debug("SSE timeout [requestId={}, path={}]", MDC.get("requestId"), path);
+            logger.debug("SSE timeout [requestId={}, path={}]", requestIdAccessor.current(), path);
             return ResponseEntity.noContent().build();
         }
 
@@ -140,7 +143,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex, HttpServletRequest request) {
         logger.error(
                 "Unhandled API exception [requestId={}, method={}, path={}, userId={}]",
-                MDC.get("requestId"),
+                requestIdAccessor.current(),
                 request.getMethod(),
                 sensitiveLogSanitizer.sanitizeRequestTarget(request),
                 resolveUserId(request),
@@ -153,7 +156,7 @@ public class GlobalExceptionHandler {
     private void logHandledException(HttpStatus status, String messageCode, HttpServletRequest request) {
         logger.info(
                 "API request failed [requestId={}, status={}, method={}, path={}, userId={}, code={}]",
-                MDC.get("requestId"),
+                requestIdAccessor.current(),
                 status.value(),
                 request.getMethod(),
                 sensitiveLogSanitizer.sanitizeRequestTarget(request),

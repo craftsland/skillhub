@@ -94,6 +94,11 @@ spring:
             enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:false}
 
 skillhub:
+  observability:
+    log-format: ${SKILLHUB_LOG_FORMAT:text}
+    log-async-queue-size: ${SKILLHUB_LOG_ASYNC_QUEUE_SIZE:1024}
+    service-version: ${SKILLHUB_SERVICE_VERSION:unknown}
+    service-environment: ${SKILLHUB_SERVICE_ENVIRONMENT:local}
   builtin-skills:
     enabled: ${SKILLHUB_BUILTIN_SKILLS_ENABLED:true}
   redis:

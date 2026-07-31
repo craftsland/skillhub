@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iflytek.skillhub.auth.token.ApiTokenAccessDeniedException;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -26,13 +26,16 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
     private final ObjectMapper objectMapper;
     private final ApiResponseFactory apiResponseFactory;
     private final SensitiveLogSanitizer sensitiveLogSanitizer;
+    private final RequestIdAccessor requestIdAccessor;
 
     public ApiAccessDeniedHandler(ObjectMapper objectMapper,
                                   ApiResponseFactory apiResponseFactory,
-                                  SensitiveLogSanitizer sensitiveLogSanitizer) {
+                                  SensitiveLogSanitizer sensitiveLogSanitizer,
+                                  RequestIdAccessor requestIdAccessor) {
         this.objectMapper = objectMapper;
         this.apiResponseFactory = apiResponseFactory;
         this.sensitiveLogSanitizer = sensitiveLogSanitizer;
+        this.requestIdAccessor = requestIdAccessor;
     }
 
     @Override
@@ -45,7 +48,7 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
                         : null;
         logger.info(
                 "Forbidden API request [requestId={}, method={}, path={}, reason={}, detail={}]",
-                MDC.get("requestId"),
+                requestIdAccessor.current(),
                 request.getMethod(),
                 sensitiveLogSanitizer.sanitizeRequestTarget(request),
                 accessDeniedException.getClass().getSimpleName(),
