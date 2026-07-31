@@ -111,14 +111,8 @@ jobs:
       - name: Build and validate weekly reports
         if: steps.changed.outputs.docs == 'true'
         run: |
-          cd weekly
-          python3 scripts/build_site.py
-          python3 scripts/validate_site.py _site
-
-      - name: Assemble Pages artifact layout
-        if: steps.changed.outputs.docs == 'true'
-        run: |
-          mkdir -p docs/skillhub/.vitepress/dist/weekly
-          cp -R weekly/_site/. docs/skillhub/.vitepress/dist/weekly/
-          test -f docs/skillhub/.vitepress/dist/weekly/index.html
-          test -f docs/skillhub/.vitepress/dist/weekly/archive.html
+          python3 weekly/scripts/build_site.py \
+            --source weekly/site \
+            --output docs/skillhub/.vitepress/dist/weekly
+          python3 weekly/scripts/validate_site.py \
+            docs/skillhub/.vitepress/dist/weekly
