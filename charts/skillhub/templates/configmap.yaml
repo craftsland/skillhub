@@ -59,6 +59,29 @@ data:
   device-auth-verification-uri: {{ $deviceAuthVerificationUri | quote }}
   auth-direct-enabled: {{ .Values.auth.direct.enabled | quote }}
   auth-direct-provider: {{ .Values.auth.direct.provider | quote }}
+  auth-ldap-enabled: {{ .Values.auth.ldap.enabled | quote }}
+  auth-ldap-provider-code: {{ .Values.auth.ldap.providerCode | quote }}
+  auth-ldap-display-name: {{ .Values.auth.ldap.displayName | quote }}
+  auth-ldap-authority: {{ .Values.auth.ldap.authority | quote }}
+  auth-ldap-url: {{ .Values.auth.ldap.url | quote }}
+  auth-ldap-start-tls: {{ .Values.auth.ldap.startTls | quote }}
+  auth-ldap-directory-type: {{ .Values.auth.ldap.directoryType | quote }}
+  auth-ldap-base-dn: {{ .Values.auth.ldap.baseDn | quote }}
+  auth-ldap-user-search-base: {{ .Values.auth.ldap.userSearchBase | quote }}
+  auth-ldap-user-search-filter: {{ .Values.auth.ldap.userSearchFilter | quote }}
+  auth-ldap-bind-dn: {{ .Values.auth.ldap.bindDn | quote }}
+  auth-ldap-subject-attribute: {{ .Values.auth.ldap.subjectAttribute | quote }}
+  auth-ldap-subject-type: {{ .Values.auth.ldap.subjectType | quote }}
+  auth-ldap-username-attribute: {{ .Values.auth.ldap.usernameAttribute | quote }}
+  auth-ldap-display-name-attribute: {{ .Values.auth.ldap.displayNameAttribute | quote }}
+  auth-ldap-email-attribute: {{ .Values.auth.ldap.emailAttribute | quote }}
+  auth-ldap-avatar-url-attribute: {{ .Values.auth.ldap.avatarUrlAttribute | quote }}
+  auth-ldap-email-authoritative: {{ .Values.auth.ldap.emailAuthoritative | quote }}
+  auth-ldap-connect-timeout: {{ .Values.auth.ldap.connectTimeout | quote }}
+  auth-ldap-read-timeout: {{ .Values.auth.ldap.readTimeout | quote }}
+  auth-ldap-pool-wait-timeout: {{ .Values.auth.ldap.poolWaitTimeout | quote }}
+  auth-ldap-max-concurrent-requests: {{ .Values.auth.ldap.maxConcurrentRequests | quote }}
+  auth-ldap-max-attribute-values: {{ .Values.auth.ldap.maxAttributeValues | quote }}
   auth-cas-enabled: {{ .Values.auth.cas.enabled | quote }}
   auth-cas-provider-code: {{ .Values.auth.cas.providerCode | quote }}
   auth-cas-display-name: {{ .Values.auth.cas.displayName | quote }}

@@ -85,6 +85,47 @@ class IdentityAssertionFactoryTest {
     }
 
     @Test
+    void promotesAssertedEmailOnlyForTrustedAuthoritativeSource() {
+        ProviderDescriptor descriptor = new ProviderDescriptor(
+                "corporate-ldap",
+                "ldap",
+                "corp-directory-v1",
+                "Corporate Directory",
+                "ldap_entry_uuid",
+                "ldap_entry_uuid",
+                Map.of(
+                        "ldap_entry_uuid",
+                        SubjectCanonicalizer.EXACT),
+                List.of("ldap_display_name"),
+                List.of("ldap_email"),
+                List.of(),
+                EmailAssurance.AUTHORITATIVE,
+                true,
+                ProvisioningMode.AUTO,
+                ProfileSyncPolicy.defaults());
+        ProviderAuthenticationResult result = result(
+                new SubjectCandidate(
+                        "ldap_entry_uuid",
+                        "550e8400-e29b-41d4-a716-446655440000"),
+                List.of(),
+                Map.of(
+                        "ldap_email",
+                        values(
+                                "alice@example.com",
+                                ProviderAttributeTrust.ASSERTED)),
+                "ldap");
+
+        IdentityAssertion assertion = factory.create(
+                descriptor,
+                result);
+
+        assertThat(assertion.profile().email()).contains(
+                new EmailClaim(
+                        "alice@example.com",
+                        EmailAssurance.AUTHORITATIVE));
+    }
+
+    @Test
     void rejectsProtocolClaimThatDoesNotMatchTrustedDescriptor() {
         ProviderAuthenticationResult result = result(
                 new SubjectCandidate("github_user_id", "123456"),

@@ -125,7 +125,7 @@ final class IdentityAssertionFactory {
                 .filter(value -> !value.value().isBlank())
                 .map(value -> new EmailClaim(
                         value.value(),
-                        toEmailAssurance(value.trust())
+                        emailAssurance(descriptor, value)
                                 .clampTo(descriptor.emailAssuranceLimit())));
 
         Optional<URI> avatarUrl = firstValue(
@@ -200,6 +200,16 @@ final class IdentityAssertionFactory {
             case ASSERTED -> EmailAssurance.PROVIDER_ASSERTED;
             case VERIFIED -> EmailAssurance.VERIFIED;
         };
+    }
+
+    private EmailAssurance emailAssurance(
+            ProviderDescriptor descriptor,
+            ProviderAttributeValue value) {
+        if (descriptor.authoritativeEmailSource()
+                && value.trust() == ProviderAttributeTrust.ASSERTED) {
+            return EmailAssurance.AUTHORITATIVE;
+        }
+        return toEmailAssurance(value.trust());
     }
 
     private IdentityCoreException invalidAssertion() {

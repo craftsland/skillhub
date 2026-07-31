@@ -202,6 +202,23 @@ grep -Fq 'auth-cas-enabled: "true"' "$TMP_DIR/cas.yaml"
 grep -Fq 'auth-cas-server-url: "https://cas.example.com/cas"' "$TMP_DIR/cas.yaml"
 grep -Fq 'name: SKILLHUB_AUTH_CAS_SERVICE_URL' "$TMP_DIR/cas.yaml"
 
+render ldap "$CHART_DIR" \
+  --set auth.ldap.enabled=true \
+  --set auth.ldap.url=ldaps://ldap.example.com:636 \
+  --set-string 'auth.ldap.baseDn=dc=example\,dc=com' \
+  --set-string 'auth.ldap.bindDn=cn=skillhub\,dc=example\,dc=com' \
+  --set-string secrets.ldapBindPassword=ldap-bind-password \
+  --show-only templates/configmap.yaml \
+  --show-only templates/secret.yaml \
+  --show-only templates/server-deployment.yaml >"$TMP_DIR/ldap.yaml"
+grep -Fq 'auth-ldap-enabled: "true"' "$TMP_DIR/ldap.yaml"
+grep -Fq 'auth-ldap-url: "ldaps://ldap.example.com:636"' "$TMP_DIR/ldap.yaml"
+grep -Fq 'ldap-bind-password: "ldap-bind-password"' "$TMP_DIR/ldap.yaml"
+grep -Fq 'name: SKILLHUB_AUTH_LDAP_BIND_PASSWORD' "$TMP_DIR/ldap.yaml"
+if grep -Fq 'ldap-bind-password:' "$TMP_DIR/default.yaml"; then
+  fail "disabled LDAP must not render a bind password"
+fi
+
 render tls "$CHART_DIR" \
   --set ingress.enabled=true \
   --set-json 'ingress.tls=[{"hosts":["skills.example.com"],"secretName":"skills-tls"}]' \
@@ -275,6 +292,20 @@ assert_rejected server-off --set server.enabled=false
 assert_rejected direct-auth-without-provider \
   --set auth.direct.enabled=true \
   --set-string auth.direct.provider=
+assert_rejected ldap-without-url \
+  --set auth.ldap.enabled=true \
+  --set-string secrets.ldapBindPassword=ldap-bind-password
+assert_rejected ldap-without-secret \
+  --set auth.ldap.enabled=true \
+  --set auth.ldap.url=ldaps://ldap.example.com:636 \
+  --set-string 'auth.ldap.baseDn=dc=example\,dc=com' \
+  --set-string 'auth.ldap.bindDn=cn=skillhub\,dc=example\,dc=com'
+assert_rejected ldap-with-insecure-url \
+  --set auth.ldap.enabled=true \
+  --set auth.ldap.url=ldap://ldap.example.com:389 \
+  --set-string 'auth.ldap.baseDn=dc=example\,dc=com' \
+  --set-string 'auth.ldap.bindDn=cn=skillhub\,dc=example\,dc=com' \
+  --set-string secrets.ldapBindPassword=ldap-bind-password
 assert_rejected cas-without-server \
   --set auth.cas.enabled=true \
   --set auth.cas.serviceUrl=https://skills.example.com/api/v1/auth/cas/cas-main/callback

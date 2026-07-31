@@ -21,6 +21,7 @@ final class ProviderAuthenticationFailureMapper {
             ProviderAuthenticationException exception) {
         return switch (exception.getReasonCode()) {
             case UPSTREAM_INVALID_CREDENTIALS,
+                    UPSTREAM_IDENTITY_NOT_FOUND,
                     REPLAY_DETECTED -> failure(
                     HttpStatus.UNAUTHORIZED,
                     "error.auth.external.invalidAssertion");
@@ -41,6 +42,7 @@ final class ProviderAuthenticationFailureMapper {
         IdentityLinkFailureCode reasonCode =
                 switch (exception.getReasonCode()) {
                     case UPSTREAM_INVALID_CREDENTIALS,
+                            UPSTREAM_IDENTITY_NOT_FOUND,
                             UPSTREAM_ACCESS_DENIED,
                             REPLAY_DETECTED ->
                             IdentityLinkFailureCode
@@ -59,6 +61,7 @@ final class ProviderAuthenticationFailureMapper {
         AccountMergeFailureCode reasonCode =
                 switch (exception.getReasonCode()) {
                     case UPSTREAM_INVALID_CREDENTIALS,
+                            UPSTREAM_IDENTITY_NOT_FOUND,
                             UPSTREAM_ACCESS_DENIED,
                             REPLAY_DETECTED ->
                             AccountMergeFailureCode

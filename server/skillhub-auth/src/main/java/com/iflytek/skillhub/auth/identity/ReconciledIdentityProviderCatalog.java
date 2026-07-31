@@ -274,6 +274,7 @@ class ReconciledIdentityProviderCatalog
                 definition.emailAttributes(),
                 definition.avatarAttributes(),
                 definition.emailAssuranceLimit(),
+                definition.authoritativeEmailSource(),
                 policy.provisioningMode(),
                 policy.profileSyncPolicy());
     }

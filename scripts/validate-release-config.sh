@@ -222,10 +222,52 @@ validate_boolean BOOTSTRAP_ADMIN_ENABLED
 validate_boolean SKILLHUB_TRUST_FORWARDED_PROTO
 validate_boolean SKILLHUB_STORAGE_S3_FORCE_PATH_STYLE
 validate_boolean SKILLHUB_STORAGE_S3_AUTO_CREATE_BUCKET
+validate_boolean SKILLHUB_AUTH_LDAP_ENABLED
+validate_boolean SKILLHUB_AUTH_LDAP_START_TLS
+validate_boolean SKILLHUB_AUTH_LDAP_ALLOW_INSECURE_FOR_TESTING
+validate_boolean SKILLHUB_AUTH_LDAP_EMAIL_AUTHORITATIVE
 validate_boolean SKILLHUB_AUTH_CAS_ENABLED
 validate_boolean SKILLHUB_AUTH_CAS_ALLOW_INSECURE_FOR_TESTING
 validate_boolean SPRING_DATA_REDIS_SSL_ENABLED
 validate_boolean SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST
+
+if [ "${SKILLHUB_AUTH_LDAP_ENABLED:-false}" = "true" ]; then
+  require_non_empty SKILLHUB_AUTH_LDAP_PROVIDER_CODE
+  require_non_empty SKILLHUB_AUTH_LDAP_DISPLAY_NAME
+  require_non_empty SKILLHUB_AUTH_LDAP_AUTHORITY
+  require_non_empty SKILLHUB_AUTH_LDAP_URL
+  require_non_empty SKILLHUB_AUTH_LDAP_BASE_DN
+  require_non_empty SKILLHUB_AUTH_LDAP_USER_SEARCH_FILTER
+  require_non_empty SKILLHUB_AUTH_LDAP_BIND_DN
+  require_non_empty SKILLHUB_AUTH_LDAP_BIND_PASSWORD
+  case "${SKILLHUB_AUTH_LDAP_DIRECTORY_TYPE:-OPENLDAP}" in
+    OPENLDAP|ACTIVE_DIRECTORY|CUSTOM) ;;
+    *) error "SKILLHUB_AUTH_LDAP_DIRECTORY_TYPE must be OPENLDAP, ACTIVE_DIRECTORY, or CUSTOM" ;;
+  esac
+  if [ "${SKILLHUB_AUTH_LDAP_DIRECTORY_TYPE:-OPENLDAP}" = "CUSTOM" ]; then
+    require_non_empty SKILLHUB_AUTH_LDAP_SUBJECT_ATTRIBUTE
+    require_non_empty SKILLHUB_AUTH_LDAP_SUBJECT_TYPE
+  fi
+  case "${SKILLHUB_AUTH_LDAP_URL:-}" in
+    ldaps://*)
+      if [ "${SKILLHUB_AUTH_LDAP_START_TLS:-false}" = "true" ]; then
+        error "SKILLHUB_AUTH_LDAP_START_TLS must be false for an ldaps URL"
+      fi
+      ;;
+    ldap://*)
+      if [ "${SKILLHUB_AUTH_LDAP_START_TLS:-false}" != "true" ]; then
+        error "SKILLHUB_AUTH_LDAP_START_TLS must be true for an ldap URL in release deployments"
+      fi
+      ;;
+    *) error "SKILLHUB_AUTH_LDAP_URL must start with ldap:// or ldaps://" ;;
+  esac
+  case "${SKILLHUB_AUTH_LDAP_URL:-}" in
+    *\?*|*\#*) error "SKILLHUB_AUTH_LDAP_URL must not contain a query or fragment" ;;
+  esac
+  if [ "${SKILLHUB_AUTH_LDAP_ALLOW_INSECURE_FOR_TESTING:-false}" = "true" ]; then
+    error "SKILLHUB_AUTH_LDAP_ALLOW_INSECURE_FOR_TESTING cannot be true in release deployments"
+  fi
+fi
 
 if [ "${SKILLHUB_AUTH_CAS_ENABLED:-false}" = "true" ]; then
   require_non_empty SKILLHUB_AUTH_CAS_PROVIDER_CODE

@@ -150,6 +150,42 @@ write_env "$invalid_redis_sentinel_check_env" "release-download-secret-32-bytes-
 printf '%s\n' "SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST=yes" >>"$invalid_redis_sentinel_check_env"
 expect_fail "$invalid_redis_sentinel_check_env" "SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST must be true or false"
 
+valid_ldaps_env="$tmp/valid-ldaps.env"
+write_env "$valid_ldaps_env" "release-download-secret-32-bytes-minimum"
+cat >>"$valid_ldaps_env" <<'EOF'
+SKILLHUB_AUTH_LDAP_ENABLED=true
+SKILLHUB_AUTH_LDAP_PROVIDER_CODE=ldap-main
+SKILLHUB_AUTH_LDAP_DISPLAY_NAME=Corporate Directory
+SKILLHUB_AUTH_LDAP_AUTHORITY=corp-directory
+SKILLHUB_AUTH_LDAP_URL=ldaps://ldap.example.com:636
+SKILLHUB_AUTH_LDAP_DIRECTORY_TYPE=OPENLDAP
+SKILLHUB_AUTH_LDAP_BASE_DN=dc=example,dc=com
+SKILLHUB_AUTH_LDAP_USER_SEARCH_FILTER=(uid={0})
+SKILLHUB_AUTH_LDAP_BIND_DN=cn=skillhub,dc=example,dc=com
+SKILLHUB_AUTH_LDAP_BIND_PASSWORD=release-ldap-bind-password
+EOF
+"$SCRIPT" "$valid_ldaps_env" >/dev/null
+
+valid_starttls_env="$tmp/valid-starttls.env"
+cp "$valid_ldaps_env" "$valid_starttls_env"
+sed -i 's|ldaps://ldap.example.com:636|ldap://ldap.example.com:389|' "$valid_starttls_env"
+printf '%s\n' "SKILLHUB_AUTH_LDAP_START_TLS=true" >>"$valid_starttls_env"
+"$SCRIPT" "$valid_starttls_env" >/dev/null
+
+insecure_ldap_env="$tmp/insecure-ldap.env"
+cp "$valid_ldaps_env" "$insecure_ldap_env"
+sed -i 's|ldaps://ldap.example.com:636|ldap://ldap.example.com:389|' "$insecure_ldap_env"
+expect_fail "$insecure_ldap_env" "SKILLHUB_AUTH_LDAP_START_TLS must be true for an ldap URL"
+
+missing_ldap_secret_env="$tmp/missing-ldap-secret.env"
+grep -v '^SKILLHUB_AUTH_LDAP_BIND_PASSWORD=' "$valid_ldaps_env" >"$missing_ldap_secret_env"
+expect_fail "$missing_ldap_secret_env" "SKILLHUB_AUTH_LDAP_BIND_PASSWORD is required"
+
+custom_ldap_without_subject_env="$tmp/custom-ldap-without-subject.env"
+cp "$valid_ldaps_env" "$custom_ldap_without_subject_env"
+printf '%s\n' "SKILLHUB_AUTH_LDAP_DIRECTORY_TYPE=CUSTOM" >>"$custom_ldap_without_subject_env"
+expect_fail "$custom_ldap_without_subject_env" "SKILLHUB_AUTH_LDAP_SUBJECT_ATTRIBUTE is required"
+
 draft_env="$tmp/draft.env"
 while IFS= read -r line || [[ -n "$line" ]]; do
   case "$line" in

@@ -648,6 +648,7 @@ public class CasLoginAppService {
                 exception.getReasonCode();
         return switch (code) {
             case UPSTREAM_INVALID_CREDENTIALS,
+                    UPSTREAM_IDENTITY_NOT_FOUND,
                     REPLAY_DETECTED ->
                     failure(CasLoginFailure.VALIDATION_FAILED);
             case UPSTREAM_ACCESS_DENIED ->
