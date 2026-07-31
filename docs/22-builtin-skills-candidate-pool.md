@@ -209,6 +209,5 @@ B25 的核心行程生成实测失败，并会把敏感旅行画像写入宿主�
 7. 将不可变 URL 和制品 SHA-256 写入
    `server/skillhub-app/src/main/resources/builtin-skills/manifest.json`，在干净部署中验证同步、下载和安装。
 
-第一批 15 个适配包已经完成内容、安全和确定性构建检查；在官方不可变 CDN URL 可用前，暂不把
-它们写入运行时 manifest。把 GitHub 分支下载地址直接写进 manifest，会导致内容变化后无法审计
-和复现。
+第一批 15 个适配包已经完成内容、安全和确定性构建检查，并已通过官方不可变 CDN URL 和
+SHA-256 写入运行时 manifest。后续更新必须发布新版本和新制品，不得覆盖当前 URL 对应的字节。

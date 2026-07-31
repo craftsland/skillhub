@@ -18,6 +18,34 @@ python3 "$BUILDER" --output "$second"
 
 cmp "$first/artifacts.json" "$second/artifacts.json"
 
+runtime_manifest="$REPO_ROOT/server/skillhub-app/src/main/resources/builtin-skills/manifest.json"
+python3 - "$first/artifacts.json" "$runtime_manifest" <<'PY'
+import json
+import sys
+from pathlib import Path
+from urllib.parse import urlsplit
+
+artifacts = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["artifacts"]
+runtime_items = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))["skills"]
+runtime_by_coordinate = {}
+for item in runtime_items:
+    coordinate = (item["slug"], item["version"])
+    assert coordinate not in runtime_by_coordinate, coordinate
+    runtime_by_coordinate[coordinate] = item
+
+assert len(runtime_items) == 17, len(runtime_items)
+for artifact in artifacts:
+    coordinate = (artifact["slug"], artifact["version"])
+    assert coordinate in runtime_by_coordinate, coordinate
+    runtime_item = runtime_by_coordinate[coordinate]
+    assert runtime_item["sha256"] == artifact["sha256"], coordinate
+    parsed_url = urlsplit(runtime_item["url"])
+    assert parsed_url.scheme == "https", coordinate
+    assert parsed_url.hostname == "bjcdn.openstorage.cn", coordinate
+    assert not parsed_url.query and not parsed_url.fragment, coordinate
+    assert parsed_url.path.endswith(f'/{artifact["sha256"]}.zip'), coordinate
+PY
+
 python3 - "$first" <<'PY'
 import json
 import sys

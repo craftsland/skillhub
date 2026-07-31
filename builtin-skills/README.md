@@ -25,6 +25,9 @@ added to the runtime manifest only after its immutable CDN URL is available; the
 the matching SHA-256 so the backend can reject changed or incorrectly uploaded bytes before
 extraction.
 
+The first batch of 15 packages is pinned in the runtime manifest. A clean deployment initializes
+these packages alongside the existing built-in Skills in the public `@global` namespace.
+
 ## Share a Skill with the Community
 
 A Skill shared with the community may be considered for the curated starter collection.
