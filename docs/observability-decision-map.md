@@ -1,11 +1,14 @@
 # 通用可观测性决策图
 
 目标：为 SkillHub 建立独立、通用、可插拔的日志关联、指标和链路追踪基础设施。
-它观察 HTTP、线程池、定时任务和可靠任务等执行边界，但不进入业务模型和业务载荷。
+当前实现覆盖 HTTP、SkillHub 管理的线程池和明确接入的内部 HTTP Client；定时任务、
+Redis Stream 消费循环和 Reclaimer 是独立后台边界，不继承 HTTP 上下文。
+这些边界不进入业务模型和业务载荷。
 
 边界：
 
-- Servlet Filter、执行器装饰器、调度拦截器和任务执行拦截器负责建立/恢复上下文。
+- Servlet Filter、执行器装饰器和明确接入的 Client Builder 负责建立/恢复上下文。
+- 定时任务和 Redis Stream 目前只输出自身执行日志，不自动继承请求或 Trace 上下文。
 - 业务代码不读写 MDC，不负责创建通用 Span，也不负责统计任务生命周期指标。
 - 使用 W3C Trace Context；日志后端、Metrics 后端和 Trace Exporter 均可替换。
 - 上下文是有长度限制的基础设施元数据，不进入业务 payload。
@@ -13,8 +16,9 @@
 
 必须满足的不变量：
 
-- 每个执行边界都正确建立作用域并在 `finally` 清理，线程复用不得串号。
-- 日志稳定输出 `requestId`、`traceId`、`spanId`；任务执行时额外输出执行资源标识。
+- 每个已纳入本期的执行边界都正确建立作用域并在 `finally` 清理，线程复用不得串号。
+- 日志稳定输出 `requestId`、`traceId`、`spanId`（存在时）；任务执行资源标识不由本期
+  可观测性自动生成。
 - Trace 与 Metrics 可关闭、可替换；关闭后不得改变业务行为。
 - 指标只使用低基数维度，业务 ID 不进入标签。
 - 采集端不可用必须异步、限时、限队列并 fail-open。
@@ -40,8 +44,8 @@ Type: Research
 
 ### Question
 
-如何区分现有 `X-Request-Id`、W3C `traceId/spanId` 和执行资源标识，并跨 HTTP、线程池、
-调度器和持久化任务边界传播？
+如何区分现有 `X-Request-Id`、W3C `traceId/spanId` 和执行资源标识，并跨 HTTP、线程池
+边界传播？
 
 ### Answer
 
@@ -50,7 +54,7 @@ Type: Research
 - `requestId` 是 SkillHub 的请求/审计关联标识，不冒充分布式 Trace。
 - `traceId/spanId` 由 Tracer 生成，跨进程只使用 W3C `traceparent/tracestate`。
 - 定时任务或可靠任务的执行资源 ID 只作为当前执行作用域属性，不进入业务 payload。
-- HTTP、线程池、调度器和持久化 carrier 的注入/提取全部位于基础设施拦截器。
+- HTTP 和线程池 carrier 的注入/提取位于基础设施拦截器；持久化任务不携带 HTTP Trace。
 - 不传播任意 MDC Map；baggage 默认关闭，任何允许项都必须低敏、限长、显式配置。
 - 无效或不可信的公网 Trace Context 按 W3C 规则丢弃，服务端控制采样。
 
@@ -84,8 +88,9 @@ Type: Prototype
 
 ### Question
 
-验证线程复用隔离、嵌套作用域、异步/调度/持久化任务边界、采样、Exporter 超时、
-Collector 中断、队列打满和关闭观测能力等场景。
+验证线程复用隔离、嵌套作用域、异步任务边界、采样、Exporter 超时、Collector 中断、
+队列打满和关闭观测能力等场景。调度任务和 Redis Stream 的独立后台边界只验证不继承
+请求上下文。
 
 ### Answer
 
@@ -97,6 +102,7 @@ Collector 中断、队列打满和关闭观测能力等场景。
 - Scanner 使用 Spring 管理的 `WebClient.Builder` 传播 W3C `traceparent`。
 - 面向用户配置的 GitLab 外部 Client 不传播 Trace Context。
 - `none / otel-sdk / external-agent` 的应用上下文和 Exporter 条件符合设计。
+- `@Scheduled` 和 Redis Stream/Reclaimer 不继承请求上下文，保持独立后台执行边界。
 
 Collector 中断、日志背压、采样率和关闭行为仍由 `big-main` 精确 SHA 镜像的远端原型验证。
 

@@ -331,13 +331,14 @@ override 或部署平台环境变量把上述 `SPRING_SECURITY_*` 变量注入 `
 
 ```dotenv
 SKILLHUB_TRACING_MODE=none
-SKILLHUB_LOG_FORMAT=text
+SKILLHUB_LOG_FORMAT=json
 SKILLHUB_SERVICE_VERSION=v0.2.15
 SKILLHUB_SERVICE_ENVIRONMENT=production
 ```
 
-部署环境建议将 `SKILLHUB_LOG_FORMAT` 设为 `json`，由 Filebeat、Fluent Bit 或容器平台
-采集 stdout。SkillHub 不直接连接 Elasticsearch。JSON 日志使用以下稳定字段：
+发布 Compose 默认使用 ECS 风格 JSON，由 Filebeat、Fluent Bit 或容器平台采集 stdout。
+本地源码开发仍可使用 `SKILLHUB_LOG_FORMAT=text`。SkillHub 不直接连接 Elasticsearch。
+JSON 日志使用以下稳定字段：
 
 - `request.id`：SkillHub 请求、响应和审计关联 ID。
 - `trace.id`、`span.id`：当前存在有效 Trace 时输出。
@@ -446,6 +447,9 @@ SkyWalking 中没有被保留的 Trace。这是头部采样的预期行为。
 4. 滚动重启 Server。
 
 关闭 Trace 和 JSON 日志不会改变请求、数据库或异步任务的业务语义。
+
+开发者接入统一标准的最小步骤、内部/外部 HTTP Client 传播边界和扩展点见：
+[可观测性开发者接入指南](./observability-developer-guide.md)。
 
 ## 11 安全扫描服务
 

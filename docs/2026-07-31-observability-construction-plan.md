@@ -35,7 +35,8 @@ Issue #597 中“搜索索引可靠异步交付”应作为独立问题处理，
    Elasticsearch/Kibana。
 7. Trace 可以选择通过 OTLP Collector 接入 SkyWalking。
 8. Collector、SkyWalking、Elasticsearch 或日志采集器不可用时，SkillHub 业务继续运行。
-9. 同一进程只能有一个实际生效的 Tracer。
+9. SkillHub 应用配置只能启用一个应用内 Tracer；`external-agent` 模式下唯一外部
+   Agent 由部署参数和发布检查保证。
 
 本方案按多个小阶段、小提交实施和验证，全部通过后再统一创建一个替代 PR。
 
@@ -104,14 +105,15 @@ skillhub:
 必须保证：
 
 - `none` 和 `external-agent` 不创建应用内 OTel Span。
-- `otel-sdk` 不支持同时启用 SkyWalking、OTel 或其他外部 Tracing Agent。
+- `otel-sdk` 不支持同时启用 SkyWalking、OTel 或其他外部 Tracing Agent；应用只能校验
+  自身 endpoint/mode 冲突，不能可靠识别任意 JVM Agent。
 - `external-agent` 不创建 OTLP Exporter。
 - SkillHub 配置能够识别的冲突应在启动时失败；任意 Java Agent 无法被应用可靠识别，因此
   部署检查和原型测试还必须验证实际 JVM 参数中只有一个 Tracer。
 
-一期实现并验证三种模式的互斥边界和日志关联。`external-agent` 只验证 SkyWalking Agent
-接管 Trace 后不会与应用内 OTel Tracer 冲突；SkyWalking 特有高级能力不进入 SkillHub
-核心代码。
+一期实现并验证三种模式的应用上下文互斥边界和日志关联。`external-agent` 只验证
+SkyWalking Agent 接管 Trace 时应用内 OTel Tracer/Exporter 不工作；“只挂载一个外部
+Agent”属于部署验收项。SkyWalking 特有高级能力不进入 SkillHub 核心代码。
 
 ## 6. 关联字段契约
 

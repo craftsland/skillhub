@@ -8,6 +8,7 @@ import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -38,6 +39,7 @@ public class GitLabClaimsExtractor implements OAuthClaimsExtractor {
      * Uses an external-service client that is intentionally not customized with application
      * tracing. Trace context must not be propagated to a user-configured GitLab host.
      */
+    @Autowired
     public GitLabClaimsExtractor() {
         this(RestClient.builder());
     }
