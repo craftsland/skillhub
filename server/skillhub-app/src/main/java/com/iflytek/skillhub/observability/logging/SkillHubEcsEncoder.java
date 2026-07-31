@@ -25,6 +25,7 @@ public class SkillHubEcsEncoder extends LoggingEventCompositeJsonEncoder {
     private String serviceName = "skillhub";
     private String serviceVersion = "unknown";
     private String serviceEnvironment = "local";
+    private boolean externalTraceIdEnabled;
 
     @Override
     public void start() {
@@ -46,6 +47,10 @@ public class SkillHubEcsEncoder extends LoggingEventCompositeJsonEncoder {
 
     public void setServiceEnvironment(String serviceEnvironment) {
         this.serviceEnvironment = serviceEnvironment;
+    }
+
+    public void setTracingMode(String tracingMode) {
+        this.externalTraceIdEnabled = "external-agent".equalsIgnoreCase(tracingMode);
     }
 
     private LoggingEventJsonProviders createProviders() {
@@ -74,7 +79,7 @@ public class SkillHubEcsEncoder extends LoggingEventCompositeJsonEncoder {
         providers.addThreadName(thread);
 
         providers.addGlobalCustomFields(serviceFields());
-        providers.addProvider(new CorrelationJsonProvider());
+        providers.addProvider(new CorrelationJsonProvider(externalTraceIdEnabled));
 
         ThrowableClassNameJsonProvider errorType = new ThrowableClassNameJsonProvider();
         errorType.setFieldName("error.type");

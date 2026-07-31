@@ -5,6 +5,9 @@
     <springProperty name="activeAppender"
                     source="skillhub.observability.log-format"
                     defaultValue="text"/>
+    <springProperty name="tracingMode"
+                    source="skillhub.observability.tracing-mode"
+                    defaultValue="none"/>
     <springProperty name="asyncQueueSize"
                     source="skillhub.observability.log-async-queue-size"
                     defaultValue="1024"/>
@@ -30,6 +33,7 @@
             <serviceName>${serviceName}</serviceName>
             <serviceVersion>${serviceVersion}</serviceVersion>
             <serviceEnvironment>${serviceEnvironment}</serviceEnvironment>
+            <tracingMode>${tracingMode}</tracingMode>
         </encoder>
     </appender>
 

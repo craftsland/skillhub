@@ -95,6 +95,7 @@ spring:
 
 skillhub:
   observability:
+    tracing-mode: ${SKILLHUB_TRACING_MODE:none}
     log-format: ${SKILLHUB_LOG_FORMAT:text}
     log-async-queue-size: ${SKILLHUB_LOG_ASYNC_QUEUE_SIZE:1024}
     service-version: ${SKILLHUB_SERVICE_VERSION:unknown}
@@ -214,6 +215,17 @@ skillhub:
       email: ${BOOTSTRAP_ADMIN_EMAIL:admin@skillhub.local}
 
 management:
+  tracing:
+    sampling:
+      probability: ${SKILLHUB_TRACING_SAMPLING_PROBABILITY:0.1}
+    baggage:
+      enabled: false
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      timeout: ${SKILLHUB_OTLP_TIMEOUT:5s}
+      compression: ${SKILLHUB_OTLP_COMPRESSION:gzip}
   health:
     mail:
       enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}

@@ -82,6 +82,32 @@ class SkillHubEcsEncoderTest {
     }
 
     @Test
+    void shouldNormalizeExternalAgentTraceId() throws Exception {
+        encoder.stop();
+        encoder.setTracingMode("external-agent");
+        encoder.start();
+        LoggingEvent event = event("external trace");
+        event.setMDCPropertyMap(Map.of("tid", "TID: external-agent-trace"));
+
+        JsonNode json = encode(event);
+
+        assertThat(json.path("trace.id").asText()).isEqualTo("external-agent-trace");
+    }
+
+    @Test
+    void shouldNotWriteToolkitSentinelAsTraceId() throws Exception {
+        encoder.stop();
+        encoder.setTracingMode("external-agent");
+        encoder.start();
+        LoggingEvent event = event("no external agent");
+        event.setMDCPropertyMap(Map.of("tid", "TID: N/A"));
+
+        JsonNode json = encode(event);
+
+        assertThat(json.has("trace.id")).isFalse();
+    }
+
+    @Test
     void shouldWriteStructuredExceptionFields() throws Exception {
         LoggingEvent event = event("failed");
         event.setThrowableProxy(new ThrowableProxy(new IllegalStateException("boom")));
