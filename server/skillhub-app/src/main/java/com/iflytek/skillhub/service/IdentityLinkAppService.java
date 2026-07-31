@@ -319,7 +319,8 @@ public class IdentityLinkAppService {
                             username,
                             password));
         } catch (ProviderAuthenticationException exception) {
-            throw ProviderAuthenticationFailureMapper.map(exception);
+            throw ProviderAuthenticationFailureMapper
+                    .mapIdentityLink(exception);
         }
     }
 
