@@ -1379,15 +1379,24 @@ PRIMARY KEY(user_id, field_name)
 ```text
 id                      uuid PK
 primary_user_id         varchar(128) NOT NULL
+operation               LINK / UNLINK
 provider_code           varchar(64) NOT NULL
-state_hash              varchar(128) NOT NULL
-status                  PENDING / COMPLETED / EXPIRED / CANCELLED
+target_binding_id       bigint NULL
+state_hash              char(64) NOT NULL
+status                  PENDING_REAUTHENTICATION / READY /
+                        COMPLETED / EXPIRED / CANCELLED
+reauthentication_method varchar(96)
+reauthenticated_at      timestamptz
 expires_at              timestamptz NOT NULL
 created_at              timestamptz NOT NULL
+updated_at              timestamptz NOT NULL
 completed_at            timestamptz
+cancelled_at            timestamptz
 ```
 
-只保存 hash 和流程元数据，不保存 OAuth code、CAS Ticket 或密码。
+只保存 hash 和流程元数据，不保存 OAuth code、CAS Ticket 或密码。`provider_code`
+保留创建 intent 时的历史值，不对 `identity_provider_state` 建外键：配置已删除或
+Authority 不可用的历史 Binding 仍必须能在账号还有其他登录方式时安全解绑。
 
 ### 10.6 SCIM 资源绑定
 
@@ -1576,14 +1585,21 @@ PROVIDER_AUTHORITATIVE
 9. 写审计并消费 link request。
 ```
 
-未来 Interface：
+当前 Interface：
 
 ```java
 public interface ExternalIdentityLinkService {
 
+    IdentityLinkOutcome reauthenticate(
+        IdentityLinkActor actor,
+        UUID intentId,
+        ResolvedProviderHandle provider,
+        ProviderAuthenticationResult result
+    );
+
     IdentityLinkOutcome link(
-        AuthenticatedActor actor,
-        IdentityLinkIntent intent,
+        IdentityLinkActor actor,
+        UUID intentId,
         ResolvedProviderHandle provider,
         ProviderAuthenticationResult result
     );
@@ -1592,6 +1608,108 @@ public interface ExternalIdentityLinkService {
 
 Link Facade 内部复用同一个 descriptor source、Authority Lock 和 package-private
 Assertion Factory；Provider 仍不能构造 `IdentityAssertion`。
+
+#### 12.2.1 Identity Link 实现契约
+
+[#655](https://github.com/iflytek/skillhub/issues/655) 实现上述 Link/Unlink 核心。
+HTTP、Session 和 Provider 协议 I/O 位于事务外；身份核心拥有 intent 状态检查、
+Provider capability 检查、Binding/Subject 唯一性、账号资格和审计规则。
+
+服务端状态机：
+
+| 状态 | 允许操作 | 下一状态 |
+|---|---|---|
+| `PENDING_REAUTHENTICATION` | 当前账号 fresh reauthentication | `READY` |
+| `READY` + `LINK` | 独立认证目标 Provider 并创建 Binding V2 | `COMPLETED` |
+| `READY` + `UNLINK` | 检查仍有其他可用登录方式并撤销 Binding/Subjects | `COMPLETED` |
+| active intent | 取消 | `CANCELLED` |
+| active intent 超过 10 分钟 TTL | 任意读取或消费 | `EXPIRED` |
+| `COMPLETED/CANCELLED/EXPIRED` | 重放 | 拒绝，不再改变状态 |
+
+每个 intent 同时绑定：
+
+- 当前 `userId`；
+- 当前 Platform Session 中 256-bit 随机 nonce；数据库只保存 SHA-256；
+- 操作类型、目标 Provider、可选目标 Binding；
+- 固定过期时间和一次性状态。
+
+当前账号证明与目标 Provider 证明必须分开。Browser Provider 使用现有 OAuth state
+校验并保留主 Platform Session；Credential Provider 只在 Adapter 中校验凭据，
+只把 `ProviderAuthenticationResult` 交给核心。密码、OAuth code/token、ticket、
+Cookie、原始 Session ID/nonce 和 proof 不进入 DTO、数据库、审计或日志。
+
+公开 API：
+
+| 方法 | 路径 | 作用 |
+|---|---|---|
+| `GET` | `/api/v1/auth/identity-links` | 列出当前账号已绑定和可添加的登录方式；不返回外部 Subject |
+| `POST` | `/api/v1/auth/identity-link-intents/link` | 创建 Link intent |
+| `POST` | `/api/v1/auth/identity-link-intents/unlink` | 创建 Unlink intent |
+| `GET` / `DELETE` | `/api/v1/auth/identity-link-intents/{intentId}` | 查看或取消 intent |
+| `POST` | `.../{intentId}/reauthenticate/local` | 用本地密码重新认证当前账号 |
+| `POST` | `.../{intentId}/reauthenticate/browser` | 发起 Browser Provider 当前账号证明 |
+| `POST` | `.../{intentId}/reauthenticate/credential` | 用 Credential Provider 证明当前账号 |
+| `POST` | `.../{intentId}/link/browser` | 发起目标 Browser Provider 认证 |
+| `POST` | `.../{intentId}/link/credential` | 认证并绑定目标 Credential Provider |
+| `POST` | `.../{intentId}/unlink` | fresh reauthentication 后完成解绑 |
+
+REST 失败响应除 HTTP status 和本地化 `msg` 外，必须返回稳定 `reasonCode`。Browser
+回调失败通过 `/settings/security?identityLink=failed&intentId=...&reasonCode=...`
+返回同一 allowlist 中的 code。当前 allowlist：
+
+```text
+INTENT_NOT_FOUND
+REAUTHENTICATION_REQUIRED
+SESSION_MISMATCH
+INTENT_EXPIRED
+ALREADY_CONSUMED
+ACTIVE_INTENT_EXISTS
+ACCOUNT_NOT_ELIGIBLE
+PROVIDER_UNAVAILABLE
+PROVIDER_AUTHENTICATION_FAILED
+ALREADY_LINKED
+IDENTITY_IN_USE
+FINAL_LOGIN_METHOD
+INVALID_OPERATION
+```
+
+前端账号安全页只使用生成的 OpenAPI `paths/components` 和 `openapi-fetch` 调用这些
+端点，并由 TanStack Query 管理服务端状态。Callback 只接受固定格式的 reason code，
+显示本地化安全提示；不得显示外部 Subject 或原始 Provider 错误。
+
+#### 12.2.2 模块与持久化边界
+
+`IdentityLinkAppService` 只编排 Session context、Provider 协议调用和响应映射。
+intent 状态、operation、Provider capability、账号资格、Binding/Subject 唯一性和
+最后登录方式保护位于 `skillhub-auth` identity core。
+
+`identity_link_request`、Identity Binding V2 和 Subject 是认证 bounded context 的
+安全状态，因此 Entity 和 Spring Data Repository 保留在 `skillhub-auth`。这是相对
+通用 domain-port/infra-implementation 规则的显式例外：它们不属于 SkillHub 业务
+Domain Aggregate，且必须与认证事务、pessimistic lock 和 Provider Authority Lock
+共同演进。App 和 Provider Adapter 不得直接写这些表。
+
+#### 12.2.3 升级、滚动发布和回滚
+
+V49 是向后兼容的 expand migration：增加 `identity_link_request`，并把旧的全量唯一
+约束替换为 ACTIVE-only 部分唯一索引；它不重写已有 Binding。升级测试必须从 V48
+数据库执行 V49，并验证旧 ACTIVE Binding 仍能登录。
+
+解绑后允许同一 Subject 重新绑定，同时保留 REVOKED Binding/Subject 历史。因此一旦
+生产数据发生“解绑后重绑”，会存在同一 `provider + legacy subject` 的一条 ACTIVE 和
+一条或多条 REVOKED 记录。V49-aware 代码只读取 ACTIVE 记录；V49 之前使用无状态单行
+查询的运行时可能得到非唯一结果。
+
+发布约束：
+
+1. 多实例部署必须先让所有认证实例升级到 V49-aware 版本，再向用户开放 Link/Unlink
+   入口；不能在旧、新认证实例混跑时允许完成解绑或重绑。
+2. 部署期间若不能保证上述顺序，应暂时在网关隐藏新增端点和账号安全入口，完成升级后
+   再开放。
+3. V49 migration 本身可与旧数据共存；首次 Link/Unlink 写入之后，安全回滚下限提升为
+   V49-aware 版本。不得回滚到使用无状态 legacy Binding 单行查询的版本。
+4. 回滚只允许代码回滚到 V49-aware 版本，不回滚或删除 V49 表和 REVOKED 历史。
+5. 发布前必须在 PostgreSQL 16 上验证 V48 → V49、并发消费、解绑后重绑和旧账号登录。
 
 ### 12.3 解绑
 
@@ -2366,7 +2484,7 @@ PR 4：Provider Registry + Adapter 契约冻结
 - disabled/misconfigured Provider 不出现在目录且不联网。
 - 旧前端登录目录 API 保持兼容。
 
-#### PR 5：显式 Identity Link
+#### PR 5：显式 Identity Link（#655）
 
 范围：
 
@@ -2380,6 +2498,10 @@ PR 4：Provider Registry + Adapter 契约冻结
 
 - 无法只凭 email 或 username 创建 Binding。
 - Link 重放、过期、并发消费和最后登录方式测试通过。
+- JSON API 和 Browser callback 都返回 allowlist 内的稳定 reason code。
+- PostgreSQL 16 验证同一 intent 并发消费只能成功一次。
+- 以准确 `big-main` SHA 构建镜像，在隔离测试环境验证升级、回归和真实浏览器链路后，
+  才能进入 `main`。
 
 #### PR 6：安全 Account Merge
 

@@ -4,6 +4,7 @@ import path from 'path'
 
 const JS_BUILD_TARGET = 'es2020'
 const LEGACY_BROWSER_TARGETS = ['chrome83', 'edge83', 'firefox78', 'safari14']
+const DEV_API_TARGET = process.env.SKILLHUB_DEV_API_TARGET?.trim() || 'http://localhost:8080'
 
 export default defineConfig({
   plugins: [react()],
@@ -34,12 +35,16 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: DEV_API_TARGET,
         changeOrigin: true,
       },
       '/oauth2': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
+        target: DEV_API_TARGET,
+        changeOrigin: false,
+      },
+      '/login/oauth2/code': {
+        target: DEV_API_TARGET,
+        changeOrigin: false,
       },
     },
   },

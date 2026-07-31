@@ -29,10 +29,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'pnpm exec vite --host 127.0.0.1 --port 3000 --strictPort',
-    url: 'http://127.0.0.1:3000',
-    reuseExistingServer: true,
-    timeout: 120000,
-  },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: 'pnpm exec vite --host 127.0.0.1 --port 3000 --strictPort',
+        url: 'http://127.0.0.1:3000',
+        reuseExistingServer: true,
+        timeout: 120000,
+      },
 })

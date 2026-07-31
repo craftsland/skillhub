@@ -6,6 +6,8 @@ import static org.mockito.Mockito.when;
 
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
+import com.iflytek.skillhub.dto.IdentityLinkErrorResponse;
+import com.iflytek.skillhub.auth.exception.AuthFlowException;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
 import com.iflytek.skillhub.security.SensitiveLogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +42,10 @@ class GlobalExceptionHandlerTest {
     void setUp() {
         StaticMessageSource messageSource = new StaticMessageSource();
         messageSource.addMessage("error.request.timeout", java.util.Locale.getDefault(), "Request timed out");
+        messageSource.addMessage(
+                "error.auth.local.invalidCredentials",
+                java.util.Locale.getDefault(),
+                "Invalid username or password");
         ApiResponseFactory responseFactory = new ApiResponseFactory(
                 messageSource,
                 Clock.fixed(Instant.parse("2026-03-20T00:00:00Z"), ZoneOffset.UTC)
@@ -91,5 +97,34 @@ class GlobalExceptionHandlerTest {
 
         assertThatThrownBy(() -> handler.handleSessionInvalidated(ex, request))
                 .isSameAs(ex);
+    }
+
+    @Test
+    void handleAuthFailure_shouldUseIdentityLinkReasonCode() {
+        String path =
+                "/api/v1/auth/identity-link-intents/test"
+                        + "/reauthenticate/local";
+        when(request.getRequestURI()).thenReturn(path);
+        when(request.getMethod()).thenReturn("POST");
+        when(sensitiveLogSanitizer
+                .sanitizeRequestTarget(request))
+                .thenReturn(path);
+
+        ResponseEntity<?> response =
+                handler.handleAuthFlowException(
+                        new AuthFlowException(
+                                HttpStatus.UNAUTHORIZED,
+                                "error.auth.local.invalidCredentials"),
+                        request);
+
+        assertThat(response.getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody())
+                .isInstanceOf(
+                        IdentityLinkErrorResponse.class);
+        IdentityLinkErrorResponse body =
+                (IdentityLinkErrorResponse) response.getBody();
+        assertThat(body.reasonCode())
+                .isEqualTo("REAUTHENTICATION_REQUIRED");
     }
 }

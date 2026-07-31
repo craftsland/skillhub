@@ -1,13 +1,25 @@
 package com.iflytek.skillhub.auth.oauth;
 
 import com.iflytek.skillhub.auth.identity.ExternalIdentityLoginService;
+import com.iflytek.skillhub.auth.identity.ExternalIdentityLinkService;
+import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import com.iflytek.skillhub.auth.identity.TrustedProviderRouteResolver;
+import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
+import com.iflytek.skillhub.auth.session.PlatformSessionService;
 import jakarta.servlet.http.HttpSession;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -15,6 +27,7 @@ import static org.mockito.Mockito.mock;
 class OAuth2AuthorizationRequestResolverTest {
 
     private SkillHubOAuth2AuthorizationRequestResolver resolver;
+    private OAuthLoginFlowService oauthLoginFlowService;
 
     @BeforeEach
     void setUp() {
@@ -30,15 +43,62 @@ class OAuth2AuthorizationRequestResolverTest {
                 .scope("read:user")
                 .clientName("GitHub")
                 .build();
-        OAuthLoginFlowService oauthLoginFlowService = new OAuthLoginFlowService(
+        oauthLoginFlowService = new OAuthLoginFlowService(
                 java.util.List.of(),
                 mock(TrustedProviderRouteResolver.class),
-                mock(ExternalIdentityLoginService.class)
+                mock(ExternalIdentityLoginService.class),
+                mock(ExternalIdentityLinkService.class),
+                mock(IdentityLinkSessionManager.class)
         );
         resolver = new SkillHubOAuth2AuthorizationRequestResolver(
                 new InMemoryClientRegistrationRepository(github),
-                oauthLoginFlowService
+                oauthLoginFlowService,
+                mock(IdentityLinkSessionManager.class)
         );
+    }
+
+    @Test
+    void resolve_preservesReturnToAcrossCallbackUntilSuccessHandler()
+            throws Exception {
+        String returnTo =
+                "/settings/security?identityLink=linked"
+                        + "&intentId=7d26c414-6040-48b5-b025-53a16b8aa6b9";
+        MockHttpServletRequest authorizationRequest =
+                oauthRequest("/oauth2/authorization/github");
+        authorizationRequest.setParameter("returnTo", returnTo);
+
+        assertThat(resolver.resolve(authorizationRequest)).isNotNull();
+
+        MockHttpSession session =
+                (MockHttpSession) authorizationRequest.getSession(false);
+        assertThat(session).isNotNull();
+        assertThat(session.getAttribute(
+                OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE))
+                .isEqualTo(returnTo);
+
+        MockHttpServletRequest callbackRequest =
+                oauthRequest("/login/oauth2/code/github");
+        callbackRequest.setSession(session);
+        assertThat(resolver.resolve(callbackRequest)).isNull();
+        assertThat(session.getAttribute(
+                OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE))
+                .isEqualTo(returnTo);
+
+        OAuth2LoginSuccessHandler successHandler =
+                new OAuth2LoginSuccessHandler(
+                        new PlatformSessionService(),
+                        oauthLoginFlowService);
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+        successHandler.onAuthenticationSuccess(
+                callbackRequest,
+                response,
+                oauthAuthentication());
+
+        assertThat(response.getRedirectedUrl()).isEqualTo(returnTo);
+        assertThat(session.getAttribute(
+                OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE))
+                .isNull();
     }
 
     @Test
@@ -64,5 +124,42 @@ class OAuth2AuthorizationRequestResolverTest {
         HttpSession session = request.getSession(false);
         assertThat(session).isNotNull();
         assertThat(session.getAttribute(OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE)).isNull();
+    }
+
+    @Test
+    void resolve_nonAuthorizationRequestDoesNotCreateSession() {
+        MockHttpServletRequest request =
+                oauthRequest("/login/oauth2/code/github");
+
+        assertThat(resolver.resolve(request)).isNull();
+        assertThat(request.getSession(false)).isNull();
+    }
+
+    private MockHttpServletRequest oauthRequest(String path) {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("GET", path);
+        request.setServletPath(path);
+        return request;
+    }
+
+    private Authentication oauthAuthentication() {
+        PlatformPrincipal principal = new PlatformPrincipal(
+                "user-1",
+                "User",
+                "user@example.com",
+                null,
+                "github",
+                Set.of());
+        return new UsernamePasswordAuthenticationToken(
+                new DefaultOAuth2User(
+                        List.of(),
+                        Map.of(
+                                "platformPrincipal",
+                                principal,
+                                "login",
+                                "user"),
+                        "login"),
+                null,
+                List.of());
     }
 }

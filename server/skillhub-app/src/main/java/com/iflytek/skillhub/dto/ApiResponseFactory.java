@@ -32,4 +32,34 @@ public class ApiResponseFactory {
     public ApiResponse<Void> errorMessage(int code, String msg) {
         return new ApiResponse<>(code, msg, null, Instant.now(clock), MDC.get("requestId"));
     }
+
+    public IdentityLinkErrorResponse identityLinkError(
+            int code,
+            String messageCode,
+            String reasonCode,
+            Object... args) {
+        String msg = messageSource.getMessage(
+                messageCode,
+                args,
+                messageCode,
+                LocaleContextHolder.getLocale());
+        return new IdentityLinkErrorResponse(
+                code,
+                msg,
+                reasonCode,
+                Instant.now(clock),
+                MDC.get("requestId"));
+    }
+
+    public IdentityLinkErrorResponse identityLinkErrorMessage(
+            int code,
+            String message,
+            String reasonCode) {
+        return new IdentityLinkErrorResponse(
+                code,
+                message,
+                reasonCode,
+                Instant.now(clock),
+                MDC.get("requestId"));
+    }
 }

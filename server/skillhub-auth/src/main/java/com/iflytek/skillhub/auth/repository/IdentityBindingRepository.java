@@ -16,7 +16,10 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface IdentityBindingRepository extends JpaRepository<IdentityBinding, Long> {
-    Optional<IdentityBinding> findByProviderCodeAndSubject(String providerCode, String subject);
+    Optional<IdentityBinding> findByProviderCodeAndSubjectAndStatus(
+            String providerCode,
+            String subject,
+            IdentityBindingStatus status);
 
     @Query("""
             select distinct binding.providerCode
@@ -39,4 +42,8 @@ public interface IdentityBindingRepository extends JpaRepository<IdentityBinding
     boolean existsByProviderCode(String providerCode);
 
     List<IdentityBinding> findByUserId(String userId);
+
+    List<IdentityBinding> findByUserIdAndStatus(
+            String userId,
+            IdentityBindingStatus status);
 }

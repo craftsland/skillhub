@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.iflytek.skillhub.auth.identity.IdentityCoreException;
 import com.iflytek.skillhub.auth.identity.IdentityFailureCode;
 import com.iflytek.skillhub.auth.identity.IdentityProviderReadinessService;
+import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ class IdentityProviderRouteReadinessFilterTest {
     private ClientRegistrationRepository registrationRepository;
     private IdentityProviderReadinessService readinessService;
     private ClientRegistration registration;
+    private OAuth2LoginFailureHandler failureHandler;
     private IdentityProviderRouteReadinessFilter filter;
 
     @BeforeEach
@@ -33,12 +35,15 @@ class IdentityProviderRouteReadinessFilterTest {
                 ClientRegistrationRepository.class);
         readinessService = mock(
                 IdentityProviderReadinessService.class);
+        failureHandler = mock(
+                OAuth2LoginFailureHandler.class);
         registration = registration();
         when(registrationRepository.findByRegistrationId("github"))
                 .thenReturn(registration);
         filter = new IdentityProviderRouteReadinessFilter(
                 registrationRepository,
-                readinessService);
+                readinessService,
+                failureHandler);
     }
 
     @Test
@@ -72,6 +77,32 @@ class IdentityProviderRouteReadinessFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(503);
         assertThat(response.isCommitted()).isFalse();
+        verify(chain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void mismatchCallbackRedirectsOwnedIdentityLinkFlow()
+            throws Exception {
+        FilterChain chain = mock(FilterChain.class);
+        doThrow(new IdentityCoreException(
+                IdentityFailureCode.PROVIDER_AUTHORITY_MISMATCH))
+                .when(readinessService).requireReady(registration);
+        MockHttpServletRequest request = request(
+                "/login/oauth2/code/github");
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+        when(failureHandler.redirectIdentityLinkRouteFailure(
+                request,
+                response,
+                IdentityLinkFailureCode.PROVIDER_UNAVAILABLE))
+                .thenReturn(true);
+
+        filter.doFilter(request, response, chain);
+
+        verify(failureHandler).redirectIdentityLinkRouteFailure(
+                request,
+                response,
+                IdentityLinkFailureCode.PROVIDER_UNAVAILABLE);
         verify(chain, never()).doFilter(request, response);
     }
 

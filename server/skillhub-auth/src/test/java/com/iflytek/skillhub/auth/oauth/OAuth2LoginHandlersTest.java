@@ -1,5 +1,7 @@
 package com.iflytek.skillhub.auth.oauth;
 
+import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
+import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -15,7 +17,9 @@ import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -104,7 +108,9 @@ class OAuth2LoginHandlersTest {
     @Test
     void failureHandler_redirectsBackToLoginWithReturnTo() throws Exception {
         OAuthLoginFlowService oauthLoginFlowService = mock(OAuthLoginFlowService.class);
-        OAuth2LoginFailureHandler handler = new OAuth2LoginFailureHandler(oauthLoginFlowService);
+        OAuth2LoginFailureHandler handler = new OAuth2LoginFailureHandler(
+                oauthLoginFlowService,
+                mock(IdentityLinkSessionManager.class));
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         HttpSession session = request.getSession(true);
@@ -129,5 +135,130 @@ class OAuth2LoginHandlersTest {
 
         assertThat(response.getRedirectedUrl()).isEqualTo("/login?returnTo=%2Fsettings%2Faccounts");
         assertThat(session.getAttribute(OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE)).isNull();
+    }
+
+    @Test
+    void failureHandler_preservesIdentityLinkIntentForRetry()
+            throws Exception {
+        OAuthLoginFlowService oauthLoginFlowService =
+                mock(OAuthLoginFlowService.class);
+        IdentityLinkSessionManager sessionManager =
+                mock(IdentityLinkSessionManager.class);
+        OAuth2LoginFailureHandler handler =
+                new OAuth2LoginFailureHandler(
+                        oauthLoginFlowService,
+                        sessionManager);
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+        HttpSession session = request.getSession(true);
+        UUID intentId = UUID.randomUUID();
+        org.mockito.Mockito.when(
+                sessionManager.consumeFailedBrowserFlow(session))
+                .thenReturn(Optional.of(intentId));
+
+        handler.onAuthenticationFailure(
+                request,
+                response,
+                new OAuth2AuthenticationException(
+                        new OAuth2Error("access_denied")));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo(
+                        "/settings/security?identityLink=failed"
+                                + "&intentId="
+                                + intentId
+                                + "&reasonCode="
+                                + "PROVIDER_AUTHENTICATION_FAILED");
+        org.mockito.Mockito.verify(
+                oauthLoginFlowService,
+                org.mockito.Mockito.never())
+                .resolveFailureRedirect(
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void failureHandler_preservesStableIdentityLinkReasonCode()
+            throws Exception {
+        OAuthLoginFlowService oauthLoginFlowService =
+                mock(OAuthLoginFlowService.class);
+        IdentityLinkSessionManager sessionManager =
+                mock(IdentityLinkSessionManager.class);
+        OAuth2LoginFailureHandler handler =
+                new OAuth2LoginFailureHandler(
+                        oauthLoginFlowService,
+                        sessionManager);
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+        HttpSession session = request.getSession(true);
+        UUID intentId = UUID.randomUUID();
+        OAuth2AuthenticationException failure =
+                new OAuth2AuthenticationException(
+                        new OAuth2Error(
+                                "identity_link_failed",
+                                "PROVIDER_UNAVAILABLE",
+                                null));
+        org.mockito.Mockito.when(
+                sessionManager.consumeFailedBrowserFlow(session))
+                .thenReturn(Optional.of(intentId));
+        org.mockito.Mockito.when(
+                oauthLoginFlowService
+                        .identityLinkFailureReasonCode(failure))
+                .thenReturn(Optional.of(
+                        "PROVIDER_UNAVAILABLE"));
+
+        handler.onAuthenticationFailure(
+                request,
+                response,
+                failure);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo(
+                        "/settings/security?identityLink=failed"
+                                + "&intentId="
+                                + intentId
+                                + "&reasonCode=PROVIDER_UNAVAILABLE");
+    }
+
+    @Test
+    void routeFailureRedirectsOnlyAnOwnedIdentityLinkFlow()
+            throws Exception {
+        OAuthLoginFlowService oauthLoginFlowService =
+                mock(OAuthLoginFlowService.class);
+        IdentityLinkSessionManager sessionManager =
+                mock(IdentityLinkSessionManager.class);
+        OAuth2LoginFailureHandler handler =
+                new OAuth2LoginFailureHandler(
+                        oauthLoginFlowService,
+                        sessionManager);
+        MockHttpServletRequest request =
+                new MockHttpServletRequest();
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+        HttpSession session = request.getSession(true);
+        UUID intentId = UUID.randomUUID();
+        org.mockito.Mockito.when(
+                sessionManager.consumeFailedBrowserFlow(session))
+                .thenReturn(Optional.of(intentId));
+
+        boolean redirected =
+                handler.redirectIdentityLinkRouteFailure(
+                        request,
+                        response,
+                        IdentityLinkFailureCode.PROVIDER_UNAVAILABLE);
+
+        assertThat(redirected).isTrue();
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo(
+                        "/settings/security?identityLink=failed"
+                                + "&intentId="
+                                + intentId
+                                + "&reasonCode=PROVIDER_UNAVAILABLE");
+        org.mockito.Mockito.verify(oauthLoginFlowService)
+                .consumeReturnTo(session);
     }
 }

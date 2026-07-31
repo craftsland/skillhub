@@ -14,6 +14,7 @@ import com.iflytek.skillhub.auth.entity.Role;
 import com.iflytek.skillhub.auth.entity.UserRoleBinding;
 import com.iflytek.skillhub.auth.identity.AccountLoginGuard;
 import com.iflytek.skillhub.auth.identity.PlatformPrincipalFactory;
+import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
 import com.iflytek.skillhub.domain.namespace.GlobalNamespaceMembershipService;
 import com.iflytek.skillhub.domain.user.UserAccount;
@@ -99,7 +100,7 @@ class LocalAuthServiceTest {
         given(role.getCode()).willReturn("USER_ADMIN");
         UserRoleBinding binding = new UserRoleBinding("usr_1", role);
 
-        given(credentialRepository.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(credential));
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("alice")).willReturn(Optional.of(credential));
         given(userAccountRepository.findById("usr_1")).willReturn(Optional.of(user));
         given(passwordEncoder.matches("Abcd123!", "encoded")).willReturn(true);
         given(userRoleBindingRepository.findByUserId("usr_1")).willReturn(List.of(binding));
@@ -116,7 +117,7 @@ class LocalAuthServiceTest {
         LocalCredential credential = new LocalCredential("usr_1", "alice", "encoded");
         UserAccount user = new UserAccount("usr_1", "alice", "alice@example.com", null);
 
-        given(credentialRepository.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(credential));
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("alice")).willReturn(Optional.of(credential));
         given(userAccountRepository.findById("usr_1")).willReturn(Optional.of(user));
         given(passwordEncoder.matches("bad", "encoded")).willReturn(false);
 
@@ -135,7 +136,7 @@ class LocalAuthServiceTest {
         credential.setFailedAttempts(4);
         UserAccount user = new UserAccount("usr_1", "alice", "alice@example.com", null);
 
-        given(credentialRepository.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(credential));
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("alice")).willReturn(Optional.of(credential));
         given(userAccountRepository.findById("usr_1")).willReturn(Optional.of(user));
         given(passwordEncoder.matches("bad", "encoded")).willReturn(false);
 
@@ -153,7 +154,7 @@ class LocalAuthServiceTest {
         credential.setLockedUntil(Instant.now(CLOCK).plusSeconds(5 * 60));
         UserAccount user = new UserAccount("usr_1", "alice", "alice@example.com", null);
 
-        given(credentialRepository.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(credential));
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("alice")).willReturn(Optional.of(credential));
         given(userAccountRepository.findById("usr_1")).willReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.login("alice", "Abcd123!"))
@@ -163,7 +164,7 @@ class LocalAuthServiceTest {
 
     @Test
     void login_withUnknownUsername_stillPerformsDummyPasswordCheck() {
-        given(credentialRepository.findByUsernameIgnoreCase("ghost")).willReturn(Optional.empty());
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("ghost")).willReturn(Optional.empty());
         given(passwordEncoder.matches(eq("bad"), eq("$2a$12$8Q/2o2A0V.b18G2DutV4c.s5zZxH6MECM7tP8mYv6b6Q6x6o9v3vu")))
             .willReturn(false);
 
@@ -182,7 +183,7 @@ class LocalAuthServiceTest {
         UserAccount user = new UserAccount("usr_1", "alice", "alice@example.com", null);
         user.setStatus(UserStatus.DISABLED);
 
-        given(credentialRepository.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(credential));
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("alice")).willReturn(Optional.of(credential));
         given(userAccountRepository.findById("usr_1")).willReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.login("alice", "Abcd123!"))
@@ -196,7 +197,7 @@ class LocalAuthServiceTest {
         UserAccount user = new UserAccount("usr_1", "alice", "alice@example.com", null);
         user.setStatus(UserStatus.PENDING);
 
-        given(credentialRepository.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(credential));
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("alice")).willReturn(Optional.of(credential));
         given(userAccountRepository.findById("usr_1")).willReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.login("alice", "Abcd123!"))
@@ -210,7 +211,7 @@ class LocalAuthServiceTest {
         UserAccount user = new UserAccount("usr_1", "alice", "alice@example.com", null);
         user.setStatus(UserStatus.MERGED);
 
-        given(credentialRepository.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(credential));
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("alice")).willReturn(Optional.of(credential));
         given(userAccountRepository.findById("usr_1")).willReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.login("alice", "Abcd123!"))
@@ -225,7 +226,7 @@ class LocalAuthServiceTest {
         UserAccount user = UserAccount.systemAccount(
             "system_1", "system", null, null);
 
-        given(credentialRepository.findByUsernameIgnoreCase("system"))
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("system"))
             .willReturn(Optional.of(credential));
         given(userAccountRepository.findById("system_1"))
             .willReturn(Optional.of(user));
@@ -242,7 +243,7 @@ class LocalAuthServiceTest {
         LocalCredential credential = new LocalCredential("usr_1", "alice", "encoded");
         UserAccount user = new UserAccount("usr_1", "alice", "alice@example.com", null);
 
-        given(credentialRepository.findByUsernameIgnoreCase("alice")).willReturn(Optional.of(credential));
+        given(credentialRepository.findByUsernameIgnoreCaseForUpdate("alice")).willReturn(Optional.of(credential));
         given(userAccountRepository.findById("usr_1")).willReturn(Optional.of(user));
         given(passwordEncoder.matches("Abcd123!", "encoded")).willReturn(true);
         given(userRoleBindingRepository.findByUserId("usr_1")).willReturn(List.of());
@@ -250,6 +251,77 @@ class LocalAuthServiceTest {
         var principal = service.login("alice", "Abcd123!");
 
         assertThat(principal.platformRoles()).containsExactly("USER");
+    }
+
+    @Test
+    void reauthenticate_withCurrentUsersPassword_returnsPrincipal() {
+        LocalCredential credential =
+            new LocalCredential("usr_1", "alice", "encoded");
+        UserAccount user =
+            new UserAccount(
+                "usr_1",
+                "alice",
+                "alice@example.com",
+                null);
+        given(credentialRepository.findByUserIdForUpdate("usr_1"))
+            .willReturn(Optional.of(credential));
+        given(userAccountRepository.findById("usr_1"))
+            .willReturn(Optional.of(user));
+        given(passwordEncoder.matches("Abcd123!", "encoded"))
+            .willReturn(true);
+        given(userRoleBindingRepository.findByUserId("usr_1"))
+            .willReturn(List.of());
+
+        PlatformPrincipal principal = service.reauthenticate(
+            "usr_1",
+            "Abcd123!");
+
+        assertThat(principal.userId()).isEqualTo("usr_1");
+        assertThat(principal.oauthProvider()).isEqualTo("local");
+        verify(credentialRepository).save(credential);
+    }
+
+    @Test
+    void reauthenticate_withInvalidPassword_updatesLockCounters() {
+        LocalCredential credential =
+            new LocalCredential("usr_1", "alice", "encoded");
+        credential.setFailedAttempts(4);
+        UserAccount user =
+            new UserAccount(
+                "usr_1",
+                "alice",
+                "alice@example.com",
+                null);
+        given(credentialRepository.findByUserIdForUpdate("usr_1"))
+            .willReturn(Optional.of(credential));
+        given(userAccountRepository.findById("usr_1"))
+            .willReturn(Optional.of(user));
+        given(passwordEncoder.matches("bad", "encoded"))
+            .willReturn(false);
+
+        assertThatThrownBy(() ->
+            service.reauthenticate("usr_1", "bad"))
+            .isInstanceOf(AuthFlowException.class)
+            .extracting("status")
+            .isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        assertThat(credential.getFailedAttempts()).isEqualTo(5);
+        assertThat(credential.getLockedUntil())
+            .isEqualTo(Instant.now(CLOCK).plusSeconds(15 * 60));
+        verify(credentialRepository).save(credential);
+    }
+
+    @Test
+    void reauthenticate_withoutLocalCredential_doesNotCheckPassword() {
+        given(credentialRepository.findByUserIdForUpdate("oauth-only"))
+            .willReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+            service.reauthenticate("oauth-only", "secret"))
+            .isInstanceOf(AuthFlowException.class)
+            .hasMessageContaining("error.auth.local.notEnabled");
+
+        verify(passwordEncoder, never()).matches(any(), any());
     }
 
     @Test

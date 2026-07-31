@@ -80,7 +80,8 @@ class IdentityResolutionTransactionTest {
                 auditLogService);
         when(subjectRepository.findMatchingSubjects(any(), any()))
                 .thenReturn(List.of());
-        when(bindingRepository.findByProviderCodeAndSubject(
+        when(bindingRepository.findByProviderCodeAndSubjectAndStatus(
+                any(),
                 any(),
                 any())).thenReturn(Optional.empty());
         when(userRepository.save(any(UserAccount.class)))
@@ -309,9 +310,11 @@ class IdentityResolutionTransactionTest {
                         "123456",
                         true);
         UserAccount user = user("usr_1", UserStatus.ACTIVE, false);
-        when(bindingRepository.findByProviderCodeAndSubject(
+        when(bindingRepository.findByProviderCodeAndSubjectAndStatus(
                 "github",
-                "123456")).thenReturn(Optional.of(binding));
+                "123456",
+                IdentityBindingStatus.ACTIVE))
+                .thenReturn(Optional.of(binding));
         when(bindingRepository.findByIdAndStatusForUpdate(
                 1L,
                 IdentityBindingStatus.ACTIVE))
@@ -394,9 +397,11 @@ class IdentityResolutionTransactionTest {
         when(subjectRepository.findMatchingSubjects(
                 org.mockito.ArgumentMatchers.eq("provider"),
                 any())).thenReturn(List.of(alias, stable));
-        when(bindingRepository.findByProviderCodeAndSubject(
+        when(bindingRepository.findByProviderCodeAndSubjectAndStatus(
                 "provider",
-                "legacy-123")).thenReturn(Optional.of(binding));
+                "legacy-123",
+                IdentityBindingStatus.ACTIVE))
+                .thenReturn(Optional.of(binding));
         when(bindingRepository.findByIdAndStatusForUpdate(
                 1L,
                 IdentityBindingStatus.ACTIVE))
@@ -507,9 +512,11 @@ class IdentityResolutionTransactionTest {
                 "github",
                 "123456");
         UserAccount user = user("usr_1", UserStatus.PENDING, false);
-        when(bindingRepository.findByProviderCodeAndSubject(
+        when(bindingRepository.findByProviderCodeAndSubjectAndStatus(
                 "github",
-                "123456")).thenReturn(Optional.of(binding));
+                "123456",
+                IdentityBindingStatus.ACTIVE))
+                .thenReturn(Optional.of(binding));
         when(bindingRepository.findByIdAndStatusForUpdate(
                 1L,
                 IdentityBindingStatus.ACTIVE))
@@ -554,9 +561,11 @@ class IdentityResolutionTransactionTest {
                 "github",
                 "123456");
         UserAccount user = user("usr_1", UserStatus.PENDING, false);
-        when(bindingRepository.findByProviderCodeAndSubject(
+        when(bindingRepository.findByProviderCodeAndSubjectAndStatus(
                 "github",
-                "123456")).thenReturn(Optional.of(binding));
+                "123456",
+                IdentityBindingStatus.ACTIVE))
+                .thenReturn(Optional.of(binding));
         when(bindingRepository.findByIdAndStatusForUpdate(
                 1L,
                 IdentityBindingStatus.ACTIVE))
@@ -614,9 +623,11 @@ class IdentityResolutionTransactionTest {
                 "github",
                 "123456");
         UserAccount user = user("usr_blocked", status, system);
-        when(bindingRepository.findByProviderCodeAndSubject(
+        when(bindingRepository.findByProviderCodeAndSubjectAndStatus(
                 "github",
-                "123456")).thenReturn(Optional.of(binding));
+                "123456",
+                IdentityBindingStatus.ACTIVE))
+                .thenReturn(Optional.of(binding));
         when(bindingRepository.findByIdAndStatusForUpdate(
                 1L,
                 IdentityBindingStatus.ACTIVE))

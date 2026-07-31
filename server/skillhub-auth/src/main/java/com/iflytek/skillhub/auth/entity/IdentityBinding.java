@@ -16,11 +16,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "identity_binding",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"provider_code", "subject"}))
+@Table(name = "identity_binding")
 public class IdentityBinding {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -122,5 +120,33 @@ public class IdentityBinding {
                 || synchronizedAt.isAfter(lastSynchronizedAt))) {
             lastSynchronizedAt = synchronizedAt;
         }
+    }
+
+    public void revoke(
+            String actorUserId,
+            String reason,
+            Instant revokedAt) {
+        if (status != IdentityBindingStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Only an active identity binding can be revoked");
+        }
+        if (actorUserId == null
+                || actorUserId.isBlank()
+                || actorUserId.length() > 128) {
+            throw new IllegalArgumentException(
+                    "Invalid identity binding revocation actor");
+        }
+        if (reason == null
+                || reason.isBlank()
+                || reason.length() > 256) {
+            throw new IllegalArgumentException(
+                    "Invalid identity binding revocation reason");
+        }
+        status = IdentityBindingStatus.REVOKED;
+        this.revokedAt = java.util.Objects.requireNonNull(
+                revokedAt,
+                "revokedAt");
+        revokedBy = actorUserId;
+        revocationReason = reason;
     }
 }

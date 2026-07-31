@@ -65,13 +65,33 @@ jobs:
       - name: Verify Binding V2 migration and concurrency on PostgreSQL
         run: bash scripts/tests/identity-binding-v2-postgres-test.sh
 
+      - name: Start loopback identity provider for Identity Link
+        run: |
+          python3 scripts/tests/oauth2-mock-provider.py --port 18081 \
+            > /tmp/skillhub-oauth2-mock.log 2>&1 &
+          echo "$!" > /tmp/skillhub-oauth2-mock.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent \
+              http://127.0.0.1:18081/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
       - name: Start full dev stack
+        env:
+          OAUTH2_GITLAB_BASE_URI: http://127.0.0.1:18081
+          OAUTH2_GITLAB_CLIENT_ID: skillhub-e2e
+          OAUTH2_GITLAB_CLIENT_SECRET: skillhub-e2e-secret
         run: make dev-all
 
       - name: Install Playwright browsers
         run: cd web && pnpm exec playwright install --with-deps chromium
 
       - name: Run frontend E2E tests
+        env:
+          E2E_IDENTITY_LINK_BROWSER_PROVIDER: gitlab
         run: make test-e2e-frontend
 
       - name: Upload Playwright HTML report
@@ -95,3 +115,10 @@ jobs:
       - name: Stop full dev stack
         if: ${{ always() }}
         run: make dev-all-down
+
+      - name: Stop loopback identity provider
+        if: ${{ always() }}
+        run: |
+          if [[ -f /tmp/skillhub-oauth2-mock.pid ]]; then
+            kill "$(cat /tmp/skillhub-oauth2-mock.pid)" 2>/dev/null || true
+          fi
