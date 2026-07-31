@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.auth.identity;
 
+import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
 import java.sql.SQLException;
 import java.util.Objects;
 import org.slf4j.Logger;
@@ -80,6 +81,41 @@ class DefaultExternalIdentityLoginService
                     metricProvider,
                     metricProtocol);
             throw exception;
+        }
+    }
+
+    @Override
+    public void recordProviderAuthenticationFailure(
+            ResolvedProviderHandle provider,
+            ProviderAuthenticationFailureCode failureCode,
+            IdentityLoginContext context) {
+        Objects.requireNonNull(provider, "provider");
+        Objects.requireNonNull(failureCode, "failureCode");
+        Objects.requireNonNull(context, "context");
+
+        String providerCode = provider.providerCode();
+        String protocol = "unknown";
+        try {
+            ProviderDescriptor descriptor = descriptorSource.require(provider);
+            providerCode = descriptor.providerCode();
+            protocol = descriptor.protocol();
+        } catch (RuntimeException descriptorFailure) {
+            log.warn(
+                    "Unable to resolve provider descriptor for denial audit '{}'",
+                    providerCode);
+        }
+        try {
+            securityAuditWriter.recordProviderDenied(
+                    providerCode,
+                    protocol,
+                    failureCode,
+                    context);
+        } catch (RuntimeException auditFailure) {
+            log.error(
+                    "Provider denial audit failed for provider '{}' and reason '{}'",
+                    providerCode,
+                    failureCode,
+                    auditFailure);
         }
     }
 

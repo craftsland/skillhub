@@ -169,6 +169,21 @@ display name、email 和 avatar 的覆盖行为继续由统一身份核心的 Pr
 
 低基数指标名为 `skillhub.auth.ldap`，标签只包含 `provider`、`transport` 和 `result`。
 
+部署后的最小 operator smoke 可以使用仓库中的脚本执行。凭据只通过环境变量传入，不会
+写入脚本或日志：
+
+```bash
+LDAP_SMOKE_PROVIDER=ldap-main \\
+LDAP_SMOKE_USERNAME=alice \\
+LDAP_SMOKE_PASSWORD="$LDAP_TEST_PASSWORD" \\
+LDAP_SMOKE_RENAMED_USERNAME=alice-renamed \\
+./scripts/ldap-smoke-test.sh http://127.0.0.1:8080
+```
+
+脚本验证健康检查、认证目录、首次/重复登录、错误密码、未知账号、响应脱敏，并在提供
+`LDAP_SMOKE_RENAMED_USERNAME` 时验证 username 变化仍解析到同一平台用户。email collision、
+多结果、Subject 缺失和 TLS 证书错误需要由真实目录 fixture 或部署配置单独覆盖。
+
 ## 6. 升级与回滚
 
 - 新 Provider 和全部配置默认关闭，不修改数据库 schema、Spring Session 序列化或现有

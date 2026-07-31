@@ -70,7 +70,8 @@ public class DirectAuthService {
             var result = authenticate(
                     route,
                     username,
-                    password);
+                    password,
+                    request);
             if (result == null) {
                 throw new AuthFlowException(
                         HttpStatus.UNAUTHORIZED,
@@ -89,13 +90,18 @@ public class DirectAuthService {
     private ProviderAuthenticationResult authenticate(
             IdentityProviderRegistry.CredentialRoute route,
             String username,
-            String password) {
+            String password,
+            HttpServletRequest request) {
         try {
             return route.adapter().authenticate(
                     new CredentialAuthenticationRequest(
-                            username,
-                            password));
+                        username,
+                        password));
         } catch (ProviderAuthenticationException exception) {
+            providerLoginAppService.recordProviderAuthenticationFailure(
+                    route.provider(),
+                    exception,
+                    request);
             throw ProviderAuthenticationFailureMapper.map(exception);
         }
     }

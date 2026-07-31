@@ -2,8 +2,12 @@ package com.iflytek.skillhub.auth.identity;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -120,13 +124,9 @@ final class IdentityAssertionFactory {
                     return primarySubject.value();
                 });
 
-        Optional<EmailClaim> email = firstValue(
-                result.attributes(), descriptor.emailAttributes())
-                .filter(value -> !value.value().isBlank())
-                .map(value -> new EmailClaim(
-                        value.value(),
-                        emailAssurance(descriptor, value)
-                                .clampTo(descriptor.emailAssuranceLimit())));
+        Optional<EmailClaim> email = selectEmail(
+                descriptor,
+                result.attributes());
 
         Optional<URI> avatarUrl = firstValue(
                 result.attributes(), descriptor.avatarAttributes())
@@ -147,6 +147,95 @@ final class IdentityAssertionFactory {
             }
         }
         return Optional.empty();
+    }
+
+    private Optional<EmailClaim> selectEmail(
+            ProviderDescriptor descriptor,
+            Map<String, List<ProviderAttributeValue>> attributes) {
+        List<EmailCandidate> candidates = new ArrayList<>();
+        for (int attributePriority = 0;
+                attributePriority < descriptor.emailAttributes().size();
+                attributePriority++) {
+            String attribute = descriptor.emailAttributes()
+                    .get(attributePriority);
+            List<ProviderAttributeValue> values = attributes.get(attribute);
+            if (values == null) {
+                continue;
+            }
+            for (ProviderAttributeValue value : values) {
+                Optional<String> normalized = normalizeEmail(value.value());
+                if (normalized.isEmpty()) {
+                    continue;
+                }
+                EmailAssurance assurance = emailAssurance(
+                        descriptor,
+                        value).clampTo(descriptor.emailAssuranceLimit());
+                candidates.add(new EmailCandidate(
+                        normalized.orElseThrow(),
+                        assurance,
+                        attributePriority));
+            }
+        }
+        if (candidates.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Map<String, EmailCandidate> deduplicated =
+                new LinkedHashMap<>();
+        for (EmailCandidate candidate : candidates) {
+            deduplicated.merge(
+                    candidate.value(),
+                    candidate,
+                    (existing, duplicate) -> existing.assurance().ordinal()
+                            >= duplicate.assurance().ordinal()
+                            ? existing
+                            : duplicate);
+        }
+
+        long trustedEmailCount = deduplicated.values().stream()
+                .filter(candidate -> candidate.assurance()
+                        .isVerifiedOrAuthoritative())
+                .map(EmailCandidate::value)
+                .distinct()
+                .count();
+        if (trustedEmailCount > 1) {
+            throw invalidAssertion();
+        }
+
+        return deduplicated.values().stream()
+                .min(Comparator
+                        .comparing(
+                                EmailCandidate::assurance,
+                                Comparator.reverseOrder())
+                        .thenComparingInt(EmailCandidate::attributePriority)
+                        .thenComparing(EmailCandidate::value))
+                .map(candidate -> new EmailClaim(
+                        candidate.value(),
+                        candidate.assurance()));
+    }
+
+    private Optional<String> normalizeEmail(String value) {
+        if (value == null) {
+            return Optional.empty();
+        }
+        String normalized = value.strip().toLowerCase(Locale.ROOT);
+        int at = normalized.indexOf('@');
+        if (normalized.length() > 256
+                || at <= 0
+                || at != normalized.lastIndexOf('@')
+                || at == normalized.length() - 1
+                || normalized.chars().anyMatch(
+                        character -> Character.isISOControl(character)
+                                || Character.isWhitespace(character))) {
+            return Optional.empty();
+        }
+        return Optional.of(normalized);
+    }
+
+    private record EmailCandidate(
+            String value,
+            EmailAssurance assurance,
+            int attributePriority) {
     }
 
     private URI parseAvatarUri(String value) {

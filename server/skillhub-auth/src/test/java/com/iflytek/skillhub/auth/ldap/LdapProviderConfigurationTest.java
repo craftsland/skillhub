@@ -86,6 +86,30 @@ class LdapProviderConfigurationTest {
                 .doesNotContain("bindPassword");
     }
 
+    @Test
+    void rejectsUnstableExplicitSubjectAttribute() {
+        LdapProperties properties = validProperties();
+        properties.setSubjectAttribute("uid");
+
+        assertThatThrownBy(() -> configuration(properties, "prod")
+                .requireResolved())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid LDAP provider configuration");
+    }
+
+    @Test
+    void rejectsUnstableCustomSubjectType() {
+        LdapProperties properties = validProperties();
+        properties.setDirectoryType("CUSTOM");
+        properties.setSubjectAttribute("immutableId");
+        properties.setSubjectType("mail");
+
+        assertThatThrownBy(() -> configuration(properties, "prod")
+                .requireResolved())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid LDAP provider configuration");
+    }
+
     private static LdapProviderConfiguration configuration(
             LdapProperties properties,
             String profile) {

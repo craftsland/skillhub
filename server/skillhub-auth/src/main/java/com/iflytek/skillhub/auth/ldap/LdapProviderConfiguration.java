@@ -34,6 +34,20 @@ final class LdapProviderConfiguration {
     private static final int MAX_SECRET_LENGTH = 4096;
     private static final int MAX_DN_LENGTH = 2048;
     private static final int MAX_FILTER_LENGTH = 1024;
+    private static final Set<String> UNSTABLE_SUBJECT_NAMES = Set.of(
+            "uid",
+            "mail",
+            "email",
+            "username",
+            "userprincipalname",
+            "samaccountname",
+            "cn",
+            "displayname",
+            "dn",
+            "distinguishedname",
+            "entrydn",
+            "uidnumber",
+            "employeenumber");
 
     private final LdapProperties properties;
     private final Environment environment;
@@ -83,6 +97,7 @@ final class LdapProviderConfiguration {
         String subjectType = optionalSubjectType(
                 properties.getSubjectType())
                 .orElseGet(() -> defaultSubjectType(directoryType));
+        validateSubjectMapping(subjectAttribute, subjectType);
         Optional<String> usernameAttribute = optionalAttribute(
                 properties.getUsernameAttribute());
         Optional<String> displayNameAttribute = optionalAttribute(
@@ -309,6 +324,23 @@ final class LdapProviderConfiguration {
             throw invalidConfiguration();
         }
         return Optional.of(value);
+    }
+
+    private void validateSubjectMapping(
+            String subjectAttribute,
+            String subjectType) {
+        if (isUnstableSubjectName(subjectAttribute)
+                || isUnstableSubjectName(subjectType)) {
+            throw invalidConfiguration();
+        }
+    }
+
+    private boolean isUnstableSubjectName(String value) {
+        String normalized = value
+                .toLowerCase(Locale.ROOT)
+                .replace("_", "")
+                .replace("-", "");
+        return UNSTABLE_SUBJECT_NAMES.contains(normalized);
     }
 
     private Duration requireDuration(Duration value) {

@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.auth.identity;
 
+import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
 import com.iflytek.skillhub.domain.audit.AuditLogService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -34,6 +35,29 @@ class IdentitySecurityAuditWriter {
         auditLogService.record(
                 null,
                 action,
+                "IDENTITY_PROVIDER",
+                null,
+                context.requestId(),
+                context.clientIp(),
+                context.userAgent(),
+                "{\"providerCode\":\""
+                        + providerCode
+                        + "\",\"protocol\":\""
+                        + protocol
+                        + "\",\"reason\":\""
+                        + failureCode.name()
+                        + "\"}");
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordProviderDenied(
+            String providerCode,
+            String protocol,
+            ProviderAuthenticationFailureCode failureCode,
+            IdentityLoginContext context) {
+        auditLogService.record(
+                null,
+                "IDENTITY_LOGIN_DENIED",
                 "IDENTITY_PROVIDER",
                 null,
                 context.requestId(),

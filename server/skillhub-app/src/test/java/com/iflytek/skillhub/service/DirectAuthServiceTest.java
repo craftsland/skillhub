@@ -226,7 +226,13 @@ class DirectAuthServiceTest {
                 .isEqualTo(
                         org.springframework.http.HttpStatus
                                 .SERVICE_UNAVAILABLE);
-        verifyNoInteractions(localAuth, providerLogin, sessions);
+        org.mockito.Mockito.verify(providerLogin)
+                .recordProviderAuthenticationFailure(
+                        org.mockito.ArgumentMatchers.eq(route.provider()),
+                        org.mockito.ArgumentMatchers.any(
+                                ProviderAuthenticationException.class),
+                        org.mockito.ArgumentMatchers.eq(request));
+        verifyNoInteractions(localAuth, sessions);
     }
 
     private static ProviderAuthenticationResult result() {
