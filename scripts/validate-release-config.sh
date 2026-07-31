@@ -222,8 +222,46 @@ validate_boolean BOOTSTRAP_ADMIN_ENABLED
 validate_boolean SKILLHUB_TRUST_FORWARDED_PROTO
 validate_boolean SKILLHUB_STORAGE_S3_FORCE_PATH_STYLE
 validate_boolean SKILLHUB_STORAGE_S3_AUTO_CREATE_BUCKET
+validate_boolean SKILLHUB_AUTH_CAS_ENABLED
+validate_boolean SKILLHUB_AUTH_CAS_ALLOW_INSECURE_FOR_TESTING
 validate_boolean SPRING_DATA_REDIS_SSL_ENABLED
 validate_boolean SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST
+
+if [ "${SKILLHUB_AUTH_CAS_ENABLED:-false}" = "true" ]; then
+  require_non_empty SKILLHUB_AUTH_CAS_PROVIDER_CODE
+  require_non_empty SKILLHUB_AUTH_CAS_DISPLAY_NAME
+  require_non_empty SKILLHUB_AUTH_CAS_AUTHORITY
+  require_non_empty SKILLHUB_AUTH_CAS_SERVER_URL
+  require_non_empty SKILLHUB_AUTH_CAS_SERVICE_URL
+  validate_url SKILLHUB_AUTH_CAS_SERVER_URL
+  validate_url SKILLHUB_AUTH_CAS_SERVICE_URL
+  case "${SKILLHUB_AUTH_CAS_SERVER_URL:-}" in
+    *\?*|*\#*) error "SKILLHUB_AUTH_CAS_SERVER_URL must not contain a query or fragment" ;;
+  esac
+  case "${SKILLHUB_AUTH_CAS_SERVICE_URL:-}" in
+    *\?*|*\#*) error "SKILLHUB_AUTH_CAS_SERVICE_URL must not contain a query or fragment" ;;
+  esac
+  case "${SKILLHUB_AUTH_CAS_SERVER_URL:-}" in
+    https://*) ;;
+    *) error "SKILLHUB_AUTH_CAS_SERVER_URL must use https in release deployments" ;;
+  esac
+  case "${SKILLHUB_AUTH_CAS_SERVICE_URL:-}" in
+    https://*) ;;
+    *) error "SKILLHUB_AUTH_CAS_SERVICE_URL must use https in release deployments" ;;
+  esac
+  case "${SKILLHUB_AUTH_CAS_PROTOCOL_VERSION:-3.0}" in
+    2.0|3.0) ;;
+    *) error "SKILLHUB_AUTH_CAS_PROTOCOL_VERSION must be 2.0 or 3.0" ;;
+  esac
+  expected_cas_callback="/api/v1/auth/cas/${SKILLHUB_AUTH_CAS_PROVIDER_CODE}/callback"
+  case "${SKILLHUB_AUTH_CAS_SERVICE_URL:-}" in
+    *"$expected_cas_callback") ;;
+    *) error "SKILLHUB_AUTH_CAS_SERVICE_URL must end with $expected_cas_callback" ;;
+  esac
+  if [ "${SKILLHUB_AUTH_CAS_ALLOW_INSECURE_FOR_TESTING:-false}" = "true" ]; then
+    error "SKILLHUB_AUTH_CAS_ALLOW_INSECURE_FOR_TESTING cannot be true in release deployments"
+  fi
+fi
 
 validate_port POSTGRES_PORT
 validate_port REDIS_PORT

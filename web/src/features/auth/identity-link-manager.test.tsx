@@ -163,6 +163,33 @@ describe('IdentityLinkManager', () => {
     expect(html).toMatch(/<button[^>]*disabled/)
   })
 
+  it('treats CAS as a browser identity link method', () => {
+    accountState = {
+      localPasswordEnabled: false,
+      linkedProviders: [{
+        bindingId: 43,
+        providerCode: 'cas-main',
+        displayName: 'Corporate CAS',
+        methodTypes: ['CAS_REDIRECT'],
+        usable: true,
+        canUnlink: true,
+      }],
+      availableProviders: [{
+        providerCode: 'cas-backup',
+        displayName: 'Backup CAS',
+        methodTypes: ['CAS_REDIRECT'],
+      }],
+    }
+
+    const html = renderToStaticMarkup(<IdentityLinkManager />)
+
+    expect(html).toContain('Corporate CAS')
+    expect(html).toContain('Backup CAS')
+    expect(html).not.toContain(
+      'security.identityLinks.noReauthenticationMethod',
+    )
+  })
+
   it('shows the browser-link success result after callback', () => {
     vi.stubGlobal('window', {
       location: {

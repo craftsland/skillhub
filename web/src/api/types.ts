@@ -15,9 +15,14 @@ export type OAuthProvider = Omit<components['schemas']['AuthProviderResponse'], 
   authorizationUrl: string
 }
 
-export interface AuthMethod {
+type AuthMethodSchema = components['schemas']['AuthMethodResponse']
+
+export type AuthMethod = Omit<
+  AuthMethodSchema,
+  'id' | 'methodType' | 'provider' | 'displayName' | 'actionUrl'
+> & {
   id: string
-  methodType: 'PASSWORD' | 'OAUTH_REDIRECT' | 'DIRECT_PASSWORD' | 'SESSION_BOOTSTRAP' | string
+  methodType: NonNullable<AuthMethodSchema['methodType']>
   provider: string
   displayName: string
   actionUrl: string

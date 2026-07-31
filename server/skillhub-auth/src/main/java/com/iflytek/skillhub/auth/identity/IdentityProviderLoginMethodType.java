@@ -5,6 +5,7 @@ package com.iflytek.skillhub.auth.identity;
  */
 public enum IdentityProviderLoginMethodType {
     OAUTH_REDIRECT,
+    CAS_REDIRECT,
     DIRECT_PASSWORD,
     SESSION_BOOTSTRAP
 }

@@ -12,6 +12,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.iflytek.skillhub.auth.provider.BrowserAuthenticationAdapter;
+import com.iflytek.skillhub.auth.provider.BrowserAuthenticationMethod;
 import com.iflytek.skillhub.auth.provider.CredentialAuthenticationAdapter;
 import com.iflytek.skillhub.auth.provider.CredentialAuthenticationRequest;
 import com.iflytek.skillhub.auth.provider.PassiveAuthenticationAdapter;
@@ -48,6 +50,7 @@ class ReconciledIdentityProviderCatalogTest {
                 authorityLockService,
                 bindingPreflightService,
                 new IdentityProviderPolicyProperties(),
+                List.of(),
                 List.of(),
                 List.of());
     }
@@ -173,6 +176,7 @@ class ReconciledIdentityProviderCatalogTest {
                 authorityLockService,
                 bindingPreflightService,
                 new IdentityProviderPolicyProperties(),
+                List.of(),
                 List.of(credential),
                 List.of(passive));
 
@@ -223,6 +227,7 @@ class ReconciledIdentityProviderCatalogTest {
                 authorityLockService,
                 bindingPreflightService,
                 new IdentityProviderPolicyProperties(),
+                List.of(),
                 List.of(adapter),
                 List.of());
 
@@ -256,6 +261,7 @@ class ReconciledIdentityProviderCatalogTest {
                 authorityLockService,
                 bindingPreflightService,
                 new IdentityProviderPolicyProperties(),
+                List.of(),
                 List.of(credential),
                 List.of(passive));
 
@@ -281,6 +287,7 @@ class ReconciledIdentityProviderCatalogTest {
                 authorityLockService,
                 bindingPreflightService,
                 new IdentityProviderPolicyProperties(),
+                List.of(),
                 List.of(adapter),
                 List.of());
 
@@ -288,6 +295,76 @@ class ReconciledIdentityProviderCatalogTest {
 
         assertThat(catalog.listReadyLoginMethods()).isEmpty();
         verify(adapter, never()).authenticate(any());
+    }
+
+    @Test
+    void registersAndRoutesReadyCasBrowserAdapterByExchangeType() {
+        BrowserAuthenticationAdapter<String> adapter =
+                new BrowserAuthenticationAdapter<>() {
+                    @Override
+                    public ProviderInstanceDefinition provider() {
+                        return new ProviderInstanceDefinition(
+                                "cas-main",
+                                "cas",
+                                "corp-cas",
+                                "Corporate CAS",
+                                "cas_principal",
+                                "cas_principal",
+                                Map.of(
+                                        "cas_principal",
+                                        SubjectNormalization.EXACT),
+                                List.of("display_name"),
+                                List.of("email"),
+                                List.of(),
+                                EmailAssurance.PROVIDER_ASSERTED);
+                    }
+
+                    @Override
+                    public Class<String> exchangeType() {
+                        return String.class;
+                    }
+
+                    @Override
+                    public BrowserAuthenticationMethod loginMethod() {
+                        return BrowserAuthenticationMethod.CAS_REDIRECT;
+                    }
+
+                    @Override
+                    public ProviderAuthenticationResult authenticate(
+                            String exchange) {
+                        throw new UnsupportedOperationException(
+                                "not called");
+                    }
+                };
+        when(descriptorSource.configuredDescriptors())
+                .thenReturn(List.of());
+        when(authorityLockService.isReady(any()))
+                .thenReturn(true);
+        catalog = new ReconciledIdentityProviderCatalog(
+                descriptorSource,
+                authorityLockService,
+                bindingPreflightService,
+                new IdentityProviderPolicyProperties(),
+                List.of(adapter),
+                List.of(),
+                List.of());
+
+        catalog.reconcile();
+
+        assertThat(catalog.listReadyLoginMethods())
+                .containsExactly(new IdentityProviderLoginMethod(
+                        "cas-main",
+                        "Corporate CAS",
+                        IdentityProviderLoginMethodType.CAS_REDIRECT));
+        assertThat(catalog.requireBrowserRoute(
+                "cas-main",
+                String.class).adapter()).isSameAs(adapter);
+        assertThatThrownBy(() -> catalog.requireBrowserRoute(
+                "cas-main",
+                Integer.class))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.PROVIDER_DISABLED);
     }
 
     private static ProviderDescriptor descriptor(

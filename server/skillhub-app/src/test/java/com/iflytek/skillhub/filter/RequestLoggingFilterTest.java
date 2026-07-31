@@ -6,6 +6,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.iflytek.skillhub.security.SensitiveLogSanitizer;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletResponse;
@@ -38,7 +39,7 @@ class RequestLoggingFilterTest {
     @Test
     void doFilterInternal_truncatesLongRequestBodyAndOmitsResponseBody()
             throws ServletException, IOException {
-        RequestLoggingFilter filter = new RequestLoggingFilter();
+        RequestLoggingFilter filter = filter();
         String longBody = "x".repeat(5_000);
         attachAppender();
 
@@ -69,7 +70,7 @@ class RequestLoggingFilterTest {
     @Test
     void doFilterInternal_skipsActuatorEndpoints()
             throws ServletException, IOException {
-        RequestLoggingFilter filter = new RequestLoggingFilter();
+        RequestLoggingFilter filter = filter();
         attachAppender();
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/health");
@@ -85,7 +86,7 @@ class RequestLoggingFilterTest {
     @Test
     void doFilterInternal_skipsOtherSseEndpointsWithoutWrappingResponse()
             throws ServletException, IOException {
-        RequestLoggingFilter filter = new RequestLoggingFilter();
+        RequestLoggingFilter filter = filter();
         attachAppender();
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/web/scan/sse");
@@ -110,7 +111,7 @@ class RequestLoggingFilterTest {
     @Test
     void doFilterInternal_logsCoreSummaryFields()
             throws ServletException, IOException {
-        RequestLoggingFilter filter = new RequestLoggingFilter();
+        RequestLoggingFilter filter = filter();
         attachAppender();
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/skills");
@@ -132,7 +133,7 @@ class RequestLoggingFilterTest {
 
     @Test
     void doFilterInternal_shouldBypassCachingWrapperForNotificationSse() throws Exception {
-        RequestLoggingFilter filter = new RequestLoggingFilter();
+        RequestLoggingFilter filter = filter();
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/web/notifications/sse");
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<ServletResponse> responseSeenByChain = new AtomicReference<>();
@@ -153,7 +154,7 @@ class RequestLoggingFilterTest {
 
     @Test
     void doFilterInternal_shouldKeepCachingWrapperForRegularApiResponses() throws Exception {
-        RequestLoggingFilter filter = new RequestLoggingFilter();
+        RequestLoggingFilter filter = filter();
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/web/notifications/unread-count");
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<ServletResponse> responseSeenByChain = new AtomicReference<>();
@@ -166,6 +167,46 @@ class RequestLoggingFilterTest {
 
         assertThat(responseSeenByChain.get()).isInstanceOf(ContentCachingResponseWrapper.class);
         assertThat(response.getContentAsString()).isEqualTo("{\"count\":1}");
+    }
+
+    @Test
+    void doFilterInternal_redactsCasQueryAndOmitsAuthBody()
+            throws Exception {
+        RequestLoggingFilter filter = filter();
+        attachAppender();
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/api/v1/auth/cas/cas-main/callback");
+        request.setQueryString(
+                "ticket=ST-request-log-secret&state=state-secret"
+                        + "&returnTo=%2Fdashboard");
+        request.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        request.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        request.setContent(
+                "{\"password\":\"body-secret\"}"
+                        .getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response =
+                new MockHttpServletResponse();
+
+        filter.doFilter(
+                request,
+                response,
+                (req, res) -> req.getReader().lines().count());
+
+        assertThat(loggedMessages()).anySatisfy(message -> {
+            assertThat(message)
+                    .contains("ticket=[REDACTED]")
+                    .contains("state=[REDACTED]")
+                    .contains("returnTo=%2Fdashboard")
+                    .doesNotContain("ST-request-log-secret")
+                    .doesNotContain("state-secret")
+                    .doesNotContain("body-secret");
+        });
+    }
+
+    private RequestLoggingFilter filter() {
+        return new RequestLoggingFilter(
+                new SensitiveLogSanitizer());
     }
 
     private void attachAppender() {

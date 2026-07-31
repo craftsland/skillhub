@@ -25,6 +25,7 @@ import com.iflytek.skillhub.dto.IdentityLinkProviderResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Application orchestration for explicit link/unlink workflows. Protocol I/O
@@ -182,12 +183,14 @@ public class IdentityLinkAppService {
                 session,
                 intentId,
                 context);
+        IdentityProviderLoginMethodType browserMethod =
+                requireBrowserMethod(providerCode);
         IdentityLinkIntent intent =
                 intentService.prepareExternalReauthentication(
-                actor,
-                intentId,
-                providerCode,
-                IdentityProviderLoginMethodType.OAUTH_REDIRECT);
+                        actor,
+                        intentId,
+                        providerCode,
+                        browserMethod);
         sessionManager.prepareBrowserFlow(
                 session,
                 intentId,
@@ -196,6 +199,7 @@ public class IdentityLinkAppService {
                 context);
         return browserAuthorizationUrl(
                 providerCode,
+                browserMethod,
                 "/settings/security?identityLink=reauthenticated"
                         + "&intentId="
                         + intentId);
@@ -209,10 +213,15 @@ public class IdentityLinkAppService {
                 session,
                 intentId,
                 context);
+        IdentityLinkIntent current = intentService.getIntent(
+                actor,
+                intentId);
+        IdentityProviderLoginMethodType browserMethod =
+                requireBrowserMethod(current.providerCode());
         IdentityLinkIntent intent = intentService.prepareExternalLink(
                 actor,
                 intentId,
-                IdentityProviderLoginMethodType.OAUTH_REDIRECT);
+                browserMethod);
         sessionManager.prepareBrowserFlow(
                 session,
                 intentId,
@@ -221,6 +230,7 @@ public class IdentityLinkAppService {
                 context);
         return browserAuthorizationUrl(
                 intent.providerCode(),
+                browserMethod,
                 "/settings/security?identityLink=linked"
                         + "&intentId="
                         + intentId);
@@ -326,13 +336,52 @@ public class IdentityLinkAppService {
 
     private String browserAuthorizationUrl(
             String providerCode,
+            IdentityProviderLoginMethodType methodType,
             String returnTo) {
-        return "/oauth2/authorization/"
-                + providerCode
-                + "?returnTo="
-                + java.net.URLEncoder.encode(
-                        returnTo,
-                        java.nio.charset.StandardCharsets.UTF_8);
+        if (methodType
+                == IdentityProviderLoginMethodType.OAUTH_REDIRECT) {
+            return "/oauth2/authorization/"
+                    + providerCode
+                    + "?returnTo="
+                    + java.net.URLEncoder.encode(
+                            returnTo,
+                            java.nio.charset.StandardCharsets.UTF_8);
+        }
+        if (methodType
+                == IdentityProviderLoginMethodType.CAS_REDIRECT) {
+            return UriComponentsBuilder
+                    .fromPath(
+                            "/api/v1/auth/cas/{providerCode}/login")
+                    .queryParam("returnTo", returnTo)
+                    .buildAndExpand(providerCode)
+                    .encode()
+                    .toUriString();
+        }
+        throw new IdentityLinkException(
+                IdentityLinkFailureCode.PROVIDER_UNAVAILABLE);
+    }
+
+    private IdentityProviderLoginMethodType requireBrowserMethod(
+            String providerCode) {
+        boolean casAvailable = false;
+        for (var method : providerRegistry.listReadyLoginMethods()) {
+            if (!method.providerCode().equals(providerCode)) {
+                continue;
+            }
+            if (method.methodType()
+                    == IdentityProviderLoginMethodType.OAUTH_REDIRECT) {
+                return IdentityProviderLoginMethodType.OAUTH_REDIRECT;
+            }
+            if (method.methodType()
+                    == IdentityProviderLoginMethodType.CAS_REDIRECT) {
+                casAvailable = true;
+            }
+        }
+        if (casAvailable) {
+            return IdentityProviderLoginMethodType.CAS_REDIRECT;
+        }
+        throw new IdentityLinkException(
+                IdentityLinkFailureCode.PROVIDER_UNAVAILABLE);
     }
 
     private IdentityLinkIntentResponse toResponse(

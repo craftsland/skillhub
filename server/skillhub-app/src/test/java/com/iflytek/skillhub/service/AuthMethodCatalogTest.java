@@ -111,4 +111,38 @@ class AuthMethodCatalogTest {
             .containsExactly("local-password", "oauth-github");
     }
 
+    @Test
+    void projectsCasAsFixedFirstPartyLoginRoute() {
+        IdentityProviderRegistry registry =
+            mock(IdentityProviderRegistry.class);
+        when(registry.listReadyLoginMethods()).thenReturn(List.of(
+            new IdentityProviderLoginMethod(
+                "cas-main",
+                "Corporate CAS",
+                IdentityProviderLoginMethodType.CAS_REDIRECT
+            )
+        ));
+
+        AuthMethodCatalog catalog = new AuthMethodCatalog(
+            registry,
+            new DirectAuthProperties(),
+            new AuthSessionBootstrapProperties()
+        );
+
+        assertThat(catalog.listMethods("/skills?sort=updated"))
+            .filteredOn(method -> "cas-cas-main".equals(method.id()))
+            .singleElement()
+            .satisfies(method -> {
+                assertThat(method.methodType())
+                    .isEqualTo("CAS_REDIRECT");
+                assertThat(method.provider())
+                    .isEqualTo("cas-main");
+                assertThat(method.actionUrl())
+                    .isEqualTo(
+                        "/api/v1/auth/cas/cas-main/login"
+                            + "?returnTo=%2Fskills%3Fsort%3Dupdated"
+                    );
+            });
+    }
+
 }

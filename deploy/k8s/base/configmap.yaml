@@ -46,6 +46,26 @@ data:
   # Session 配置
   # HTTP 环境设为 false，HTTPS 环境设为 true
   session-cookie-secure: "false"
+
+  # CAS 2.0/3.0 登录（默认关闭）
+  # service-url 必须是浏览器可访问的精确回调地址，且 provider code
+  # 必须与路径中的值一致。
+  auth-cas-enabled: "false"
+  auth-cas-provider-code: cas-main
+  auth-cas-display-name: Corporate CAS
+  auth-cas-authority: corp-cas
+  auth-cas-server-url: https://cas.example.com/cas
+  auth-cas-service-url: https://skillhub.example.com/api/v1/auth/cas/cas-main/callback
+  auth-cas-protocol-version: "3.0"
+  auth-cas-subject-type: cas_principal
+  auth-cas-connect-timeout: PT5S
+  auth-cas-read-timeout: PT10S
+  auth-cas-state-ttl: PT5M
+  auth-cas-max-response-bytes: "1048576"
+  auth-cas-attribute-subject: ""
+  auth-cas-attribute-display-name: displayName
+  auth-cas-attribute-email: mail
+  auth-cas-attribute-avatar-url: ""
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

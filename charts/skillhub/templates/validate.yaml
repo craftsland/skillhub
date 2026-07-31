@@ -6,6 +6,24 @@
 {{- if and .Values.auth.direct.enabled (not .Values.auth.direct.provider) -}}
 {{- fail "auth.direct.enabled=true requires auth.direct.provider" -}}
 {{- end -}}
+{{- if .Values.auth.cas.enabled -}}
+{{- if not .Values.auth.cas.serverUrl -}}
+{{- fail "auth.cas.enabled=true requires auth.cas.serverUrl" -}}
+{{- end -}}
+{{- if not .Values.auth.cas.serviceUrl -}}
+{{- fail "auth.cas.enabled=true requires auth.cas.serviceUrl" -}}
+{{- end -}}
+{{- if not (regexMatch "^https://[^[:space:]]+$" .Values.auth.cas.serverUrl) -}}
+{{- fail "auth.cas.serverUrl must be an absolute HTTPS URL" -}}
+{{- end -}}
+{{- if not (regexMatch "^https://[^[:space:]?#]+$" .Values.auth.cas.serviceUrl) -}}
+{{- fail "auth.cas.serviceUrl must be an absolute HTTPS URL without query or fragment" -}}
+{{- end -}}
+{{- $expectedCasCallback := printf "/api/v1/auth/cas/%s/callback" .Values.auth.cas.providerCode -}}
+{{- if not (hasSuffix $expectedCasCallback .Values.auth.cas.serviceUrl) -}}
+{{- fail (printf "auth.cas.serviceUrl must end with %s" $expectedCasCallback) -}}
+{{- end -}}
+{{- end -}}
 
 {{- if and .Values.ingress.enabled (not .Values.server.service.enabled) -}}
 {{- fail "ingress.enabled=true requires server.service.enabled=true" -}}

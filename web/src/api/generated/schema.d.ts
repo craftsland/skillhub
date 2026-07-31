@@ -3238,6 +3238,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/cas/{providerCode}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start a CAS browser login */
+        get: operations["login_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/cas/{providerCode}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Complete a CAS browser login */
+        get: operations["callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -5145,14 +5179,14 @@ export interface components {
             bindingId?: number;
             providerCode?: string;
             displayName?: string;
-            methodTypes?: ("OAUTH_REDIRECT" | "DIRECT_PASSWORD" | "SESSION_BOOTSTRAP")[];
+            methodTypes?: ("OAUTH_REDIRECT" | "CAS_REDIRECT" | "DIRECT_PASSWORD" | "SESSION_BOOTSTRAP")[];
             usable?: boolean;
             canUnlink?: boolean;
         };
         IdentityLinkProviderResponse: {
             providerCode?: string;
             displayName?: string;
-            methodTypes?: ("OAUTH_REDIRECT" | "DIRECT_PASSWORD" | "SESSION_BOOTSTRAP")[];
+            methodTypes?: ("OAUTH_REDIRECT" | "CAS_REDIRECT" | "DIRECT_PASSWORD" | "SESSION_BOOTSTRAP")[];
         };
         AdminUserSummaryResponse: {
             id?: string;
@@ -11842,6 +11876,51 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["IdentityLinkErrorResponse"];
                 };
+            };
+        };
+    };
+    login_1: {
+        parameters: {
+            query?: {
+                returnTo?: string;
+            };
+            header?: never;
+            path: {
+                providerCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the configured CAS login endpoint */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    callback: {
+        parameters: {
+            query?: {
+                ticket?: string;
+                state?: string;
+            };
+            header?: never;
+            path: {
+                providerCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the authenticated target or login failure page */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

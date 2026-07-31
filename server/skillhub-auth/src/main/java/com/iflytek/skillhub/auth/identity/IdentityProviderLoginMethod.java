@@ -33,7 +33,8 @@ public record IdentityProviderLoginMethod(
 
     public ProviderCapability capability() {
         return switch (methodType) {
-            case OAUTH_REDIRECT -> ProviderCapability.BROWSER;
+            case OAUTH_REDIRECT, CAS_REDIRECT ->
+                    ProviderCapability.BROWSER;
             case DIRECT_PASSWORD -> ProviderCapability.CREDENTIAL;
             case SESSION_BOOTSTRAP -> ProviderCapability.PASSIVE;
         };

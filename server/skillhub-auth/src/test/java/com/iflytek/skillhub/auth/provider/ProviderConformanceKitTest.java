@@ -84,7 +84,28 @@ class ProviderConformanceKitTest {
                                 "X-Private-Assertion",
                                 List.of("fixture-assertion")));
         BrowserAuthenticationAdapter<String> browser =
-                exchange -> result;
+                new BrowserAuthenticationAdapter<>() {
+                    @Override
+                    public ProviderInstanceDefinition provider() {
+                        return provider;
+                    }
+
+                    @Override
+                    public Class<String> exchangeType() {
+                        return String.class;
+                    }
+
+                    @Override
+                    public BrowserAuthenticationMethod loginMethod() {
+                        return BrowserAuthenticationMethod.OAUTH_REDIRECT;
+                    }
+
+                    @Override
+                    public ProviderAuthenticationResult authenticate(
+                            String exchange) {
+                        return result;
+                    }
+                };
         PassiveAuthenticationAdapter passive =
                 new PassiveAuthenticationAdapter() {
                     @Override
@@ -101,7 +122,6 @@ class ProviderConformanceKitTest {
                 };
 
         assertThat(ProviderConformanceKit.verifyBrowser(
-                provider,
                 browser,
                 "verified-exchange")).isSameAs(result);
         assertThat(ProviderConformanceKit.verifyPassive(

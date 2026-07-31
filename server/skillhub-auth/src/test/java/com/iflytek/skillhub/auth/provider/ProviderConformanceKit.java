@@ -41,10 +41,10 @@ public final class ProviderConformanceKit {
     }
 
     public static <T> ProviderAuthenticationResult verifyBrowser(
-            ProviderInstanceDefinition provider,
             BrowserAuthenticationAdapter<T> adapter,
             T fixture) {
-        assertThat(provider).isNotNull();
+        ProviderInstanceDefinition provider =
+                verifyDefinition(adapter.provider(), adapter.provider());
         ProviderAuthenticationResult result =
                 adapter.authenticate(fixture);
         verifyResult(provider, result);

@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next'
+import { ShieldCheck } from 'lucide-react'
+import type { AuthMethod } from '@/api/types'
 import { Button } from '@/shared/ui/button'
 import { useAuthMethods } from './use-auth-methods'
 
@@ -6,14 +8,26 @@ interface LoginButtonProps {
   returnTo?: string
 }
 
-/**
- * Returns the appropriate icon for a given OAuth provider.
- */
-function OAuthIcon({ provider }: { provider: string }) {
+export function providerLogoSource(provider: string) {
   const normalizedProvider = provider.toLowerCase()
+  if (normalizedProvider === 'github' || normalizedProvider === 'gitlab') {
+    return `/${normalizedProvider}-logo.svg`
+  }
+  return null
+}
+
+export function isBrowserLoginMethod(method: AuthMethod) {
+  return method.methodType === 'OAUTH_REDIRECT' || method.methodType === 'CAS_REDIRECT'
+}
+
+function ProviderIcon({ provider }: { provider: string }) {
+  const logoSource = providerLogoSource(provider)
+  if (!logoSource) {
+    return <ShieldCheck aria-hidden="true" className="w-5 h-5 mr-3" />
+  }
   return (
     <img
-      src={`/${normalizedProvider}-logo.svg`}
+      src={logoSource}
       alt={provider}
       className="w-5 h-5 mr-3"
     />
@@ -21,13 +35,13 @@ function OAuthIcon({ provider }: { provider: string }) {
 }
 
 /**
- * Renders OAuth login buttons from the auth-method catalog returned by the backend.
+ * Renders browser-redirect login methods from the backend catalog.
  */
 export function LoginButton({ returnTo }: LoginButtonProps) {
   const { t } = useTranslation()
   const { data, isLoading } = useAuthMethods(returnTo)
 
-  const providers = (data ?? []).filter((method) => method.methodType === 'OAUTH_REDIRECT')
+  const providers = (data ?? []).filter(isBrowserLoginMethod)
 
   if (isLoading) {
     return (
@@ -51,11 +65,10 @@ export function LoginButton({ returnTo }: LoginButtonProps) {
             window.location.href = provider.actionUrl
           }}
         >
-          <OAuthIcon provider={provider.provider} />
+          <ProviderIcon provider={provider.provider} />
           {t('loginButton.loginWith', { name: provider.displayName })}
         </Button>
       ))}
     </div>
   )
 }
-

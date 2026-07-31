@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.auth.identity;
 
+import com.iflytek.skillhub.auth.provider.BrowserAuthenticationAdapter;
 import com.iflytek.skillhub.auth.provider.CredentialAuthenticationAdapter;
 import com.iflytek.skillhub.auth.provider.PassiveAuthenticationAdapter;
 import java.util.List;
@@ -13,9 +14,37 @@ public interface IdentityProviderRegistry extends IdentityProviderCatalog {
 
     List<IdentityProviderLoginMethod> listReadyLoginMethods();
 
+    <T> BrowserRoute<T> requireBrowserRoute(
+            String providerCode,
+            Class<T> exchangeType);
+
     CredentialRoute requireCredentialRoute(String providerCode);
 
     PassiveRoute requirePassiveRoute(String providerCode);
+
+    class BrowserRoute<T> {
+        private final ResolvedProviderHandle provider;
+        private final BrowserAuthenticationAdapter<T> adapter;
+
+        public BrowserRoute(
+                ResolvedProviderHandle provider,
+                BrowserAuthenticationAdapter<T> adapter) {
+            this.provider = Objects.requireNonNull(
+                    provider,
+                    "provider");
+            this.adapter = Objects.requireNonNull(
+                    adapter,
+                    "adapter");
+        }
+
+        public ResolvedProviderHandle provider() {
+            return provider;
+        }
+
+        public BrowserAuthenticationAdapter<T> adapter() {
+            return adapter;
+        }
+    }
 
     class CredentialRoute {
         private final ResolvedProviderHandle provider;

@@ -295,6 +295,86 @@ spec:
                 configMapKeyRef:
                   name: {{ include "skillhub.fullname" . }}-config
                   key: auth-direct-enabled
+            - name: SKILLHUB_AUTH_CAS_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-enabled
+            - name: SKILLHUB_AUTH_CAS_PROVIDER_CODE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-provider-code
+            - name: SKILLHUB_AUTH_CAS_DISPLAY_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-display-name
+            - name: SKILLHUB_AUTH_CAS_AUTHORITY
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-authority
+            - name: SKILLHUB_AUTH_CAS_SERVER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-server-url
+            - name: SKILLHUB_AUTH_CAS_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-service-url
+            - name: SKILLHUB_AUTH_CAS_PROTOCOL_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-protocol-version
+            - name: SKILLHUB_AUTH_CAS_SUBJECT_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-subject-type
+            - name: SKILLHUB_AUTH_CAS_CONNECT_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-connect-timeout
+            - name: SKILLHUB_AUTH_CAS_READ_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-read-timeout
+            - name: SKILLHUB_AUTH_CAS_STATE_TTL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-state-ttl
+            - name: SKILLHUB_AUTH_CAS_MAX_RESPONSE_BYTES
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-max-response-bytes
+            - name: SKILLHUB_AUTH_CAS_ATTRIBUTES_SUBJECT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-attribute-subject
+            - name: SKILLHUB_AUTH_CAS_ATTRIBUTES_DISPLAY_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-attribute-display-name
+            - name: SKILLHUB_AUTH_CAS_ATTRIBUTES_EMAIL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-attribute-email
+            - name: SKILLHUB_AUTH_CAS_ATTRIBUTES_AVATAR_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "skillhub.fullname" . }}-config
+                  key: auth-cas-attribute-avatar-url
             - name: SKILLHUB_BUILTIN_SKILLS_ENABLED
               valueFrom:
                 configMapKeyRef:
