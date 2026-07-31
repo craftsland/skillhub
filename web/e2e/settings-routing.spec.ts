@@ -8,9 +8,11 @@ test.describe('Settings Routing (Real API)', () => {
     await registerSession(page, testInfo)
   })
 
-  test('redirects accounts route to security settings', async ({ page }) => {
+  test('keeps the accounts route and renders its capability state', async ({ page }) => {
     await page.goto('/settings/accounts')
-    await expect(page).toHaveURL('/settings/security')
-    await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible()
+    await expect(page).toHaveURL('/settings/accounts')
+    await expect(page.getByRole('heading', {
+      name: /Account merging|Merge accounts/,
+    })).toBeVisible()
   })
 })

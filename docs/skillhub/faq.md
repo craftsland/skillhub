@@ -325,14 +325,18 @@ xargs -a skills.txt -I {} skillhub install "{}" --dir "$target_dir"
 
 ## Q: 为什么账号合并页面显示暂时不可用？
 
-A: 旧的账号合并流程不能分别证明主账号和次账号的控制权，因此已被安全隔离。在新的
-双重重新认证流程上线前：
+A: 旧的账号合并流程不能分别证明主账号和次账号的控制权，因此已被永久隔离。安全的
+双重重新认证流程由管理员分阶段启用；页面显示暂时不可用表示当前部署尚未完成
+indexed Session namespace 切换和功能开关门禁。
 
 - 请继续分别使用两个账号。
 - 不要让管理员直接修改数据库、移动 identity binding、角色、namespace membership、
   本地凭据或 API Token。
 - 已存在的 `account_merge_request` 记录会被保留，但不会继续执行。
 - 如果 API 客户端仍调用旧接口，已认证请求会收到 `503 Service Unavailable`。
+- 管理员应按
+  [`安全账号合并运维与发布手册`](../25-secure-account-merge-operations.md)
+  完成两阶段启用，不应直接打开功能开关。
 
 这不会影响普通登录、身份绑定读取、Namespace 或 Skill 操作。
 

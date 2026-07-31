@@ -66,4 +66,34 @@ public class ApiResponseFactory {
                 Instant.now(clock),
                 requestIdAccessor.current());
     }
+
+    public AccountMergeErrorResponse accountMergeError(
+            int code,
+            String messageCode,
+            String reasonCode,
+            Object... args) {
+        String msg = messageSource.getMessage(
+                messageCode,
+                args,
+                messageCode,
+                LocaleContextHolder.getLocale());
+        return new AccountMergeErrorResponse(
+                code,
+                msg,
+                reasonCode,
+                Instant.now(clock),
+                requestIdAccessor.current());
+    }
+
+    public AccountMergeErrorResponse accountMergeErrorMessage(
+            int code,
+            String message,
+            String reasonCode) {
+        return new AccountMergeErrorResponse(
+                code,
+                message,
+                reasonCode,
+                Instant.now(clock),
+                requestIdAccessor.current());
+    }
 }

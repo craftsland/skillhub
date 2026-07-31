@@ -21,7 +21,7 @@
     "auth": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["direct", "cas"],
+      "required": ["direct", "accountMerge", "cas"],
       "properties": {
         "direct": {
           "type": "object",
@@ -30,6 +30,15 @@
           "properties": {
             "enabled": { "type": "boolean" },
             "provider": { "type": "string" }
+          }
+        },
+        "accountMerge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "sessionCutoverComplete"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "sessionCutoverComplete": { "type": "boolean" }
           }
         },
         "cas": {
@@ -158,8 +167,13 @@
     "session": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["cookieSecure"],
-      "properties": { "cookieSecure": { "type": "boolean" } }
+      "required": ["cookieSecure", "redisNamespace", "repositoryType", "configureAction"],
+      "properties": {
+        "cookieSecure": { "type": "boolean" },
+        "redisNamespace": { "type": "string", "minLength": 1 },
+        "repositoryType": { "enum": ["default", "indexed"] },
+        "configureAction": { "enum": ["notify-keyspace-events", "none"] }
+      }
     },
     "bootstrapAdmin": {
       "type": "object",

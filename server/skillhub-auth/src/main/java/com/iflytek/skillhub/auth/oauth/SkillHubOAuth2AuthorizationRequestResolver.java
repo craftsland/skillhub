@@ -1,6 +1,7 @@
 package com.iflytek.skillhub.auth.oauth;
 
 import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
@@ -18,16 +19,22 @@ public class SkillHubOAuth2AuthorizationRequestResolver
     private final DefaultOAuth2AuthorizationRequestResolver delegate;
     private final OAuthLoginFlowService oauthLoginFlowService;
     private final IdentityLinkSessionManager identityLinkSessionManager;
+    private final AccountMergeSessionManager
+            accountMergeSessionManager;
 
     public SkillHubOAuth2AuthorizationRequestResolver(ClientRegistrationRepository clientRegistrationRepository,
                                                       OAuthLoginFlowService oauthLoginFlowService,
-                                                      IdentityLinkSessionManager identityLinkSessionManager) {
+                                                      IdentityLinkSessionManager identityLinkSessionManager,
+                                                      AccountMergeSessionManager
+                                                              accountMergeSessionManager) {
         this.delegate = new DefaultOAuth2AuthorizationRequestResolver(
                 clientRegistrationRepository,
                 "/oauth2/authorization"
         );
         this.oauthLoginFlowService = oauthLoginFlowService;
         this.identityLinkSessionManager = identityLinkSessionManager;
+        this.accountMergeSessionManager =
+                accountMergeSessionManager;
     }
 
     @Override
@@ -54,6 +61,10 @@ public class SkillHubOAuth2AuthorizationRequestResolver
         String registrationId = authorizationRequest.getAttribute(
                 "registration_id");
         identityLinkSessionManager.activateBrowserFlow(
+                request.getSession(false),
+                registrationId,
+                authorizationRequest.getState());
+        accountMergeSessionManager.activateBrowserFlow(
                 request.getSession(false),
                 registrationId,
                 authorizationRequest.getState());

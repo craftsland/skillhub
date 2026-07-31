@@ -65,6 +65,9 @@ jobs:
       - name: Verify Binding V2 migration and concurrency on PostgreSQL
         run: bash scripts/tests/identity-binding-v2-postgres-test.sh
 
+      - name: Verify Account Merge on PostgreSQL and Redis
+        run: bash scripts/tests/account-merge-integration-test.sh
+
       - name: Start loopback identity provider for Identity Link
         run: |
           python3 scripts/tests/oauth2-mock-provider.py --port 18081 \

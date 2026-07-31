@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType } from 'react'
-import { createRouter, createRoute, createRootRoute, redirect } from '@tanstack/react-router'
+import { createRouter, createRoute, createRootRoute } from '@tanstack/react-router'
 import { Layout } from './layout'
 import { getCurrentUser } from '@/api/client'
 import { RoleGuard } from '@/shared/components/role-guard'
@@ -121,6 +121,10 @@ const CliAuthPage = createLazyRouteComponent(() => import('@/pages/cli-auth'), '
 const SecuritySettingsPage = createLazyRouteComponent(
   () => import('@/pages/settings/security'),
   'SecuritySettingsPage',
+)
+const AccountSettingsPage = createLazyRouteComponent(
+  () => import('@/pages/settings/accounts'),
+  'AccountSettingsPage',
 )
 const ProfileSettingsPage = createLazyRouteComponent(
   () => import('@/pages/settings/profile'),
@@ -416,10 +420,8 @@ const settingsNotificationsRoute = createRoute({
 const settingsAccountsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'settings/accounts',
-  beforeLoad: async (ctx) => {
-    await requireAuth(ctx)
-    throw redirect({ to: '/settings/security' })
-  },
+  beforeLoad: requireAuth,
+  component: AccountSettingsPage,
 })
 
 const adminUsersRoute = createRoute({

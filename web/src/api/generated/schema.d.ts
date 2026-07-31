@@ -1792,6 +1792,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/account/merge/reauthenticate/local": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Freshly reauthenticate the primary account with its local password */
+        post: operations["reauthenticatePrimaryLocal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/reauthenticate/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Freshly authenticate the primary account through a credential provider */
+        post: operations["reauthenticatePrimaryCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/reauthenticate/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start primary fresh authentication through a browser provider */
+        post: operations["reauthenticatePrimaryBrowser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a safe account-merge intent */
+        post: operations["createIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/intents/{intentId}/secondary-auth/local": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prove control of the secondary local account */
+        post: operations["authenticateSecondaryLocal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/intents/{intentId}/secondary-auth/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Independently authenticate the secondary through a credential provider */
+        post: operations["authenticateSecondaryCredential"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/intents/{intentId}/secondary-auth/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start independent secondary authentication through a browser provider */
+        post: operations["prepareSecondaryBrowser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/intents/{intentId}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Build a versioned account-merge preview */
+        post: operations["preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/intents/{intentId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm an unchanged account-merge preview */
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/account/merge/initiate": {
         parameters: {
             query?: never;
@@ -1817,7 +1970,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["confirm"];
+        post: operations["confirm_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3336,6 +3489,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/account/merge/intents/{intentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the current safe account-merge intent */
+        get: operations["getIntent_1"];
+        put?: never;
+        post?: never;
+        /** Cancel an active account-merge intent */
+        delete: operations["cancel_1"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account/merge/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List safe account-merge authentication methods */
+        get: operations["capabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cli/v1/skills/{namespace}/{slug}/versions/{version}/download": {
         parameters: {
             query?: never;
@@ -4279,6 +4467,180 @@ export interface components {
             /** Format: int64 */
             mergeRequestId: number;
             verificationToken: string;
+        };
+        AccountMergeLocalReauthenticationRequest: {
+            password: string;
+        };
+        AccountMergeErrorResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            /** @enum {string} */
+            reasonCode: "ACCOUNT_MERGE_UNAVAILABLE" | "MERGE_INTENT_NOT_FOUND" | "MERGE_REAUTH_REQUIRED" | "MERGE_PROVIDER_AUTHENTICATION_FAILED" | "MERGE_PROVIDER_UNAVAILABLE" | "MERGE_SESSION_MISMATCH" | "MERGE_PROOF_EXPIRED" | "MERGE_CONFLICT" | "MERGE_PREVIEW_STALE" | "MERGE_ALREADY_CONSUMED" | "MERGE_ACCOUNT_NOT_ELIGIBLE";
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        AccountMergePrimaryProofResponse: {
+            method?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+        };
+        ApiResponseAccountMergePrimaryProofResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["AccountMergePrimaryProofResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        AccountMergeCredentialAuthenticationRequest: {
+            providerCode: string;
+            username: string;
+            password: string;
+        };
+        AccountMergeBrowserAuthenticationRequest: {
+            providerCode: string;
+        };
+        AccountMergeBrowserStartResponse: {
+            actionUrl?: string;
+        };
+        ApiResponseAccountMergeBrowserStartResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["AccountMergeBrowserStartResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        AccountMergeAuthenticationMethodResponse: {
+            providerCode?: string;
+            displayName?: string;
+            methodType?: string;
+        };
+        AccountMergeIntentResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            status?: "PENDING_SECONDARY_PROOF" | "READY_FOR_PREVIEW" | "READY_TO_CONFIRM" | "COMPLETED" | "CANCELLED" | "EXPIRED" | "FAILED_CONFLICT";
+            /** Format: date-time */
+            expiresAt?: string;
+            secondaryMethods?: components["schemas"]["AccountMergeAuthenticationMethodResponse"][];
+        };
+        ApiResponseAccountMergeIntentResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["AccountMergeIntentResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        AccountMergeSecondaryLocalAuthenticationRequest: {
+            username: string;
+            password: string;
+        };
+        AccountMergePreviewResponse: {
+            /** Format: uuid */
+            intentId?: string;
+            /** @enum {string} */
+            status?: "PENDING_SECONDARY_PROOF" | "READY_FOR_PREVIEW" | "READY_TO_CONFIRM" | "COMPLETED" | "CANCELLED" | "EXPIRED" | "FAILED_CONFLICT";
+            /** Format: int32 */
+            previewVersion?: number;
+            /** Format: date-time */
+            expiresAt?: string;
+            confirmable?: boolean;
+            identityProviders?: string[];
+            localCredentialAction?: string;
+            blockedPlatformRoles?: string[];
+            namespaceChanges?: components["schemas"]["NamespaceChange"][];
+            apiTokensToRevoke?: components["schemas"]["ApiToken"][];
+            /** Format: int32 */
+            skillOwnershipCount?: number;
+            social?: components["schemas"]["SocialSummary"];
+            notifications?: components["schemas"]["NotificationSummary"];
+            conflicts?: components["schemas"]["Conflict"][];
+        };
+        ApiResponseAccountMergePreviewResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["AccountMergePreviewResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        ApiToken: {
+            name?: string;
+            prefix?: string;
+        };
+        Conflict: {
+            code?: string;
+            resource?: string;
+            suggestedAction?: string;
+        };
+        DiscardedRating: {
+            /** Format: int64 */
+            skillId?: number;
+            /** Format: int32 */
+            score?: number;
+        };
+        NamespaceChange: {
+            /** Format: int64 */
+            namespaceId?: number;
+            namespaceSlug?: string;
+            primaryRole?: string;
+            secondaryRole?: string;
+            resultingRole?: string;
+            blocked?: boolean;
+        };
+        NotificationSummary: {
+            /** Format: int32 */
+            notificationsMoved?: number;
+            /** Format: int32 */
+            preferencesMoved?: number;
+            /** Format: int32 */
+            duplicatePreferencesDiscarded?: number;
+            /** Format: int32 */
+            governanceNotificationsMoved?: number;
+        };
+        SocialSummary: {
+            /** Format: int32 */
+            starsMoved?: number;
+            /** Format: int32 */
+            duplicateStarsDiscarded?: number;
+            /** Format: int32 */
+            ratingsMoved?: number;
+            /** Format: int32 */
+            duplicateRatingsDiscarded?: number;
+            /** Format: int32 */
+            subscriptionsMoved?: number;
+            /** Format: int32 */
+            duplicateSubscriptionsDiscarded?: number;
+            discardedRatings?: components["schemas"]["DiscardedRating"][];
+        };
+        AccountMergeConfirmRequest: {
+            /** Format: int32 */
+            previewVersion?: number;
+        };
+        AccountMergeCompletionResponse: {
+            /** Format: uuid */
+            intentId?: string;
+            /** @enum {string} */
+            status?: "PENDING_SECONDARY_PROOF" | "READY_FOR_PREVIEW" | "READY_TO_CONFIRM" | "COMPLETED" | "CANCELLED" | "EXPIRED" | "FAILED_CONFLICT";
+            /** Format: date-time */
+            completedAt?: string;
+        };
+        ApiResponseAccountMergeCompletionResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["AccountMergeCompletionResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
         };
         MergeInitiateRequest: {
             secondaryIdentifier: string;
@@ -5318,6 +5680,20 @@ export interface components {
             page?: number;
             /** Format: int32 */
             size?: number;
+        };
+        AccountMergeCapabilitiesResponse: {
+            enabled?: boolean;
+            primaryMethods?: components["schemas"]["AccountMergeAuthenticationMethodResponse"][];
+            secondaryMethods?: components["schemas"]["AccountMergeAuthenticationMethodResponse"][];
+        };
+        ApiResponseAccountMergeCapabilitiesResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["AccountMergeCapabilitiesResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
         };
         ApiResponseCliResolveResponse: {
             /** Format: int32 */
@@ -9429,6 +9805,791 @@ export interface operations {
             };
         };
     };
+    reauthenticatePrimaryLocal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountMergeLocalReauthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergePrimaryProofResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    reauthenticatePrimaryCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountMergeCredentialAuthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergePrimaryProofResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    reauthenticatePrimaryBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountMergeBrowserAuthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeBrowserStartResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    createIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeIntentResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    authenticateSecondaryLocal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountMergeSecondaryLocalAuthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeIntentResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    authenticateSecondaryCredential: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountMergeCredentialAuthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeIntentResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    prepareSecondaryBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountMergeBrowserAuthenticationRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeBrowserStartResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergePreviewResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountMergeConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeCompletionResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
     initiate: {
         parameters: {
             query?: never;
@@ -9453,7 +10614,7 @@ export interface operations {
             };
         };
     };
-    confirm: {
+    confirm_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -12025,6 +13186,259 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponsePageResponseAuditLogItemResponse"];
+                };
+            };
+        };
+    };
+    getIntent_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeIntentResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeIntentResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+        };
+    };
+    capabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operation completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAccountMergeCapabilitiesResponse"];
+                };
+            };
+            /** @description Invalid account merge request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Fresh authentication failed or is required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Intent belongs to another browser session */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge intent was not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Conflict, stale preview, or consumed intent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge proof or intent expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
+                };
+            };
+            /** @description Account merge or provider unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountMergeErrorResponse"];
                 };
             };
         };

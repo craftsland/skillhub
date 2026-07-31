@@ -3,6 +3,7 @@ package com.iflytek.skillhub.controller;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,6 +12,7 @@ import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.springframework.mock.web.MockHttpSession;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -108,6 +110,40 @@ class AccountMergeControllerTest {
             .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void safeIntentEndpointRemainsUnavailableByDefault()
+            throws Exception {
+        mockMvc.perform(
+                post("/api/v1/account/merge/intents")
+                        .session(primarySession())
+                        .with(authentication(
+                                primaryAuthentication()))
+                        .with(csrf())
+                        .locale(Locale.ENGLISH))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value(503))
+                .andExpect(jsonPath("$.reasonCode").value(
+                        "ACCOUNT_MERGE_UNAVAILABLE"));
+    }
+
+    @Test
+    void capabilitiesReportTheReleaseGateAsDisabledByDefault()
+            throws Exception {
+        mockMvc.perform(
+                get("/api/v1/account/merge/capabilities")
+                        .session(primarySession())
+                        .with(authentication(
+                                primaryAuthentication()))
+                        .locale(Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled")
+                        .value(false))
+                .andExpect(jsonPath("$.data.primaryMethods")
+                        .isArray())
+                .andExpect(jsonPath("$.data.secondaryMethods")
+                        .isArray());
+    }
+
     private UsernamePasswordAuthenticationToken primaryAuthentication() {
         PlatformPrincipal principal = new PlatformPrincipal(
             "usr_primary",
@@ -118,5 +154,13 @@ class AccountMergeControllerTest {
             Set.of()
         );
         return new UsernamePasswordAuthenticationToken(principal, null, List.of());
+    }
+
+    private MockHttpSession primarySession() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(
+                "platformPrincipal",
+                primaryAuthentication().getPrincipal());
+        return session;
     }
 }

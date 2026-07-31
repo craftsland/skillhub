@@ -4,6 +4,8 @@ import com.iflytek.skillhub.auth.identity.ExternalIdentityLoginService;
 import com.iflytek.skillhub.auth.identity.ExternalIdentityLinkService;
 import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import com.iflytek.skillhub.auth.identity.TrustedProviderRouteResolver;
+import com.iflytek.skillhub.auth.merge.AccountMergeProviderProofService;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.session.PlatformSessionService;
 import jakarta.servlet.http.HttpSession;
@@ -22,12 +24,16 @@ import org.springframework.security.oauth2.client.registration.InMemoryClientReg
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class OAuth2AuthorizationRequestResolverTest {
 
     private SkillHubOAuth2AuthorizationRequestResolver resolver;
     private OAuthLoginFlowService oauthLoginFlowService;
+    private AccountMergeSessionManager accountMergeSessionManager;
 
     @BeforeEach
     void setUp() {
@@ -48,12 +54,17 @@ class OAuth2AuthorizationRequestResolverTest {
                 mock(TrustedProviderRouteResolver.class),
                 mock(ExternalIdentityLoginService.class),
                 mock(ExternalIdentityLinkService.class),
-                mock(IdentityLinkSessionManager.class)
+                mock(IdentityLinkSessionManager.class),
+                mock(AccountMergeSessionManager.class),
+                mock(AccountMergeProviderProofService.class)
         );
+        accountMergeSessionManager =
+                mock(AccountMergeSessionManager.class);
         resolver = new SkillHubOAuth2AuthorizationRequestResolver(
                 new InMemoryClientRegistrationRepository(github),
                 oauthLoginFlowService,
-                mock(IdentityLinkSessionManager.class)
+                mock(IdentityLinkSessionManager.class),
+                accountMergeSessionManager
         );
     }
 
@@ -112,6 +123,11 @@ class OAuth2AuthorizationRequestResolverTest {
         assertThat(session).isNotNull();
         assertThat(session.getAttribute(OAuthLoginRedirectSupport.SESSION_RETURN_TO_ATTRIBUTE))
                 .isEqualTo("/dashboard/publish?draft=1");
+        verify(accountMergeSessionManager)
+                .activateBrowserFlow(
+                        eq(session),
+                        eq("github"),
+                        anyString());
     }
 
     @Test

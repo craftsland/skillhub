@@ -2,6 +2,9 @@ package com.iflytek.skillhub.auth.oauth;
 
 import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
+import com.iflytek.skillhub.auth.merge.AccountMergeBrowserFlowReference;
+import com.iflytek.skillhub.auth.merge.AccountMergeFailureCode;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,12 +23,18 @@ public class OAuth2LoginFailureHandler
 
     private final OAuthLoginFlowService oauthLoginFlowService;
     private final IdentityLinkSessionManager identityLinkSessionManager;
+    private final AccountMergeSessionManager
+            accountMergeSessionManager;
 
     public OAuth2LoginFailureHandler(
             OAuthLoginFlowService oauthLoginFlowService,
-            IdentityLinkSessionManager identityLinkSessionManager) {
+            IdentityLinkSessionManager identityLinkSessionManager,
+            AccountMergeSessionManager
+                    accountMergeSessionManager) {
         this.oauthLoginFlowService = oauthLoginFlowService;
         this.identityLinkSessionManager = identityLinkSessionManager;
+        this.accountMergeSessionManager =
+                accountMergeSessionManager;
     }
 
     /**
@@ -39,7 +48,33 @@ public class OAuth2LoginFailureHandler
             HttpServletResponse response,
             IdentityLinkFailureCode reasonCode)
             throws IOException {
+        return redirectSecurityFlowRouteFailure(
+                request,
+                response,
+                AccountMergeFailureCode
+                        .MERGE_PROVIDER_UNAVAILABLE,
+                reasonCode);
+    }
+
+    public boolean redirectSecurityFlowRouteFailure(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AccountMergeFailureCode accountMergeReason,
+            IdentityLinkFailureCode identityLinkReason)
+            throws IOException {
         var session = request.getSession(false);
+        var accountMergeFlow = accountMergeSessionManager
+                .consumeFailedBrowserFlow(session);
+        if (accountMergeFlow.isPresent()) {
+            oauthLoginFlowService.consumeReturnTo(session);
+            getRedirectStrategy().sendRedirect(
+                    request,
+                    response,
+                    accountMergeFailureTarget(
+                            accountMergeFlow.orElseThrow(),
+                            accountMergeReason.name()));
+            return true;
+        }
         var intentId = identityLinkSessionManager
                 .consumeFailedBrowserFlow(session);
         if (intentId.isEmpty()) {
@@ -53,7 +88,7 @@ public class OAuth2LoginFailureHandler
                         + "&intentId="
                         + intentId.get()
                         + "&reasonCode="
-                        + reasonCode.name());
+                        + identityLinkReason.name());
         return true;
     }
 
@@ -65,6 +100,23 @@ public class OAuth2LoginFailureHandler
             throws IOException, ServletException {
         var session = request.getSession(false);
         String returnTo = oauthLoginFlowService.consumeReturnTo(session);
+        var accountMergeFlow = accountMergeSessionManager
+                .consumeFailedBrowserFlow(session);
+        if (accountMergeFlow.isPresent()) {
+            String reasonCode = oauthLoginFlowService
+                    .accountMergeFailureReasonCode(exception)
+                    .orElse(
+                            AccountMergeFailureCode
+                                    .MERGE_PROVIDER_AUTHENTICATION_FAILED
+                                    .name());
+            getRedirectStrategy().sendRedirect(
+                    request,
+                    response,
+                    accountMergeFailureTarget(
+                            accountMergeFlow.orElseThrow(),
+                            reasonCode));
+            return;
+        }
         String reasonCode = oauthLoginFlowService
                 .identityLinkFailureReasonCode(exception)
                 .orElse(
@@ -89,5 +141,18 @@ public class OAuth2LoginFailureHandler
         }
 
         super.onAuthenticationFailure(request, response, exception);
+    }
+
+    private String accountMergeFailureTarget(
+            AccountMergeBrowserFlowReference flow,
+            String reasonCode) {
+        return "/settings/accounts?accountMerge=failed"
+                + "&phase="
+                + flow.phase().name()
+                + (flow.intentId() == null
+                        ? ""
+                        : "&intentId=" + flow.intentId())
+                + "&reasonCode="
+                + reasonCode;
     }
 }

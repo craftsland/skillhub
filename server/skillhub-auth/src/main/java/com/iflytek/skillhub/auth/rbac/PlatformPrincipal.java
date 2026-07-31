@@ -1,6 +1,7 @@
 package com.iflytek.skillhub.auth.rbac;
 
 import java.io.Serializable;
+import java.security.Principal;
 import java.util.Set;
 
 /**
@@ -13,4 +14,15 @@ public record PlatformPrincipal(
     String avatarUrl,
     String oauthProvider,
     Set<String> platformRoles
-) implements Serializable {}
+) implements Principal, Serializable {
+
+    /**
+     * Spring Session indexes authenticated sessions by
+     * {@link Principal#getName()}. The immutable platform user ID is the only
+     * stable name across local, OAuth, OIDC, CAS, and credential providers.
+     */
+    @Override
+    public String getName() {
+        return userId;
+    }
+}

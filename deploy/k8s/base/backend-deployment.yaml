@@ -167,6 +167,31 @@ spec:
                 configMapKeyRef:
                   name: skillhub-config
                   key: session-cookie-secure
+            - name: SPRING_SESSION_REDIS_REPOSITORY_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: session-repository-type
+            - name: SESSION_REDIS_NAMESPACE
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: session-redis-namespace
+            - name: SPRING_SESSION_REDIS_CONFIGURE_ACTION
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: session-redis-configure-action
+            - name: SKILLHUB_AUTH_ACCOUNT_MERGE_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: auth-account-merge-enabled
+            - name: SKILLHUB_AUTH_ACCOUNT_MERGE_SESSION_CUTOVER_COMPLETE
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: auth-account-merge-session-cutover-complete
 
             # CAS 2.0/3.0 browser login
             - name: SKILLHUB_AUTH_CAS_ENABLED

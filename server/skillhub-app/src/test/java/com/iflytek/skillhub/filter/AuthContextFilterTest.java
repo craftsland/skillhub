@@ -94,6 +94,46 @@ class AuthContextFilterTest {
     }
 
     @Test
+    void mergedSecondarySession_shouldInvalidateSessionAndBlockNextRequest() throws Exception {
+        PlatformPrincipal principal = new PlatformPrincipal(
+                "user-merged",
+                "Merged",
+                "merged@example.com",
+                null,
+                "local",
+                Set.of("USER"));
+        UserAccount user = new UserAccount(
+                "user-merged",
+                "Merged",
+                "merged@example.com",
+                null);
+        user.setStatus(UserStatus.MERGED);
+        user.setMergedToUserId("user-primary");
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/v1/auth/me");
+        MockHttpSession session = (MockHttpSession) request.getSession(true);
+        session.setAttribute("platformPrincipal", principal);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of())
+        );
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain filterChain = mock(FilterChain.class);
+
+        when(userAccountRepository.findById("user-merged"))
+                .thenReturn(java.util.Optional.of(user));
+
+        filter.doFilter(request, response, filterChain);
+
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentAsString().contains("\"code\":401"));
+        assertTrue(session.isInvalid());
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
     void activeSessionUser_shouldPopulateRequestContextAndContinue() throws Exception {
         PlatformPrincipal principal = new PlatformPrincipal("user-2", "Bob", "bob@example.com", null, "local", Set.of("USER"));
         UserAccount user = new UserAccount("user-2", "Bob", "bob@example.com", null);

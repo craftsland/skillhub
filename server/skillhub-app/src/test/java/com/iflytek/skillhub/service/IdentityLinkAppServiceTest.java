@@ -20,6 +20,7 @@ import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.IdentityProviderLoginMethod;
 import com.iflytek.skillhub.auth.identity.IdentityProviderLoginMethodType;
 import com.iflytek.skillhub.auth.identity.IdentityProviderRegistry;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
 import jakarta.servlet.http.HttpSession;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -67,6 +68,8 @@ class IdentityLinkAppServiceTest {
                 IdentityLinkBrowserPhase.REAUTHENTICATE,
                 PROVIDER,
                 fixture.context);
+        verify(fixture.accountMergeSessionManager)
+                .clearBrowserFlow(fixture.session);
     }
 
     @Test
@@ -101,6 +104,8 @@ class IdentityLinkAppServiceTest {
                 IdentityLinkBrowserPhase.LINK,
                 PROVIDER,
                 fixture.context);
+        verify(fixture.accountMergeSessionManager)
+                .clearBrowserFlow(fixture.session);
     }
 
     @Test
@@ -169,6 +174,9 @@ class IdentityLinkAppServiceTest {
                 mock(IdentityProviderRegistry.class);
         private final IdentityLinkSessionManager sessionManager =
                 mock(IdentityLinkSessionManager.class);
+        private final AccountMergeSessionManager
+                accountMergeSessionManager =
+                mock(AccountMergeSessionManager.class);
         private final HttpSession session = mock(HttpSession.class);
         private final IdentityLoginContext context =
                 new IdentityLoginContext(
@@ -186,7 +194,8 @@ class IdentityLinkAppServiceTest {
                         intentService,
                         externalLinkService,
                         registry,
-                        sessionManager);
+                        sessionManager,
+                        accountMergeSessionManager);
 
         private Fixture() {
             when(sessionManager.actor(

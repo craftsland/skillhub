@@ -47,6 +47,8 @@ spring:
     store-type: redis
     redis:
       namespace: ${SESSION_REDIS_NAMESPACE:skillhub:session}
+      repository-type: ${SPRING_SESSION_REDIS_REPOSITORY_TYPE:default}
+      configure-action: ${SPRING_SESSION_REDIS_CONFIGURE_ACTION:notify-keyspace-events}
   security:
     oauth2:
       client:
@@ -108,6 +110,9 @@ skillhub:
   auth:
     mock:
       enabled: ${SKILLHUB_AUTH_MOCK_ENABLED:false}
+    account-merge:
+      enabled: ${SKILLHUB_AUTH_ACCOUNT_MERGE_ENABLED:false}
+      session-cutover-complete: ${SKILLHUB_AUTH_ACCOUNT_MERGE_SESSION_CUTOVER_COMPLETE:false}
     identity:
       # Provider-specific overrides bind below providers.<registration-id>.
       # Defaults: AUTO provisioning; PRESERVE_LOCAL displayName/avatarUrl;

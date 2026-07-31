@@ -29,6 +29,14 @@ import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
 import com.iflytek.skillhub.auth.identity.ResolvedProviderHandleTestFixture;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
 import com.iflytek.skillhub.auth.identity.TrustedProviderRouteResolver;
+import com.iflytek.skillhub.auth.merge.AccountMergeProviderProofService;
+import com.iflytek.skillhub.auth.merge.AccountMergeSessionManager;
+import com.iflytek.skillhub.auth.merge.AccountMergeActor;
+import com.iflytek.skillhub.auth.merge.AccountMergeBrowserFlow;
+import com.iflytek.skillhub.auth.merge.AccountMergeIntent;
+import com.iflytek.skillhub.auth.merge.AccountMergeIntentStatus;
+import com.iflytek.skillhub.auth.merge.AccountMergePrimaryProof;
+import com.iflytek.skillhub.auth.merge.AccountMergeProviderPrimaryProof;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
@@ -92,6 +100,8 @@ class OAuthLoginFlowServiceTest {
                         identityLoginService,
                         mock(ExternalIdentityLinkService.class),
                         mock(IdentityLinkSessionManager.class),
+                        mock(AccountMergeSessionManager.class),
+                        mock(AccountMergeProviderProofService.class),
                         delegate);
         clearInvocations(extractor);
 
@@ -134,6 +144,8 @@ class OAuthLoginFlowServiceTest {
                         identityLoginService,
                         mock(ExternalIdentityLinkService.class),
                         mock(IdentityLinkSessionManager.class),
+                        mock(AccountMergeSessionManager.class),
+                        mock(AccountMergeProviderProofService.class),
                         delegate);
         clearInvocations(extractor);
 
@@ -161,7 +173,9 @@ class OAuthLoginFlowServiceTest {
                         resolver,
                         identityLoginService,
                         mock(ExternalIdentityLinkService.class),
-                        mock(IdentityLinkSessionManager.class));
+                        mock(IdentityLinkSessionManager.class),
+                        mock(AccountMergeSessionManager.class),
+                        mock(AccountMergeProviderProofService.class));
         PlatformPrincipal principal = principal();
         when(identityLoginService.authenticate(any(), any(), any()))
                 .thenReturn(new IdentityLoginOutcome.Authenticated(
@@ -194,7 +208,9 @@ class OAuthLoginFlowServiceTest {
                         resolver,
                         identityLoginService,
                         mock(ExternalIdentityLinkService.class),
-                        mock(IdentityLinkSessionManager.class));
+                        mock(IdentityLinkSessionManager.class),
+                        mock(AccountMergeSessionManager.class),
+                        mock(AccountMergeProviderProofService.class));
         when(identityLoginService.authenticate(any(), any(), any()))
                 .thenReturn(new IdentityLoginOutcome.PendingApproval(
                         "ACCOUNT_PENDING"));
@@ -219,7 +235,9 @@ class OAuthLoginFlowServiceTest {
                         resolver,
                         identityLoginService,
                         mock(ExternalIdentityLinkService.class),
-                        mock(IdentityLinkSessionManager.class));
+                        mock(IdentityLinkSessionManager.class),
+                        mock(AccountMergeSessionManager.class),
+                        mock(AccountMergeProviderProofService.class));
         when(identityLoginService.authenticate(any(), any(), any()))
                 .thenReturn(new IdentityLoginOutcome.LinkRequired(
                         "EMAIL_COLLISION"));
@@ -256,7 +274,9 @@ class OAuthLoginFlowServiceTest {
                         resolver,
                         identityLoginService,
                         mock(ExternalIdentityLinkService.class),
-                        mock(IdentityLinkSessionManager.class));
+                        mock(IdentityLinkSessionManager.class),
+                        mock(AccountMergeSessionManager.class),
+                        mock(AccountMergeProviderProofService.class));
         when(identityLoginService.authenticate(any(), any(), any()))
                 .thenThrow(new IdentityCoreException(
                         IdentityFailureCode.PROVIDER_AUTHORITY_MISMATCH));
@@ -290,7 +310,9 @@ class OAuthLoginFlowServiceTest {
                         resolver,
                         identityLoginService,
                         identityLinkService,
-                        sessionManager);
+                        sessionManager,
+                        mock(AccountMergeSessionManager.class),
+                        mock(AccountMergeProviderProofService.class));
         ResolvedProviderHandle provider =
                 ResolvedProviderHandleTestFixture.handle("github");
         UUID intentId = UUID.randomUUID();
@@ -334,6 +356,134 @@ class OAuthLoginFlowServiceTest {
         verify(sessionManager).remove(
                 request.getSession(false),
                 intentId);
+    }
+
+    @Test
+    void primaryAccountMergeProofTakesPriorityAndKeepsPrimaryPrincipal() {
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        ExternalIdentityLinkService identityLinkService =
+                mock(ExternalIdentityLinkService.class);
+        IdentityLinkSessionManager identityLinkSessions =
+                mock(IdentityLinkSessionManager.class);
+        AccountMergeSessionManager accountMergeSessions =
+                mock(AccountMergeSessionManager.class);
+        AccountMergeProviderProofService proofService =
+                mock(AccountMergeProviderProofService.class);
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(),
+                        mock(TrustedProviderRouteResolver.class),
+                        identityLoginService,
+                        identityLinkService,
+                        identityLinkSessions,
+                        accountMergeSessions,
+                        proofService);
+        ResolvedProviderHandle provider =
+                ResolvedProviderHandleTestFixture.handle("github");
+        MockHttpServletRequest request =
+                callbackRequest(principal());
+        RequestContextHolder.setRequestAttributes(
+                new ServletRequestAttributes(request));
+        AccountMergeBrowserFlow flow =
+                new AccountMergeBrowserFlow.Primary(
+                        "usr_1",
+                        "github");
+        when(accountMergeSessions.consumeBrowserFlow(
+                request,
+                "github",
+                context())).thenReturn(Optional.of(flow));
+        when(proofService.completePrimary(
+                request.getSession(false),
+                provider,
+                result(),
+                context())).thenReturn(
+                        new AccountMergeProviderPrimaryProof(
+                                principal(),
+                                new AccountMergePrimaryProof(
+                                        "provider:github",
+                                        Instant.parse(
+                                                "2026-07-30T08:00:00Z"),
+                                        Instant.parse(
+                                                "2026-07-30T08:10:00Z"))));
+
+        PlatformPrincipal authenticated = service.authenticate(
+                provider,
+                result(),
+                context());
+
+        assertThat(authenticated.userId()).isEqualTo("usr_1");
+        verifyNoInteractions(
+                identityLoginService,
+                identityLinkService);
+    }
+
+    @Test
+    void secondaryAccountMergeProofNeverReplacesPrimaryPrincipal() {
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        ExternalIdentityLinkService identityLinkService =
+                mock(ExternalIdentityLinkService.class);
+        AccountMergeSessionManager accountMergeSessions =
+                mock(AccountMergeSessionManager.class);
+        AccountMergeProviderProofService proofService =
+                mock(AccountMergeProviderProofService.class);
+        OAuthLoginFlowService service =
+                new OAuthLoginFlowService(
+                        List.of(),
+                        mock(TrustedProviderRouteResolver.class),
+                        identityLoginService,
+                        identityLinkService,
+                        mock(IdentityLinkSessionManager.class),
+                        accountMergeSessions,
+                        proofService);
+        ResolvedProviderHandle provider =
+                ResolvedProviderHandleTestFixture.handle("github");
+        MockHttpServletRequest request =
+                callbackRequest(principal());
+        RequestContextHolder.setRequestAttributes(
+                new ServletRequestAttributes(request));
+        UUID intentId = UUID.randomUUID();
+        AccountMergeActor actor = new AccountMergeActor(
+                "usr_1",
+                "local",
+                "session-nonce",
+                "local-password",
+                Instant.parse("2026-07-30T08:00:00Z"),
+                context());
+        AccountMergeBrowserFlow.Secondary flow =
+                new AccountMergeBrowserFlow.Secondary(
+                        intentId,
+                        actor,
+                        "github");
+        when(accountMergeSessions.consumeBrowserFlow(
+                request,
+                "github",
+                context())).thenReturn(Optional.of(flow));
+        when(proofService.completeSecondary(
+                actor,
+                intentId,
+                provider,
+                result(),
+                context())).thenReturn(new AccountMergeIntent(
+                        intentId,
+                        AccountMergeIntentStatus.READY_FOR_PREVIEW,
+                        Instant.parse(
+                                "2026-07-30T08:10:00Z")));
+
+        PlatformPrincipal authenticated = service.authenticate(
+                provider,
+                result(),
+                context());
+
+        assertThat(authenticated)
+                .isEqualTo(
+                        request.getSession(false)
+                                .getAttribute("platformPrincipal"));
+        assertThat(authenticated.userId()).isEqualTo("usr_1");
+        verifyNoInteractions(
+                identityLoginService,
+                identityLinkService);
     }
 
     @Test
@@ -440,7 +590,21 @@ class OAuthLoginFlowServiceTest {
                 mock(TrustedProviderRouteResolver.class),
                 mock(ExternalIdentityLoginService.class),
                 mock(ExternalIdentityLinkService.class),
-                mock(IdentityLinkSessionManager.class));
+                mock(IdentityLinkSessionManager.class),
+                mock(AccountMergeSessionManager.class),
+                mock(AccountMergeProviderProofService.class));
+    }
+
+    private static MockHttpServletRequest callbackRequest(
+            PlatformPrincipal principal) {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest(
+                        "GET",
+                        "/login/oauth2/code/github");
+        request.getSession(true).setAttribute(
+                "platformPrincipal",
+                principal);
+        return request;
     }
 
     private static ProviderAuthenticationResult result() {

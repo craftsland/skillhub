@@ -7,12 +7,15 @@ import type {
   ApiToken,
   CreateTokenRequest,
   CreateTokenResponse,
-  MergeConfirmRequest,
   LocalLoginRequest,
   LocalRegisterRequest,
-  MergeInitiateRequest,
-  MergeInitiateResponse,
-  MergeVerifyRequest,
+  AccountMergeAuthenticationMethod,
+  AccountMergeCapabilities,
+  AccountMergeCompletion,
+  AccountMergeCredentialRequest,
+  AccountMergeIntent,
+  AccountMergeMethodType,
+  AccountMergePreview,
   ReviewSkillDetail,
   ReviewTask,
   PromotionSortBy,
@@ -448,8 +451,6 @@ type IdentityLinkBindingSchema = components['schemas']['IdentityLinkBindingRespo
 type IdentityLinkProviderSchema = components['schemas']['IdentityLinkProviderResponse']
 type IdentityLinkBrowserStartSchema =
   components['schemas']['IdentityLinkBrowserStartResponse']
-type IdentityLinkErrorSchema =
-  components['schemas']['IdentityLinkErrorResponse']
 
 function normalizeIdentityLinkMethodTypes(
   methodTypes: IdentityLinkBindingSchema['methodTypes']
@@ -553,9 +554,14 @@ type OpenApiEnvelopeResult<T> = {
   response: Response
 }
 
+type ApiFailureEnvelope = {
+  msg?: string
+  reasonCode?: string
+}
+
 function isApiFailureEnvelope(
   value: unknown,
-): value is IdentityLinkErrorSchema {
+): value is ApiFailureEnvelope {
   return typeof value === 'object'
     && value !== null
     && ('msg' in value || 'reasonCode' in value)
@@ -787,35 +793,425 @@ export const identityLinkApi = {
   },
 }
 
+type AccountMergeCapabilitiesSchema =
+  components['schemas']['AccountMergeCapabilitiesResponse']
+type AccountMergeAuthenticationMethodSchema =
+  components['schemas']['AccountMergeAuthenticationMethodResponse']
+type AccountMergePrimaryProofSchema =
+  components['schemas']['AccountMergePrimaryProofResponse']
+type AccountMergeBrowserStartSchema =
+  components['schemas']['AccountMergeBrowserStartResponse']
+type AccountMergeIntentSchema =
+  components['schemas']['AccountMergeIntentResponse']
+type AccountMergePreviewSchema =
+  components['schemas']['AccountMergePreviewResponse']
+type AccountMergeCompletionSchema =
+  components['schemas']['AccountMergeCompletionResponse']
+type AccountMergeNamespaceChangeSchema =
+  components['schemas']['NamespaceChange']
+type AccountMergeTokenSchema =
+  components['schemas']['ApiToken']
+type AccountMergeDiscardedRatingSchema =
+  components['schemas']['DiscardedRating']
+type AccountMergeConflictSchema =
+  components['schemas']['Conflict']
+
+const accountMergeMethodTypes = new Set<AccountMergeMethodType>([
+  'LOCAL_PASSWORD',
+  'OAUTH_REDIRECT',
+  'CAS_REDIRECT',
+  'DIRECT_PASSWORD',
+])
+
+function invalidAccountMergeResponse(): never {
+  throw new ApiError('apiError.invalidResponse', 500)
+}
+
+function normalizeAccountMergeMethod(
+  method: AccountMergeAuthenticationMethodSchema,
+): AccountMergeAuthenticationMethod {
+  if (
+    !method.providerCode
+    || !method.displayName
+    || !method.methodType
+    || !accountMergeMethodTypes.has(
+      method.methodType as AccountMergeMethodType,
+    )
+  ) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    ...method,
+    providerCode: method.providerCode,
+    displayName: method.displayName,
+    methodType: method.methodType as AccountMergeMethodType,
+  }
+}
+
+function normalizeAccountMergeCapabilities(
+  capabilities: AccountMergeCapabilitiesSchema,
+): AccountMergeCapabilities {
+  if (capabilities.enabled === undefined) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    ...capabilities,
+    enabled: capabilities.enabled,
+    primaryMethods: (capabilities.primaryMethods ?? [])
+      .map(normalizeAccountMergeMethod),
+    secondaryMethods: (capabilities.secondaryMethods ?? [])
+      .map(normalizeAccountMergeMethod),
+  }
+}
+
+function normalizeAccountMergeIntent(
+  intent: AccountMergeIntentSchema,
+): AccountMergeIntent {
+  if (
+    !intent.id
+    || !intent.status
+    || !intent.expiresAt
+  ) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    ...intent,
+    id: intent.id,
+    status: intent.status,
+    expiresAt: intent.expiresAt,
+    secondaryMethods: (intent.secondaryMethods ?? [])
+      .map(normalizeAccountMergeMethod),
+  }
+}
+
+function requireAccountMergeActionUrl(
+  response: AccountMergeBrowserStartSchema,
+): string {
+  if (!response.actionUrl || !response.actionUrl.startsWith('/')) {
+    return invalidAccountMergeResponse()
+  }
+  return response.actionUrl
+}
+
+function normalizeAccountMergeNamespaceChange(
+  change: AccountMergeNamespaceChangeSchema,
+) {
+  if (
+    change.namespaceId === undefined
+    || !change.namespaceSlug
+    || change.blocked === undefined
+  ) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    namespaceId: change.namespaceId,
+    namespaceSlug: change.namespaceSlug,
+    primaryRole: change.primaryRole,
+    secondaryRole: change.secondaryRole,
+    resultingRole: change.resultingRole,
+    blocked: change.blocked,
+  }
+}
+
+function normalizeAccountMergeToken(
+  token: AccountMergeTokenSchema,
+) {
+  if (!token.name || !token.prefix) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    name: token.name,
+    prefix: token.prefix,
+  }
+}
+
+function normalizeAccountMergeConflict(
+  conflict: AccountMergeConflictSchema,
+) {
+  if (
+    !conflict.code
+    || !conflict.resource
+    || !conflict.suggestedAction
+  ) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    code: conflict.code,
+    resource: conflict.resource,
+    suggestedAction: conflict.suggestedAction,
+  }
+}
+
+function normalizeDiscardedRating(
+  rating: AccountMergeDiscardedRatingSchema,
+) {
+  if (
+    rating.skillId === undefined
+    || rating.score === undefined
+  ) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    skillId: rating.skillId,
+    score: rating.score,
+  }
+}
+
+function count(value: number | undefined): number {
+  if (value === undefined) {
+    return invalidAccountMergeResponse()
+  }
+  return value
+}
+
+function normalizeAccountMergePreview(
+  preview: AccountMergePreviewSchema,
+): AccountMergePreview {
+  if (
+    !preview.intentId
+    || !preview.status
+    || preview.previewVersion === undefined
+    || !preview.expiresAt
+    || preview.confirmable === undefined
+    || !preview.localCredentialAction
+    || !preview.social
+    || !preview.notifications
+  ) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    ...preview,
+    intentId: preview.intentId,
+    status: preview.status,
+    previewVersion: preview.previewVersion,
+    expiresAt: preview.expiresAt,
+    confirmable: preview.confirmable,
+    identityProviders: [...(preview.identityProviders ?? [])],
+    localCredentialAction: preview.localCredentialAction,
+    blockedPlatformRoles: [...(preview.blockedPlatformRoles ?? [])],
+    namespaceChanges: (preview.namespaceChanges ?? [])
+      .map(normalizeAccountMergeNamespaceChange),
+    apiTokensToRevoke: (preview.apiTokensToRevoke ?? [])
+      .map(normalizeAccountMergeToken),
+    skillOwnershipCount: count(preview.skillOwnershipCount),
+    social: {
+      starsMoved: count(preview.social.starsMoved),
+      duplicateStarsDiscarded: count(
+        preview.social.duplicateStarsDiscarded,
+      ),
+      ratingsMoved: count(preview.social.ratingsMoved),
+      duplicateRatingsDiscarded: count(
+        preview.social.duplicateRatingsDiscarded,
+      ),
+      subscriptionsMoved: count(preview.social.subscriptionsMoved),
+      duplicateSubscriptionsDiscarded: count(
+        preview.social.duplicateSubscriptionsDiscarded,
+      ),
+      discardedRatings: (preview.social.discardedRatings ?? [])
+        .map(normalizeDiscardedRating),
+    },
+    notifications: {
+      notificationsMoved: count(
+        preview.notifications.notificationsMoved,
+      ),
+      preferencesMoved: count(
+        preview.notifications.preferencesMoved,
+      ),
+      duplicatePreferencesDiscarded: count(
+        preview.notifications.duplicatePreferencesDiscarded,
+      ),
+      governanceNotificationsMoved: count(
+        preview.notifications.governanceNotificationsMoved,
+      ),
+    },
+    conflicts: (preview.conflicts ?? [])
+      .map(normalizeAccountMergeConflict),
+  }
+}
+
+function normalizeAccountMergeCompletion(
+  completion: AccountMergeCompletionSchema,
+): AccountMergeCompletion {
+  if (
+    !completion.intentId
+    || !completion.status
+    || !completion.completedAt
+  ) {
+    return invalidAccountMergeResponse()
+  }
+  return {
+    ...completion,
+    intentId: completion.intentId,
+    status: completion.status,
+    completedAt: completion.completedAt,
+  }
+}
+
 export const accountApi = {
-  async initiateMerge(request: MergeInitiateRequest): Promise<MergeInitiateResponse> {
-    return fetchJson<MergeInitiateResponse>('/api/v1/account/merge/initiate', {
-      method: 'POST',
-      headers: await ensureCsrfHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(request),
-    })
+  async capabilities(): Promise<AccountMergeCapabilities> {
+    const result = await client.GET(
+      '/api/v1/account/merge/capabilities',
+      { headers: withRequestHeaders() },
+    )
+    return normalizeAccountMergeCapabilities(
+      unwrapOpenApiEnvelope<AccountMergeCapabilitiesSchema>(result),
+    )
   },
 
-  async verifyMerge(request: MergeVerifyRequest): Promise<void> {
-    await fetchJson<void>('/api/v1/account/merge/verify', {
-      method: 'POST',
-      headers: await ensureCsrfHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(request),
-    })
+  async reauthenticatePrimaryLocal(password: string): Promise<void> {
+    const result = await client.POST(
+      '/api/v1/account/merge/reauthenticate/local',
+      {
+        headers: await ensureCsrfHeaders(),
+        body: { password },
+      },
+    )
+    unwrapOpenApiEnvelope<AccountMergePrimaryProofSchema>(result)
   },
 
-  async confirmMerge(request: MergeConfirmRequest): Promise<void> {
-    await fetchJson<void>('/api/v1/account/merge/confirm', {
-      method: 'POST',
-      headers: await ensureCsrfHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(request),
-    })
+  async reauthenticatePrimaryCredential(
+    providerCode: string,
+    credentials: AccountMergeCredentialRequest,
+  ): Promise<void> {
+    const result = await client.POST(
+      '/api/v1/account/merge/reauthenticate/credential',
+      {
+        headers: await ensureCsrfHeaders(),
+        body: { providerCode, ...credentials },
+      },
+    )
+    unwrapOpenApiEnvelope<AccountMergePrimaryProofSchema>(result)
+  },
+
+  async preparePrimaryBrowser(providerCode: string): Promise<string> {
+    const result = await client.POST(
+      '/api/v1/account/merge/reauthenticate/browser',
+      {
+        headers: await ensureCsrfHeaders(),
+        body: { providerCode },
+      },
+    )
+    return requireAccountMergeActionUrl(
+      unwrapOpenApiEnvelope<AccountMergeBrowserStartSchema>(result),
+    )
+  },
+
+  async createIntent(): Promise<AccountMergeIntent> {
+    const result = await client.POST(
+      '/api/v1/account/merge/intents',
+      { headers: await ensureCsrfHeaders() },
+    )
+    return normalizeAccountMergeIntent(
+      unwrapOpenApiEnvelope<AccountMergeIntentSchema>(result),
+    )
+  },
+
+  async getIntent(intentId: string): Promise<AccountMergeIntent> {
+    const result = await client.GET(
+      '/api/v1/account/merge/intents/{intentId}',
+      {
+        params: { path: { intentId } },
+        headers: withRequestHeaders(),
+      },
+    )
+    return normalizeAccountMergeIntent(
+      unwrapOpenApiEnvelope<AccountMergeIntentSchema>(result),
+    )
+  },
+
+  async authenticateSecondaryLocal(
+    intentId: string,
+    credentials: AccountMergeCredentialRequest,
+  ): Promise<AccountMergeIntent> {
+    const result = await client.POST(
+      '/api/v1/account/merge/intents/{intentId}/secondary-auth/local',
+      {
+        params: { path: { intentId } },
+        headers: await ensureCsrfHeaders(),
+        body: credentials,
+      },
+    )
+    return normalizeAccountMergeIntent(
+      unwrapOpenApiEnvelope<AccountMergeIntentSchema>(result),
+    )
+  },
+
+  async authenticateSecondaryCredential(
+    intentId: string,
+    providerCode: string,
+    credentials: AccountMergeCredentialRequest,
+  ): Promise<AccountMergeIntent> {
+    const result = await client.POST(
+      '/api/v1/account/merge/intents/{intentId}/secondary-auth/credential',
+      {
+        params: { path: { intentId } },
+        headers: await ensureCsrfHeaders(),
+        body: { providerCode, ...credentials },
+      },
+    )
+    return normalizeAccountMergeIntent(
+      unwrapOpenApiEnvelope<AccountMergeIntentSchema>(result),
+    )
+  },
+
+  async prepareSecondaryBrowser(
+    intentId: string,
+    providerCode: string,
+  ): Promise<string> {
+    const result = await client.POST(
+      '/api/v1/account/merge/intents/{intentId}/secondary-auth/browser',
+      {
+        params: { path: { intentId } },
+        headers: await ensureCsrfHeaders(),
+        body: { providerCode },
+      },
+    )
+    return requireAccountMergeActionUrl(
+      unwrapOpenApiEnvelope<AccountMergeBrowserStartSchema>(result),
+    )
+  },
+
+  async preview(intentId: string): Promise<AccountMergePreview> {
+    const result = await client.POST(
+      '/api/v1/account/merge/intents/{intentId}/preview',
+      {
+        params: { path: { intentId } },
+        headers: await ensureCsrfHeaders(),
+      },
+    )
+    return normalizeAccountMergePreview(
+      unwrapOpenApiEnvelope<AccountMergePreviewSchema>(result),
+    )
+  },
+
+  async confirm(
+    intentId: string,
+    previewVersion: number,
+  ): Promise<AccountMergeCompletion> {
+    const result = await client.POST(
+      '/api/v1/account/merge/intents/{intentId}/confirm',
+      {
+        params: { path: { intentId } },
+        headers: await ensureCsrfHeaders(),
+        body: { previewVersion },
+      },
+    )
+    return normalizeAccountMergeCompletion(
+      unwrapOpenApiEnvelope<AccountMergeCompletionSchema>(result),
+    )
+  },
+
+  async cancel(intentId: string): Promise<AccountMergeIntent> {
+    const result = await client.DELETE(
+      '/api/v1/account/merge/intents/{intentId}',
+      {
+        params: { path: { intentId } },
+        headers: await ensureCsrfHeaders(),
+      },
+    )
+    return normalizeAccountMergeIntent(
+      unwrapOpenApiEnvelope<AccountMergeIntentSchema>(result),
+    )
   },
 }
 

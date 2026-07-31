@@ -819,9 +819,99 @@
     }
   },
   "accounts": {
+    "title": "合并账号",
+    "description": "分别验证两个账号后，将另一个账号中允许迁移的登录方式和当前数据合并到本账号。",
+    "loading": "正在加载账号合并能力……",
+    "loadingIntent": "正在加载受保护的合并请求……",
+    "errorTitle": "无法加载账号合并功能",
     "unavailableTitle": "账号合并暂时不可用",
     "unavailableDescription": "旧流程无法分别证明两个账号的控制权，因此在安全重构完成前已被停用。",
-    "unavailableOperatorAction": "请勿让管理员通过数据库手工完成合并。在安全流程上线前，请继续分别使用两个账号。"
+    "unavailableOperatorAction": "请勿让管理员通过数据库手工完成合并。在安全流程上线前，请继续分别使用两个账号。",
+    "warningTitle": "此操作永久生效",
+    "warningDescription": "次账号将不能继续使用，其 API Token 会被撤销；合并完成后不能由系统自动拆分。",
+    "primaryBrowserSuccess": "本账号已完成重新验证。请立即继续创建受保护的合并请求。",
+    "secondaryBrowserSuccess": "另一个账号已独立验证成功。最终确认前请检查迁移计划。",
+    "working": "处理中……",
+    "completedTitle": "账号合并完成",
+    "completedDescription": "允许迁移的数据已归入本账号。次账号及其原有 Session 和 API Token 均不能继续使用。",
+    "done": "完成",
+    "intentUnavailableTitle": "合并请求不可用",
+    "startOver": "重新开始",
+    "cancel": "取消合并",
+    "confirm": "永久合并账号",
+    "confirmAcknowledgement": "我已检查迁移计划，并理解本次合并不可自动撤销，且会撤销次账号的 API Token 和 Session。",
+    "primary": {
+      "title": "1. 验证本账号",
+      "description": "当前登录 Session 不能代替重新认证。请使用本账号已关联的一种登录方式重新验证。",
+      "continue": "创建受保护的合并请求",
+      "noMethods": "本账号没有支持重新验证的登录方式。请先关联一种受支持的登录方式。"
+    },
+    "secondary": {
+      "title": "2. 独立验证另一个账号",
+      "description": "请实际登录要合并的账号，不能用邮箱、用户 ID 或 Provider Subject 代替身份认证。",
+      "verifyLocal": "验证另一个本地账号"
+    },
+    "authentication": {
+      "username": "用户名",
+      "password": "密码",
+      "localPassword": "本地密码",
+      "currentPassword": "当前密码",
+      "verifyAndContinue": "验证并继续",
+      "browserMethods": "通过浏览器验证",
+      "credentialMethods": "使用身份提供方凭据验证"
+    },
+    "preview": {
+      "title": "3. 检查迁移计划",
+      "description": "服务端会根据当前数据重新计算计划。预览之后的任何相关数据变化都会使旧预览失效。",
+      "readyTitle": "当前可以确认合并",
+      "readyDescription": "未发现阻塞性的权限或归属冲突。确认前请逐项检查。",
+      "blockedTitle": "解决冲突后才能合并",
+      "blockedDescription": "当前没有迁移任何数据。请先解决下列冲突，再刷新预览。",
+      "identityProviders": "将迁移的身份提供方",
+      "localCredential": "本地凭据处理方式",
+      "localCredentialActions": {
+        "NONE": "不变更本地凭据",
+        "MOVE_SECONDARY": "将次账号本地凭据迁移到主账号",
+        "KEEP_PRIMARY_DELETE_SECONDARY": "保留主账号凭据并使次账号凭据失效"
+      },
+      "skills": "将变更所有者的 Skill",
+      "tokens": "将撤销的 API Token",
+      "namespaces": "命名空间成员关系变化",
+      "tokensToRevoke": "将撤销的次账号 API Token",
+      "social": "Star、评分和订阅",
+      "socialSummary": "迁移 {{stars}} 个 Star、{{ratings}} 个评分和 {{subscriptions}} 个订阅；丢弃 {{duplicates}} 条重复记录。",
+      "discardedRatings": "将丢弃的次账号评分",
+      "discardedRating": "Skill #{{skillId}}：丢弃 {{score}} 分，保留主账号现有评分。",
+      "notifications": "通知和偏好",
+      "notificationSummary": "迁移 {{notifications}} 条通知、{{preferences}} 条偏好和 {{governance}} 条治理通知；丢弃 {{duplicates}} 条重复偏好。",
+      "blockedRoles": "阻塞合并的平台角色",
+      "conflicts": "阻塞冲突",
+      "conflictItem": "{{resource}} — {{action}}",
+      "conflictActions": {
+        "REMOVE_DUPLICATE_IDENTITY": "先移除其中一个冲突登录身份",
+        "REMOVE_SECONDARY_PLATFORM_ROLE": "先移除次账号的高权限平台角色",
+        "TRANSFER_NAMESPACE_OWNERSHIP": "先完成命名空间所有权转移",
+        "REASSIGN_OR_RENAME_SKILL": "先重新分配或重命名冲突 Skill",
+        "COMPLETE_OR_CANCEL_IDENTITY_LINK": "先完成或取消进行中的身份关联请求",
+        "COMPLETE_OR_CANCEL_PROFILE_CHANGE": "先完成或取消待处理的资料变更"
+      },
+      "none": "无",
+      "build": "生成迁移预览",
+      "refresh": "刷新迁移预览"
+    },
+    "errors": {
+      "unavailable": "当前部署尚未启用安全账号合并。",
+      "intentUnavailable": "本次合并请求已过期、已取消、属于其他 Session 或已被消费，请重新开始。",
+      "authenticationFailed": "账号验证失败。请检查凭据和账号状态后重试。",
+      "providerAuthenticationFailed": "身份提供方未能验证账号，本次没有变更任何合并数据。",
+      "providerUnavailable": "当前身份提供方暂不能用于账号验证。",
+      "conflict": "两个账号存在阻塞性的权限、身份、归属或工作流冲突。",
+      "previewStale": "生成预览后账号数据已变化，请重新生成并检查预览。",
+      "accountNotEligible": "其中一个账号当前不符合合并条件。",
+      "passwordRequired": "请输入当前密码。",
+      "credentialsRequired": "请输入用户名和密码。",
+      "default": "账号合并请求未能完成，系统没有执行部分合并。"
+    }
   },
   "namespace": {
     "notFound": "命名空间不存在",

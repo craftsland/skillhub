@@ -269,6 +269,9 @@ PR 6 开始前必须建立所有 userId 引用的迁移清单，并分类：
 任何未分类的 userId 外键、字符串引用或 JSON 引用都阻塞发布。不能只迁移旧
 `AccountMergeService` 已知的几张表就宣称完成。
 
+实现清单见
+[`24-account-merge-user-reference-inventory.md`](./24-account-merge-user-reference-inventory.md)。
+
 ## 8. 事务、Session 与跨存储一致性
 
 ### 8.1 PostgreSQL 事务
@@ -361,6 +364,9 @@ code、Ticket、SAML assertion、API Token hash 或完整上游响应。
 指标标签。
 
 ## 11. 升级、启用与回滚
+
+可执行的部署顺序、配置字段、观察方式和回滚步骤见
+[`25-secure-account-merge-operations.md`](./25-secure-account-merge-operations.md)。
 
 ### 11.1 旧请求
 

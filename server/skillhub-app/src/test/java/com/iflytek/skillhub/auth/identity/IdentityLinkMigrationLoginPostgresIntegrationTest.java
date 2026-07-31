@@ -255,7 +255,6 @@ class IdentityLinkMigrationLoginPostgresIntegrationTest {
                 .schemas(SCHEMA)
                 .defaultSchema(SCHEMA)
                 .createSchemas(true)
-                .target(MigrationVersion.fromVersion("49"))
                 .load()
                 .migrate();
     }
