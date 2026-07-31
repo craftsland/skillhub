@@ -34,6 +34,14 @@ public class GitLabClaimsExtractor implements OAuthClaimsExtractor {
 
     private final RestClient restClient;
 
+    /**
+     * Uses an external-service client that is intentionally not customized with application
+     * tracing. Trace context must not be propagated to a user-configured GitLab host.
+     */
+    public GitLabClaimsExtractor() {
+        this(RestClient.builder());
+    }
+
     public GitLabClaimsExtractor(RestClient.Builder restClientBuilder) {
         this.restClient = restClientBuilder
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)

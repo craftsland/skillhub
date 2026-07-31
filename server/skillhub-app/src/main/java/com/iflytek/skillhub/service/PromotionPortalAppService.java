@@ -12,11 +12,11 @@ import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
 import com.iflytek.skillhub.dto.PageResponse;
 import com.iflytek.skillhub.dto.PromotionResponseDto;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import com.iflytek.skillhub.repository.GovernanceQueryRepository;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import org.slf4j.MDC;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -32,17 +32,20 @@ public class PromotionPortalAppService {
     private final GovernanceQueryRepository governanceQueryRepository;
     private final RbacService rbacService;
     private final AuditLogService auditLogService;
+    private final RequestIdAccessor requestIdAccessor;
 
     public PromotionPortalAppService(PromotionService promotionService,
                                      PromotionRequestRepository promotionRequestRepository,
                                      GovernanceQueryRepository governanceQueryRepository,
                                      RbacService rbacService,
-                                     AuditLogService auditLogService) {
+                                     AuditLogService auditLogService,
+                                     RequestIdAccessor requestIdAccessor) {
         this.promotionService = promotionService;
         this.promotionRequestRepository = promotionRequestRepository;
         this.governanceQueryRepository = governanceQueryRepository;
         this.rbacService = rbacService;
         this.auditLogService = auditLogService;
+        this.requestIdAccessor = requestIdAccessor;
     }
 
     public PromotionResponseDto submitPromotion(Long sourceSkillId,
@@ -235,7 +238,7 @@ public class PromotionPortalAppService {
                 action,
                 "PROMOTION_REQUEST",
                 targetId,
-                MDC.get("requestId"),
+                requestIdAccessor.current(),
                 auditContext != null ? auditContext.clientIp() : null,
                 auditContext != null ? auditContext.userAgent() : null,
                 detailJson

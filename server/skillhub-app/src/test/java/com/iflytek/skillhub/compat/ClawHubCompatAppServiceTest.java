@@ -15,6 +15,7 @@ import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.service.SkillQueryService;
 import com.iflytek.skillhub.domain.social.SkillStarService;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import com.iflytek.skillhub.service.SkillSearchAppService;
 import java.util.Map;
 import java.util.Optional;
@@ -40,7 +41,8 @@ class ClawHubCompatAppServiceTest {
             multipartPackageExtractor,
             auditLogService,
             compatSkillLookupService,
-            skillStarService
+            skillStarService,
+            new RequestIdAccessor()
     );
 
     @Test

@@ -9,6 +9,7 @@ import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.dto.IdentityLinkErrorResponse;
 import com.iflytek.skillhub.auth.exception.AuthFlowException;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import com.iflytek.skillhub.security.SensitiveLogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
@@ -46,11 +47,18 @@ class GlobalExceptionHandlerTest {
                 "error.auth.local.invalidCredentials",
                 java.util.Locale.getDefault(),
                 "Invalid username or password");
+        RequestIdAccessor requestIdAccessor = new RequestIdAccessor();
         ApiResponseFactory responseFactory = new ApiResponseFactory(
                 messageSource,
-                Clock.fixed(Instant.parse("2026-03-20T00:00:00Z"), ZoneOffset.UTC)
+                Clock.fixed(Instant.parse("2026-03-20T00:00:00Z"), ZoneOffset.UTC),
+                requestIdAccessor
         );
-        handler = new GlobalExceptionHandler(responseFactory, sensitiveLogSanitizer, metrics);
+        handler = new GlobalExceptionHandler(
+                responseFactory,
+                sensitiveLogSanitizer,
+                metrics,
+                requestIdAccessor
+        );
     }
 
     @Test

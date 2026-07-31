@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -30,6 +31,7 @@ class ApiAuthenticationEntryPointTest {
                 new ResourceBundleMessageSource();
         messageSource.setBasename("messages");
         messageSource.setDefaultEncoding("UTF-8");
+        RequestIdAccessor requestIdAccessor = new RequestIdAccessor();
         entryPoint = new ApiAuthenticationEntryPoint(
                 objectMapper,
                 new ApiResponseFactory(
@@ -37,8 +39,10 @@ class ApiAuthenticationEntryPointTest {
                         Clock.fixed(
                                 Instant.parse(
                                         "2026-07-31T00:00:00Z"),
-                                ZoneOffset.UTC)),
-                new SensitiveLogSanitizer());
+                                ZoneOffset.UTC),
+                        requestIdAccessor),
+                new SensitiveLogSanitizer(),
+                requestIdAccessor);
         LocaleContextHolder.setLocale(Locale.ENGLISH);
     }
 

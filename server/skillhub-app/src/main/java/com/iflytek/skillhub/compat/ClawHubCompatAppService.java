@@ -21,12 +21,12 @@ import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.service.SkillQueryService;
 import com.iflytek.skillhub.domain.social.SkillStarService;
 import com.iflytek.skillhub.dto.SkillSummaryResponse;
+import com.iflytek.skillhub.observability.RequestIdAccessor;
 import com.iflytek.skillhub.service.SkillSearchAppService;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -49,6 +49,7 @@ public class ClawHubCompatAppService {
     private final AuditLogService auditLogService;
     private final CompatSkillLookupService compatSkillLookupService;
     private final SkillStarService skillStarService;
+    private final RequestIdAccessor requestIdAccessor;
 
     public ClawHubCompatAppService(CanonicalSlugMapper mapper,
                                    SkillSearchAppService skillSearchAppService,
@@ -58,7 +59,8 @@ public class ClawHubCompatAppService {
                                    MultipartPackageExtractor multipartPackageExtractor,
                                    AuditLogService auditLogService,
                                    CompatSkillLookupService compatSkillLookupService,
-                                   SkillStarService skillStarService) {
+                                   SkillStarService skillStarService,
+                                   RequestIdAccessor requestIdAccessor) {
         this.mapper = mapper;
         this.skillSearchAppService = skillSearchAppService;
         this.skillQueryService = skillQueryService;
@@ -68,6 +70,7 @@ public class ClawHubCompatAppService {
         this.auditLogService = auditLogService;
         this.compatSkillLookupService = compatSkillLookupService;
         this.skillStarService = skillStarService;
+        this.requestIdAccessor = requestIdAccessor;
     }
 
     public ClawHubSearchResponse search(String q,
@@ -430,7 +433,7 @@ public class ClawHubCompatAppService {
                 "COMPAT_PUBLISH",
                 "SKILL_VERSION",
                 versionId,
-                MDC.get("requestId"),
+                requestIdAccessor.current(),
                 clientIp,
                 userAgent,
                 detailJson

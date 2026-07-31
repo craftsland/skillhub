@@ -94,6 +94,12 @@ spring:
             enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:false}
 
 skillhub:
+  observability:
+    tracing-mode: ${SKILLHUB_TRACING_MODE:none}
+    log-format: ${SKILLHUB_LOG_FORMAT:text}
+    log-async-queue-size: ${SKILLHUB_LOG_ASYNC_QUEUE_SIZE:1024}
+    service-version: ${SKILLHUB_SERVICE_VERSION:unknown}
+    service-environment: ${SKILLHUB_SERVICE_ENVIRONMENT:local}
   builtin-skills:
     enabled: ${SKILLHUB_BUILTIN_SKILLS_ENABLED:true}
   redis:
@@ -215,6 +221,17 @@ skillhub:
       email: ${BOOTSTRAP_ADMIN_EMAIL:admin@skillhub.local}
 
 management:
+  tracing:
+    sampling:
+      probability: ${SKILLHUB_TRACING_SAMPLING_PROBABILITY:0.1}
+    baggage:
+      enabled: false
+    propagation:
+      type: W3C
+  otlp:
+    tracing:
+      timeout: ${SKILLHUB_OTLP_TIMEOUT:5s}
+      compression: ${SKILLHUB_OTLP_COMPRESSION:gzip}
   health:
     mail:
       enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
