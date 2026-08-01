@@ -30,6 +30,7 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Compatibility-focused application service that keeps ClawHub transport logic
@@ -131,9 +132,7 @@ public class ClawHubCompatAppService {
 
     public String downloadLocationByPath(String canonicalSlug, String version) {
         SkillCoordinate coord = mapper.fromCanonical(canonicalSlug);
-        return "latest".equals(version)
-                ? "/api/v1/skills/" + coord.namespace() + "/" + coord.slug() + "/download"
-                : "/api/v1/skills/" + coord.namespace() + "/" + coord.slug() + "/versions/" + version + "/download";
+        return buildDownloadLocation(coord, version);
     }
 
     public String downloadLocationByQuery(String slug,
@@ -141,9 +140,28 @@ public class ClawHubCompatAppService {
                                           String userId,
                                           Map<Long, NamespaceRole> userNsRoles) {
         SkillCoordinate coord = resolveQueryCoordinate(slug, userId, userNsRoles);
-        return "latest".equals(version)
-                ? "/api/v1/skills/" + coord.namespace() + "/" + coord.slug() + "/download"
-                : "/api/v1/skills/" + coord.namespace() + "/" + coord.slug() + "/versions/" + version + "/download";
+        return buildDownloadLocation(coord, version);
+    }
+
+    /**
+     * Builds the redirect Location for a download.
+     *
+     * <p>
+     * Each path segment is percent-encoded, because a non-ASCII slug (for example a
+     * Chinese skill name) cannot be written into the HTTP {@code Location} header as-is:
+     * Tomcat encodes header values as ISO-8859-1 and drops the header when a character
+     * falls outside 0-255, which breaks the ClawHub CLI download. Using
+     * {@code pathSegment(...)} keeps the '/' separators literal while encoding the
+     * segment contents.
+     */
+    private String buildDownloadLocation(SkillCoordinate coord, String version) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/api/v1/skills")
+                .pathSegment(coord.namespace(), coord.slug());
+        if (!"latest".equals(version)) {
+            builder.pathSegment("versions", version);
+        }
+        builder.pathSegment("download");
+        return builder.encode().toUriString();
     }
 
     private SkillCoordinate resolveQueryCoordinate(String slug,
