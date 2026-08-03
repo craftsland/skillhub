@@ -219,6 +219,20 @@ if grep -Fq 'ldap-bind-password:' "$TMP_DIR/default.yaml"; then
   fail "disabled LDAP must not render a bind password"
 fi
 
+render dingtalk "$CHART_DIR" \
+  --set auth.dingtalk.enabled=true \
+  --set-string secrets.oauth2DingtalkClientId=dingtalk-client-id \
+  --set-string secrets.oauth2DingtalkClientSecret=dingtalk-client-secret \
+  --show-only templates/configmap.yaml \
+  --show-only templates/secret.yaml \
+  --show-only templates/server-deployment.yaml >"$TMP_DIR/dingtalk.yaml"
+grep -Fq 'auth-dingtalk-enabled: "true"' "$TMP_DIR/dingtalk.yaml"
+grep -Fq 'auth-dingtalk-display-name: "DingTalk"' "$TMP_DIR/dingtalk.yaml"
+grep -Fq 'auth-dingtalk-authority: "dingtalk.corp"' "$TMP_DIR/dingtalk.yaml"
+grep -Fq 'oauth2-dingtalk-client-id: "dingtalk-client-id"' "$TMP_DIR/dingtalk.yaml"
+grep -Fq 'oauth2-dingtalk-client-secret: "dingtalk-client-secret"' "$TMP_DIR/dingtalk.yaml"
+grep -Fq 'name: OAUTH2_DINGTALK_CLIENT_SECRET' "$TMP_DIR/dingtalk.yaml"
+
 render tls "$CHART_DIR" \
   --set ingress.enabled=true \
   --set-json 'ingress.tls=[{"hosts":["skills.example.com"],"secretName":"skills-tls"}]' \
@@ -317,6 +331,17 @@ assert_rejected cas-with-wrong-callback \
   --set auth.cas.enabled=true \
   --set auth.cas.serverUrl=https://cas.example.com/cas \
   --set auth.cas.serviceUrl=https://skills.example.com/api/v1/auth/cas/other/callback
+assert_rejected dingtalk-without-client-id \
+  --set auth.dingtalk.enabled=true \
+  --set-string secrets.oauth2DingtalkClientSecret=dingtalk-client-secret
+assert_rejected dingtalk-without-client-secret \
+  --set auth.dingtalk.enabled=true \
+  --set-string secrets.oauth2DingtalkClientId=dingtalk-client-id
+assert_rejected dingtalk-with-invalid-authority \
+  --set auth.dingtalk.enabled=true \
+  --set-string auth.dingtalk.authority=https://dingtalk.example.com \
+  --set-string secrets.oauth2DingtalkClientId=dingtalk-client-id \
+  --set-string secrets.oauth2DingtalkClientSecret=dingtalk-client-secret
 assert_rejected ingress-without-server-service --set ingress.enabled=true --set server.service.enabled=false
 assert_rejected ingress-without-web-service --set ingress.enabled=true --set web.service.enabled=false
 assert_rejected multi-without-rwx --set server.replicaCount=2

@@ -398,6 +398,38 @@ spec:
                   name: skillhub-config
                   key: auth-cas-attribute-avatar-url
 
+            # DingTalk native OAuth2 browser login
+            - name: SKILLHUB_AUTH_DINGTALK_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: auth-dingtalk-enabled
+            - name: OAUTH2_DINGTALK_DISPLAY_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: auth-dingtalk-display-name
+            - name: SKILLHUB_AUTH_DINGTALK_AUTHORITY
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: auth-dingtalk-authority
+            - name: SKILLHUB_AUTH_DINGTALK_CONNECT_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: auth-dingtalk-connect-timeout
+            - name: SKILLHUB_AUTH_DINGTALK_READ_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: auth-dingtalk-read-timeout
+            - name: SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES
+              valueFrom:
+                configMapKeyRef:
+                  name: skillhub-config
+                  key: auth-dingtalk-max-response-bytes
+
             # Bootstrap Admin (non-sensitive from ConfigMap)
             - name: BOOTSTRAP_ADMIN_ENABLED
               valueFrom:
@@ -445,6 +477,20 @@ spec:
                 secretKeyRef:
                   name: skillhub-secret
                   key: oauth2-github-client-secret
+                  optional: true
+
+            # OAuth2 DingTalk (optional)
+            - name: OAUTH2_DINGTALK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: skillhub-secret
+                  key: oauth2-dingtalk-client-id
+                  optional: true
+            - name: OAUTH2_DINGTALK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: skillhub-secret
+                  key: oauth2-dingtalk-client-secret
                   optional: true
 
           volumeMounts:

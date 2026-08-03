@@ -1,5 +1,7 @@
 package com.iflytek.skillhub.auth.identity;
 
+import com.iflytek.skillhub.auth.oauth.DingTalkOAuth2Constants;
+import com.iflytek.skillhub.auth.oauth.DingTalkProperties;
 import com.iflytek.skillhub.auth.oauth.OAuthClaimsExtractor;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -35,20 +37,23 @@ class StaticTrustedProviderDescriptorSource
     private final Map<String, ProviderDescriptor> descriptors;
     private final Map<String, ClientRegistration> trustedRegistrations;
     private final IdentityProviderPolicyProperties policyProperties;
+    private final DingTalkProperties dingTalkProperties;
 
     @Autowired
     StaticTrustedProviderDescriptorSource(
             OAuth2ClientProperties properties,
             ClientRegistrationRepository registrationRepository,
             List<OAuthClaimsExtractor> extractors,
-            IdentityProviderPolicyProperties policyProperties) {
+            IdentityProviderPolicyProperties policyProperties,
+            DingTalkProperties dingTalkProperties) {
         this(
                 properties,
                 registrationRepository,
                 extractors.stream()
                         .map(OAuthClaimsExtractor::getProvider)
                         .collect(Collectors.toUnmodifiableSet()),
-                policyProperties);
+                policyProperties,
+                dingTalkProperties);
     }
 
     StaticTrustedProviderDescriptorSource(
@@ -59,7 +64,8 @@ class StaticTrustedProviderDescriptorSource
                 properties,
                 registrationRepository,
                 extractorCodes,
-                new IdentityProviderPolicyProperties());
+                new IdentityProviderPolicyProperties(),
+                new DingTalkProperties());
     }
 
     StaticTrustedProviderDescriptorSource(
@@ -67,7 +73,22 @@ class StaticTrustedProviderDescriptorSource
             ClientRegistrationRepository registrationRepository,
             Set<String> extractorCodes,
             IdentityProviderPolicyProperties policyProperties) {
+        this(
+                properties,
+                registrationRepository,
+                extractorCodes,
+                policyProperties,
+                new DingTalkProperties());
+    }
+
+    StaticTrustedProviderDescriptorSource(
+            OAuth2ClientProperties properties,
+            ClientRegistrationRepository registrationRepository,
+            Set<String> extractorCodes,
+            IdentityProviderPolicyProperties policyProperties,
+            DingTalkProperties dingTalkProperties) {
         this.policyProperties = policyProperties;
+        this.dingTalkProperties = dingTalkProperties;
         Map<String, ProviderDescriptor> resolvedDescriptors =
                 new LinkedHashMap<>();
         Map<String, ClientRegistration> resolvedRegistrations =
@@ -125,6 +146,10 @@ class StaticTrustedProviderDescriptorSource
         if (!hasRealClientId(properties.getClientId())) {
             return Optional.empty();
         }
+        if (DingTalkOAuth2Constants.REGISTRATION_ID.equals(providerCode)
+                && !hasRealClientSecret(properties.getClientSecret())) {
+            return Optional.empty();
+        }
         ClientRegistration registration;
         try {
             registration = registrationRepository
@@ -136,6 +161,11 @@ class StaticTrustedProviderDescriptorSource
             return Optional.empty();
         }
         if (registration == null) {
+            return Optional.empty();
+        }
+        if (DingTalkOAuth2Constants.REGISTRATION_ID.equals(providerCode)
+                && (!hasRealClientId(registration.getClientId())
+                || !hasRealClientSecret(registration.getClientSecret()))) {
             return Optional.empty();
         }
 
@@ -202,6 +232,16 @@ class StaticTrustedProviderDescriptorSource
                         List.of("email"),
                         List.of("avatar_url"));
             }
+            case DingTalkOAuth2Constants.REGISTRATION_ID -> {
+                if (!hasExtractor
+                        || hasIssuer
+                        || !dingTalkProperties.isEnabled()) {
+                    throw new IllegalArgumentException(
+                            "DingTalk adapter is unavailable");
+                }
+                validateDingTalkEndpoints(registration);
+                yield dingTalkDescriptor(providerCode);
+            }
             default -> {
                 if (!hasIssuer || hasExtractor) {
                     throw new IllegalArgumentException(
@@ -236,6 +276,30 @@ class StaticTrustedProviderDescriptorSource
             List<String> displayNameAttributes,
             List<String> emailAttributes,
             List<String> avatarAttributes) {
+        return descriptor(
+                providerCode,
+                protocol,
+                authority,
+                configuredDisplayName,
+                subjectType,
+                canonicalizer,
+                displayNameAttributes,
+                emailAttributes,
+                avatarAttributes,
+                EmailAssurance.VERIFIED);
+    }
+
+    private ProviderDescriptor descriptor(
+            String providerCode,
+            String protocol,
+            String authority,
+            String configuredDisplayName,
+            String subjectType,
+            SubjectCanonicalizer canonicalizer,
+            List<String> displayNameAttributes,
+            List<String> emailAttributes,
+            List<String> avatarAttributes,
+            EmailAssurance emailAssuranceLimit) {
         String displayName =
                 configuredDisplayName == null
                         || configuredDisplayName.isBlank()
@@ -254,9 +318,57 @@ class StaticTrustedProviderDescriptorSource
                 displayNameAttributes,
                 emailAttributes,
                 avatarAttributes,
-                EmailAssurance.VERIFIED,
+                emailAssuranceLimit,
                 policy.provisioningMode(),
                 policy.profileSyncPolicy());
+    }
+
+    private ProviderDescriptor dingTalkDescriptor(String providerCode) {
+        IdentityProviderPolicyProperties.ProviderIdentityPolicy policy =
+                policyProperties.resolve(providerCode);
+        String displayName = dingTalkProperties.getDisplayName();
+        if (displayName == null || displayName.isBlank()) {
+            displayName = "DingTalk";
+        }
+        return new ProviderDescriptor(
+                providerCode,
+                "dingtalk-oauth2",
+                requireDingTalkAuthority(),
+                displayName,
+                "dingtalk_union_id",
+                "dingtalk_union_id",
+                Map.of(
+                        "dingtalk_union_id",
+                        SubjectCanonicalizer.EXACT,
+                        "dingtalk_open_id",
+                        SubjectCanonicalizer.EXACT,
+                        "dingtalk_user_id",
+                        SubjectCanonicalizer.EXACT),
+                List.of("dingtalk_nick", "dingtalk_name"),
+                List.of("dingtalk_email"),
+                List.of("dingtalk_avatar_url"),
+                EmailAssurance.PROVIDER_ASSERTED,
+                policy.provisioningMode(),
+                policy.profileSyncPolicy());
+    }
+
+    private void validateDingTalkEndpoints(
+            ClientRegistration registration) {
+        if (!DingTalkOAuth2Constants.hasTrustedRegistration(registration)) {
+            throw new IllegalArgumentException(
+                    "Invalid DingTalk provider endpoints");
+        }
+    }
+
+    private String requireDingTalkAuthority() {
+        String authority = dingTalkProperties.getAuthority();
+        if (authority == null
+                || !authority.matches(
+                        "[a-z0-9][a-z0-9._:-]{0,127}")) {
+            throw new IllegalArgumentException(
+                    "Invalid DingTalk authority");
+        }
+        return authority;
     }
 
     private void validatePublicGithubEndpoints(
@@ -357,6 +469,13 @@ class StaticTrustedProviderDescriptorSource
         return clientId != null
                 && !clientId.isBlank()
                 && !clientId.toLowerCase(Locale.ROOT)
+                        .contains("placeholder");
+    }
+
+    private boolean hasRealClientSecret(String clientSecret) {
+        return clientSecret != null
+                && !clientSecret.isBlank()
+                && !clientSecret.toLowerCase(Locale.ROOT)
                         .contains("placeholder");
     }
 

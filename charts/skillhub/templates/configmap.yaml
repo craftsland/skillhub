@@ -98,4 +98,10 @@ data:
   auth-cas-attribute-display-name: {{ .Values.auth.cas.attributes.displayName | quote }}
   auth-cas-attribute-email: {{ .Values.auth.cas.attributes.email | quote }}
   auth-cas-attribute-avatar-url: {{ .Values.auth.cas.attributes.avatarUrl | quote }}
+  auth-dingtalk-enabled: {{ .Values.auth.dingtalk.enabled | quote }}
+  auth-dingtalk-display-name: {{ .Values.auth.dingtalk.displayName | quote }}
+  auth-dingtalk-authority: {{ .Values.auth.dingtalk.authority | quote }}
+  auth-dingtalk-connect-timeout: {{ .Values.auth.dingtalk.connectTimeout | quote }}
+  auth-dingtalk-read-timeout: {{ .Values.auth.dingtalk.readTimeout | quote }}
+  auth-dingtalk-max-response-bytes: {{ .Values.auth.dingtalk.maxResponseBytes | quote }}
   builtin-skills-enabled: {{ .Values.builtinSkills.enabled | quote }}

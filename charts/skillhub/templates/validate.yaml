@@ -62,6 +62,15 @@
 {{- end -}}
 {{- end -}}
 
+{{- if .Values.auth.dingtalk.enabled -}}
+{{- if and (not .Values.existingSecret) (not .Values.secrets.oauth2DingtalkClientId) -}}
+{{- fail "auth.dingtalk.enabled=true requires secrets.oauth2DingtalkClientId or existingSecret key oauth2-dingtalk-client-id" -}}
+{{- end -}}
+{{- if and (not .Values.existingSecret) (not .Values.secrets.oauth2DingtalkClientSecret) -}}
+{{- fail "auth.dingtalk.enabled=true requires secrets.oauth2DingtalkClientSecret or existingSecret key oauth2-dingtalk-client-secret" -}}
+{{- end -}}
+{{- end -}}
+
 {{- if and .Values.ingress.enabled (not .Values.server.service.enabled) -}}
 {{- fail "ingress.enabled=true requires server.service.enabled=true" -}}
 {{- end -}}

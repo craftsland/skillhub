@@ -75,6 +75,33 @@ write_env "$disabled_builtin_skills_env" "release-download-secret-32-bytes-minim
 printf '%s\n' "SKILLHUB_BUILTIN_SKILLS_ENABLED=false" >>"$disabled_builtin_skills_env"
 "$SCRIPT" "$disabled_builtin_skills_env" >/dev/null
 
+valid_dingtalk_env="$tmp/valid-dingtalk.env"
+write_env "$valid_dingtalk_env" "release-download-secret-32-bytes-minimum"
+cat >>"$valid_dingtalk_env" <<'EOF'
+SKILLHUB_AUTH_DINGTALK_ENABLED=true
+SKILLHUB_AUTH_DINGTALK_AUTHORITY=dingtalk.corp
+SKILLHUB_AUTH_DINGTALK_CONNECT_TIMEOUT=PT5S
+SKILLHUB_AUTH_DINGTALK_READ_TIMEOUT=PT10S
+SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES=1048576
+OAUTH2_DINGTALK_CLIENT_ID=real-dingtalk-client
+OAUTH2_DINGTALK_CLIENT_SECRET=real-dingtalk-secret
+EOF
+"$SCRIPT" "$valid_dingtalk_env" >/dev/null
+
+missing_dingtalk_secret_env="$tmp/missing-dingtalk-secret.env"
+grep -v '^OAUTH2_DINGTALK_CLIENT_SECRET=' "$valid_dingtalk_env" >"$missing_dingtalk_secret_env"
+expect_fail "$missing_dingtalk_secret_env" "OAUTH2_DINGTALK_CLIENT_SECRET is required"
+
+invalid_dingtalk_authority_env="$tmp/invalid-dingtalk-authority.env"
+cp "$valid_dingtalk_env" "$invalid_dingtalk_authority_env"
+sed -i 's/^SKILLHUB_AUTH_DINGTALK_AUTHORITY=.*/SKILLHUB_AUTH_DINGTALK_AUTHORITY=https:\/\/dingtalk.example.com/' "$invalid_dingtalk_authority_env"
+expect_fail "$invalid_dingtalk_authority_env" "SKILLHUB_AUTH_DINGTALK_AUTHORITY contains invalid characters"
+
+invalid_dingtalk_size_env="$tmp/invalid-dingtalk-size.env"
+cp "$valid_dingtalk_env" "$invalid_dingtalk_size_env"
+sed -i 's/^SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES=.*/SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES=512/' "$invalid_dingtalk_size_env"
+expect_fail "$invalid_dingtalk_size_env" "SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES must be between 1024 and 1048576"
+
 missing_env="$tmp/missing.env"
 write_env "$missing_env" "" no
 expect_fail "$missing_env" "SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET is required"

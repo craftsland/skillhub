@@ -3,6 +3,8 @@ package com.iflytek.skillhub.auth.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.iflytek.skillhub.auth.oauth.DingTalkOAuth2Constants;
+import com.iflytek.skillhub.auth.oauth.DingTalkProperties;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -160,6 +162,108 @@ class StaticTrustedProviderDescriptorSourceTest {
     }
 
     @Test
+    void exposesDingTalkOnlyWhenEnabledAndUsesTypedUnionIdAliases() {
+        ClientRegistration dingtalk = dingtalk();
+        DingTalkProperties dingTalkProperties = new DingTalkProperties();
+        dingTalkProperties.setEnabled(true);
+        dingTalkProperties.setAuthority("dingtalk.corp");
+        OAuth2ClientProperties properties =
+                new OAuth2ClientProperties();
+        properties.getRegistration().put(
+                "dingtalk",
+                properties("client-id", "client-secret", "DingTalk"));
+        StaticTrustedProviderDescriptorSource source =
+                new StaticTrustedProviderDescriptorSource(
+                        properties,
+                        new InMemoryClientRegistrationRepository(dingtalk),
+                        Set.of("dingtalk"),
+                        new IdentityProviderPolicyProperties(),
+                        dingTalkProperties);
+
+        ProviderDescriptor descriptor = descriptor(source, "dingtalk");
+
+        assertThat(descriptor.protocol()).isEqualTo("dingtalk-oauth2");
+        assertThat(descriptor.canonicalAuthority())
+                .isEqualTo("dingtalk.corp");
+        assertThat(descriptor.primarySubjectType())
+                .isEqualTo("dingtalk_union_id");
+        assertThat(descriptor.canonicalizerFor("dingtalk_union_id"))
+                .isEqualTo(SubjectCanonicalizer.EXACT);
+        assertThat(descriptor.canonicalizerFor("dingtalk_open_id"))
+                .isEqualTo(SubjectCanonicalizer.EXACT);
+        assertThat(descriptor.canonicalizerFor("dingtalk_user_id"))
+                .isEqualTo(SubjectCanonicalizer.EXACT);
+        assertThat(descriptor.emailAssuranceLimit())
+                .isEqualTo(EmailAssurance.PROVIDER_ASSERTED);
+    }
+
+    @Test
+    void hidesDingTalkWhenDisabledOrEndpointsAreNotOfficial() {
+        ClientRegistration dingtalk = dingtalk();
+        OAuth2ClientProperties properties = new OAuth2ClientProperties();
+        properties.getRegistration().put(
+                "dingtalk",
+                properties("client-id", "client-secret", "DingTalk"));
+
+        StaticTrustedProviderDescriptorSource disabled =
+                new StaticTrustedProviderDescriptorSource(
+                        properties,
+                        new InMemoryClientRegistrationRepository(dingtalk),
+                        Set.of("dingtalk"),
+                        new IdentityProviderPolicyProperties(),
+                        new DingTalkProperties());
+        assertThat(disabled.configuredDescriptors()).isEmpty();
+
+        DingTalkProperties enabled = new DingTalkProperties();
+        enabled.setEnabled(true);
+        enabled.setAuthority("dingtalk.corp");
+        ClientRegistration altered = ClientRegistration.withRegistrationId(
+                "dingtalk")
+                .clientId("client-id")
+                .clientSecret("client-secret")
+                .clientName("DingTalk")
+                .authorizationGrantType(
+                        AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .authorizationUri("https://attacker.example/authorize")
+                .tokenUri(DingTalkOAuth2Constants.TOKEN_URI)
+                .userInfoUri(DingTalkOAuth2Constants.USER_INFO_URI)
+                .userNameAttributeName(
+                        DingTalkOAuth2Constants.SUBJECT_ATTRIBUTE)
+                .build();
+        StaticTrustedProviderDescriptorSource alteredSource =
+                new StaticTrustedProviderDescriptorSource(
+                        properties,
+                        new InMemoryClientRegistrationRepository(altered),
+                        Set.of("dingtalk"),
+                        new IdentityProviderPolicyProperties(),
+                        enabled);
+        assertThat(alteredSource.configuredDescriptors()).isEmpty();
+    }
+
+    @Test
+    void hidesDingTalkWhenClientSecretIsMissingOrPlaceholder() {
+        ClientRegistration dingtalk = dingtalk();
+        OAuth2ClientProperties properties = new OAuth2ClientProperties();
+        properties.getRegistration().put(
+                "dingtalk",
+                properties("client-id", "placeholder", "DingTalk"));
+        DingTalkProperties enabled = new DingTalkProperties();
+        enabled.setEnabled(true);
+        enabled.setAuthority("dingtalk.corp");
+
+        StaticTrustedProviderDescriptorSource source =
+                new StaticTrustedProviderDescriptorSource(
+                        properties,
+                        new InMemoryClientRegistrationRepository(dingtalk),
+                        Set.of("dingtalk"),
+                        new IdentityProviderPolicyProperties(),
+                        enabled);
+
+        assertThat(source.configuredDescriptors()).isEmpty();
+    }
+
+    @Test
     void rejectsRegistrationThatIsBothOidcAndBackedByOAuthExtractor() {
         ClientRegistration ambiguous = oidc(
                 "custom",
@@ -202,9 +306,17 @@ class StaticTrustedProviderDescriptorSourceTest {
     private static OAuth2ClientProperties.Registration properties(
             String clientId,
             String clientName) {
+        return properties(clientId, "client-secret", clientName);
+    }
+
+    private static OAuth2ClientProperties.Registration properties(
+            String clientId,
+            String clientSecret,
+            String clientName) {
         OAuth2ClientProperties.Registration registration =
                 new OAuth2ClientProperties.Registration();
         registration.setClientId(clientId);
+        registration.setClientSecret(clientSecret);
         registration.setClientName(clientName);
         return registration;
     }
@@ -223,6 +335,24 @@ class StaticTrustedProviderDescriptorSourceTest {
                         "https://github.com/login/oauth/access_token")
                 .userInfoUri("https://api.github.com/user")
                 .userNameAttributeName("id")
+                .build();
+    }
+
+    private static ClientRegistration dingtalk() {
+        return ClientRegistration.withRegistrationId("dingtalk")
+                .clientId("client-id")
+                .clientSecret("client-secret")
+                .clientName("DingTalk")
+                .authorizationGrantType(
+                        AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .scope("openid")
+                .authorizationUri(
+                        DingTalkOAuth2Constants.AUTHORIZATION_URI)
+                .tokenUri(DingTalkOAuth2Constants.TOKEN_URI)
+                .userInfoUri(DingTalkOAuth2Constants.USER_INFO_URI)
+                .userNameAttributeName(
+                        DingTalkOAuth2Constants.SUBJECT_ATTRIBUTE)
                 .build();
     }
 
