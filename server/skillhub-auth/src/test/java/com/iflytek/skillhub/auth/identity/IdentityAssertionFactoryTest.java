@@ -85,6 +85,47 @@ class IdentityAssertionFactoryTest {
     }
 
     @Test
+    void promotesAssertedEmailOnlyForTrustedAuthoritativeSource() {
+        ProviderDescriptor descriptor = new ProviderDescriptor(
+                "corporate-ldap",
+                "ldap",
+                "corp-directory-v1",
+                "Corporate Directory",
+                "ldap_entry_uuid",
+                "ldap_entry_uuid",
+                Map.of(
+                        "ldap_entry_uuid",
+                        SubjectCanonicalizer.EXACT),
+                List.of("ldap_display_name"),
+                List.of("ldap_email"),
+                List.of(),
+                EmailAssurance.AUTHORITATIVE,
+                true,
+                ProvisioningMode.AUTO,
+                ProfileSyncPolicy.defaults());
+        ProviderAuthenticationResult result = result(
+                new SubjectCandidate(
+                        "ldap_entry_uuid",
+                        "550e8400-e29b-41d4-a716-446655440000"),
+                List.of(),
+                Map.of(
+                        "ldap_email",
+                        values(
+                                "alice@example.com",
+                                ProviderAttributeTrust.ASSERTED)),
+                "ldap");
+
+        IdentityAssertion assertion = factory.create(
+                descriptor,
+                result);
+
+        assertThat(assertion.profile().email()).contains(
+                new EmailClaim(
+                        "alice@example.com",
+                        EmailAssurance.AUTHORITATIVE));
+    }
+
+    @Test
     void rejectsProtocolClaimThatDoesNotMatchTrustedDescriptor() {
         ProviderAuthenticationResult result = result(
                 new SubjectCandidate("github_user_id", "123456"),
@@ -216,6 +257,77 @@ class IdentityAssertionFactoryTest {
     }
 
     @Test
+    void selectsEmailByAssuranceThenDescriptorPriorityNotAdapterOrder() {
+        ProviderDescriptor descriptor = emailDescriptor(
+                List.of("email", "mail"),
+                EmailAssurance.VERIFIED);
+        ProviderAuthenticationResult result = result(
+                new SubjectCandidate("stable_id", "stable-123"),
+                List.of(),
+                Map.of(
+                        "email", values(
+                                "preferred@example.com",
+                                ProviderAttributeTrust.ASSERTED),
+                        "mail", values(
+                                "verified@example.com",
+                                ProviderAttributeTrust.VERIFIED)),
+                "oidc");
+
+        assertThat(factory.create(descriptor, result).profile().email())
+                .contains(new EmailClaim(
+                        "verified@example.com",
+                        EmailAssurance.VERIFIED));
+    }
+
+    @Test
+    void deduplicatesNormalizedEmailAndKeepsHighestAssurance() {
+        ProviderDescriptor descriptor = emailDescriptor(
+                List.of("email", "mail"),
+                EmailAssurance.VERIFIED);
+        ProviderAuthenticationResult result = result(
+                new SubjectCandidate("stable_id", "stable-123"),
+                List.of(),
+                Map.of(
+                        "email", List.of(
+                                new ProviderAttributeValue(
+                                        " Alice@Example.COM ",
+                                        ProviderAttributeTrust.ASSERTED)),
+                        "mail", values(
+                                "alice@example.com",
+                                ProviderAttributeTrust.VERIFIED)),
+                "oidc");
+
+        assertThat(factory.create(descriptor, result).profile().email())
+                .contains(new EmailClaim(
+                        "alice@example.com",
+                        EmailAssurance.VERIFIED));
+    }
+
+    @Test
+    void rejectsDifferentTrustedEmailClaimsInsteadOfChoosingOne() {
+        ProviderDescriptor descriptor = emailDescriptor(
+                List.of("email"),
+                EmailAssurance.AUTHORITATIVE);
+        ProviderAuthenticationResult result = result(
+                new SubjectCandidate("stable_id", "stable-123"),
+                List.of(),
+                Map.of(
+                        "email", List.of(
+                                new ProviderAttributeValue(
+                                        "alice@example.com",
+                                        ProviderAttributeTrust.VERIFIED),
+                                new ProviderAttributeValue(
+                                        "mallory@example.com",
+                                        ProviderAttributeTrust.VERIFIED))),
+                "oidc");
+
+        assertThatThrownBy(() -> factory.create(descriptor, result))
+                .isInstanceOf(IdentityCoreException.class)
+                .extracting("reasonCode")
+                .isEqualTo(IdentityFailureCode.INVALID_IDENTITY_ASSERTION);
+    }
+
+    @Test
     void providerResultDefensivelyCopiesNestedCollections() {
         List<ProviderAttributeValue> loginValues = new ArrayList<>(
                 values("alice", ProviderAttributeTrust.ASSERTED));
@@ -258,6 +370,23 @@ class IdentityAssertionFactoryTest {
                 List.of("avatar_url"),
                 EmailAssurance.VERIFIED
         );
+    }
+
+    private static ProviderDescriptor emailDescriptor(
+            List<String> emailAttributes,
+            EmailAssurance emailAssuranceLimit) {
+        return new ProviderDescriptor(
+                "corp",
+                "oidc",
+                "https://id.example.com",
+                "Corporate Identity",
+                "stable_id",
+                "stable_id",
+                Map.of("stable_id", SubjectCanonicalizer.EXACT),
+                List.of("name"),
+                emailAttributes,
+                List.of("picture"),
+                emailAssuranceLimit);
     }
 
     private static ProviderAuthenticationResult result(

@@ -12,6 +12,37 @@
 {{- if and .Values.auth.accountMerge.enabled (not .Values.auth.accountMerge.sessionCutoverComplete) -}}
 {{- fail "auth.accountMerge.enabled=true requires auth.accountMerge.sessionCutoverComplete=true after rotating the Spring Session namespace" -}}
 {{- end -}}
+{{- if .Values.auth.ldap.enabled -}}
+{{- if not .Values.auth.ldap.url -}}
+{{- fail "auth.ldap.enabled=true requires auth.ldap.url" -}}
+{{- end -}}
+{{- if not .Values.auth.ldap.baseDn -}}
+{{- fail "auth.ldap.enabled=true requires auth.ldap.baseDn" -}}
+{{- end -}}
+{{- if not .Values.auth.ldap.bindDn -}}
+{{- fail "auth.ldap.enabled=true requires auth.ldap.bindDn" -}}
+{{- end -}}
+{{- if and (not .Values.existingSecret) (not .Values.secrets.ldapBindPassword) -}}
+{{- fail "auth.ldap.enabled=true requires secrets.ldapBindPassword or existingSecret key ldap-bind-password" -}}
+{{- end -}}
+{{- if and (eq .Values.auth.ldap.directoryType "CUSTOM") (or (not .Values.auth.ldap.subjectAttribute) (not .Values.auth.ldap.subjectType)) -}}
+{{- fail "auth.ldap.directoryType=CUSTOM requires subjectAttribute and subjectType" -}}
+{{- end -}}
+{{- if hasPrefix "ldaps://" .Values.auth.ldap.url -}}
+{{- if .Values.auth.ldap.startTls -}}
+{{- fail "auth.ldap.startTls must be false for an ldaps URL" -}}
+{{- end -}}
+{{- else if hasPrefix "ldap://" .Values.auth.ldap.url -}}
+{{- if not .Values.auth.ldap.startTls -}}
+{{- fail "auth.ldap.startTls must be true for an ldap URL" -}}
+{{- end -}}
+{{- else -}}
+{{- fail "auth.ldap.url must start with ldap:// or ldaps://" -}}
+{{- end -}}
+{{- if regexMatch "[?#]" .Values.auth.ldap.url -}}
+{{- fail "auth.ldap.url must not contain a query or fragment" -}}
+{{- end -}}
+{{- end -}}
 {{- if .Values.auth.cas.enabled -}}
 {{- if not .Values.auth.cas.serverUrl -}}
 {{- fail "auth.cas.enabled=true requires auth.cas.serverUrl" -}}

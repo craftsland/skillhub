@@ -17,6 +17,7 @@ record ProviderDescriptor(
         List<String> emailAttributes,
         List<String> avatarAttributes,
         EmailAssurance emailAssuranceLimit,
+        boolean authoritativeEmailSource,
         ProvisioningMode provisioningMode,
         ProfileSyncPolicy profileSyncPolicy
 ) {
@@ -80,6 +81,37 @@ record ProviderDescriptor(
             List<String> displayNameAttributes,
             List<String> emailAttributes,
             List<String> avatarAttributes,
+            EmailAssurance emailAssuranceLimit,
+            ProvisioningMode provisioningMode,
+            ProfileSyncPolicy profileSyncPolicy) {
+        this(
+                providerCode,
+                protocol,
+                canonicalAuthority,
+                displayName,
+                primarySubjectType,
+                legacyPrimarySubjectType,
+                subjectCanonicalizers,
+                displayNameAttributes,
+                emailAttributes,
+                avatarAttributes,
+                emailAssuranceLimit,
+                false,
+                provisioningMode,
+                profileSyncPolicy);
+    }
+
+    ProviderDescriptor(
+            String providerCode,
+            String protocol,
+            String canonicalAuthority,
+            String displayName,
+            String primarySubjectType,
+            String legacyPrimarySubjectType,
+            Map<String, SubjectCanonicalizer> subjectCanonicalizers,
+            List<String> displayNameAttributes,
+            List<String> emailAttributes,
+            List<String> avatarAttributes,
             EmailAssurance emailAssuranceLimit) {
         this(
                 providerCode,
@@ -93,6 +125,7 @@ record ProviderDescriptor(
                 emailAttributes,
                 avatarAttributes,
                 emailAssuranceLimit,
+                false,
                 ProvisioningMode.AUTO,
                 ProfileSyncPolicy.defaults());
     }

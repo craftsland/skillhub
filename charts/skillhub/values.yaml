@@ -26,6 +26,30 @@ auth:
     # documented legacy-session transition gate has completed.
     enabled: false
     sessionCutoverComplete: false
+  ldap:
+    enabled: false
+    providerCode: ldap-main
+    displayName: "Corporate Directory"
+    authority: corp-directory
+    url: ""
+    startTls: false
+    directoryType: OPENLDAP
+    baseDn: ""
+    userSearchBase: ""
+    userSearchFilter: "(uid={0})"
+    bindDn: ""
+    subjectAttribute: ""
+    subjectType: ""
+    usernameAttribute: uid
+    displayNameAttribute: displayName
+    emailAttribute: mail
+    avatarUrlAttribute: ""
+    emailAuthoritative: false
+    connectTimeout: PT5S
+    readTimeout: PT10S
+    poolWaitTimeout: PT2S
+    maxConcurrentRequests: 16
+    maxAttributeValues: 16
   cas:
     enabled: false
     providerCode: cas-main
@@ -119,6 +143,7 @@ secrets:
   downloadAnonCookieSecret: ""
   oauth2GithubClientId: ""
   oauth2GithubClientSecret: ""
+  ldapBindPassword: ""
   scannerLlmApiKey: ""
   scannerLlmBaseUrl: ""
   scannerLlmModel: ""

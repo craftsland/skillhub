@@ -85,6 +85,7 @@ class AccountMergeAppServiceTest {
                 accountMergeSessionManager,
                 mock(AccountMergeProviderProofService.class),
                 providerRegistry,
+                mock(ProviderLoginAppService.class),
                 identityLinkIntentService,
                 identityLinkSessionManager,
                 metrics,

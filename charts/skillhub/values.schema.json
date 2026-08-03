@@ -21,7 +21,7 @@
     "auth": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["direct", "accountMerge", "cas"],
+      "required": ["direct", "accountMerge", "ldap", "cas"],
       "properties": {
         "direct": {
           "type": "object",
@@ -39,6 +39,36 @@
           "properties": {
             "enabled": { "type": "boolean" },
             "sessionCutoverComplete": { "type": "boolean" }
+          }
+        },
+        "ldap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "providerCode", "displayName", "authority", "url", "startTls", "directoryType", "baseDn", "userSearchBase", "userSearchFilter", "bindDn", "subjectAttribute", "subjectType", "usernameAttribute", "displayNameAttribute", "emailAttribute", "avatarUrlAttribute", "emailAuthoritative", "connectTimeout", "readTimeout", "poolWaitTimeout", "maxConcurrentRequests", "maxAttributeValues"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "providerCode": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+            "displayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "authority": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$" },
+            "url": { "type": "string" },
+            "startTls": { "type": "boolean" },
+            "directoryType": { "enum": ["OPENLDAP", "ACTIVE_DIRECTORY", "CUSTOM"] },
+            "baseDn": { "type": "string" },
+            "userSearchBase": { "type": "string" },
+            "userSearchFilter": { "type": "string", "minLength": 1, "maxLength": 1024 },
+            "bindDn": { "type": "string" },
+            "subjectAttribute": { "type": "string" },
+            "subjectType": { "type": "string", "pattern": "^$|^[a-z][a-z0-9_]{0,63}$" },
+            "usernameAttribute": { "type": "string" },
+            "displayNameAttribute": { "type": "string" },
+            "emailAttribute": { "type": "string" },
+            "avatarUrlAttribute": { "type": "string" },
+            "emailAuthoritative": { "type": "boolean" },
+            "connectTimeout": { "type": "string", "pattern": "^P" },
+            "readTimeout": { "type": "string", "pattern": "^P" },
+            "poolWaitTimeout": { "type": "string", "pattern": "^P" },
+            "maxConcurrentRequests": { "type": "integer", "minimum": 1, "maximum": 256 },
+            "maxAttributeValues": { "type": "integer", "minimum": 1, "maximum": 64 }
           }
         },
         "cas": {
@@ -200,6 +230,7 @@
         "downloadAnonCookieSecret": { "type": "string" },
         "oauth2GithubClientId": { "type": "string" },
         "oauth2GithubClientSecret": { "type": "string" },
+        "ldapBindPassword": { "type": "string" },
         "scannerLlmApiKey": { "type": "string" },
         "scannerLlmBaseUrl": { "type": "string" },
         "scannerLlmModel": { "type": "string" }

@@ -7,6 +7,7 @@ import com.iflytek.skillhub.auth.identity.IdentityLoginContext;
 import com.iflytek.skillhub.auth.identity.IdentityLoginOutcome;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
 import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
+import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.MDC;
@@ -52,6 +53,26 @@ class ProviderLoginAppService {
         } catch (IdentityCoreException exception) {
             throw mapFailure(exception);
         }
+    }
+
+    void recordProviderAuthenticationFailure(
+            ResolvedProviderHandle provider,
+            ProviderAuthenticationException failure,
+            IdentityLoginContext context) {
+        identityLoginService.recordProviderAuthenticationFailure(
+                provider,
+                failure.getReasonCode(),
+                context);
+    }
+
+    void recordProviderAuthenticationFailure(
+            ResolvedProviderHandle provider,
+            ProviderAuthenticationException failure,
+            HttpServletRequest request) {
+        recordProviderAuthenticationFailure(
+                provider,
+                failure,
+                context(request));
     }
 
     private IdentityLoginContext context(HttpServletRequest request) {

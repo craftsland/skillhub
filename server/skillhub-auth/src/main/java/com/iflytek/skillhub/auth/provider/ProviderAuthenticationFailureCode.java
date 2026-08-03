@@ -6,6 +6,7 @@ package com.iflytek.skillhub.auth.provider;
  */
 public enum ProviderAuthenticationFailureCode {
     UPSTREAM_INVALID_CREDENTIALS,
+    UPSTREAM_IDENTITY_NOT_FOUND,
     UPSTREAM_ACCESS_DENIED,
     UPSTREAM_UNAVAILABLE,
     UPSTREAM_MISCONFIGURED,

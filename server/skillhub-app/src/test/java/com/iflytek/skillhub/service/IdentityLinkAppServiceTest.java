@@ -172,6 +172,8 @@ class IdentityLinkAppServiceTest {
                 mock(ExternalIdentityLinkService.class);
         private final IdentityProviderRegistry registry =
                 mock(IdentityProviderRegistry.class);
+        private final ProviderLoginAppService providerLoginAppService =
+                mock(ProviderLoginAppService.class);
         private final IdentityLinkSessionManager sessionManager =
                 mock(IdentityLinkSessionManager.class);
         private final AccountMergeSessionManager
@@ -194,6 +196,7 @@ class IdentityLinkAppServiceTest {
                         intentService,
                         externalLinkService,
                         registry,
+                        providerLoginAppService,
                         sessionManager,
                         accountMergeSessionManager);
 

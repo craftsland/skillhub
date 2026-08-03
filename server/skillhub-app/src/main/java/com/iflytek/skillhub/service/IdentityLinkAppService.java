@@ -38,6 +38,7 @@ public class IdentityLinkAppService {
     private final IdentityLinkIntentService intentService;
     private final ExternalIdentityLinkService externalLinkService;
     private final IdentityProviderRegistry providerRegistry;
+    private final ProviderLoginAppService providerLoginAppService;
     private final IdentityLinkSessionManager sessionManager;
     private final AccountMergeSessionManager
             accountMergeSessionManager;
@@ -46,12 +47,14 @@ public class IdentityLinkAppService {
             IdentityLinkIntentService intentService,
             ExternalIdentityLinkService externalLinkService,
             IdentityProviderRegistry providerRegistry,
+            ProviderLoginAppService providerLoginAppService,
             IdentityLinkSessionManager sessionManager,
             AccountMergeSessionManager
                     accountMergeSessionManager) {
         this.intentService = intentService;
         this.externalLinkService = externalLinkService;
         this.providerRegistry = providerRegistry;
+        this.providerLoginAppService = providerLoginAppService;
         this.sessionManager = sessionManager;
         this.accountMergeSessionManager =
                 accountMergeSessionManager;
@@ -267,7 +270,7 @@ public class IdentityLinkAppService {
                 actor,
                 intentId,
                 route.provider(),
-                authenticate(route, username, password));
+                authenticate(route, username, password, context));
         if (!(outcome instanceof IdentityLinkOutcome.Reauthenticated)) {
             throw new IllegalStateException(
                     "Credential reauthentication returned an invalid outcome");
@@ -298,7 +301,7 @@ public class IdentityLinkAppService {
                 actor,
                 intentId,
                 route.provider(),
-                authenticate(route, username, password));
+                authenticate(route, username, password, context));
         if (!(outcome instanceof IdentityLinkOutcome.Linked)) {
             throw new IllegalStateException(
                     "Credential link returned an invalid outcome");
@@ -331,13 +334,18 @@ public class IdentityLinkAppService {
     private ProviderAuthenticationResult authenticate(
             IdentityProviderRegistry.CredentialRoute route,
             String username,
-            String password) {
+            String password,
+            IdentityLoginContext context) {
         try {
             return route.adapter().authenticate(
                     new CredentialAuthenticationRequest(
                             username,
                             password));
         } catch (ProviderAuthenticationException exception) {
+            providerLoginAppService.recordProviderAuthenticationFailure(
+                    route.provider(),
+                    exception,
+                    context);
             throw ProviderAuthenticationFailureMapper
                     .mapIdentityLink(exception);
         }

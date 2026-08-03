@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -204,6 +205,30 @@ class DefaultExternalIdentityLoginServiceTest {
                 .isInstanceOf(IdentityCoreException.class)
                 .extracting("reasonCode")
                 .isEqualTo(IdentityFailureCode.ACCESS_DENIED);
+    }
+
+    @Test
+    void recordsProviderFailureBeforeIdentityCore() {
+        ResolvedProviderHandle handle =
+                new DefaultResolvedProviderHandle("github");
+        IdentityLoginContext context = new IdentityLoginContext(
+                "request-provider-failure",
+                "127.0.0.1",
+                "identity-test");
+        when(descriptorSource.require(handle)).thenReturn(descriptor);
+
+        service.recordProviderAuthenticationFailure(
+                handle,
+                ProviderAuthenticationFailureCode
+                        .UPSTREAM_IDENTITY_NOT_FOUND,
+                context);
+
+        verify(securityAuditWriter).recordProviderDenied(
+                "github",
+                "oauth2-github",
+                ProviderAuthenticationFailureCode
+                        .UPSTREAM_IDENTITY_NOT_FOUND,
+                context);
     }
 
     @Test

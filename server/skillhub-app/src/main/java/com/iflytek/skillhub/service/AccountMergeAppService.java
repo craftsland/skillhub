@@ -61,6 +61,7 @@ public class AccountMergeAppService {
     private final AccountMergeProviderProofService
             providerProofService;
     private final IdentityProviderRegistry providerRegistry;
+    private final ProviderLoginAppService providerLoginAppService;
     private final IdentityLinkIntentService
             identityLinkIntentService;
     private final IdentityLinkSessionManager
@@ -74,6 +75,7 @@ public class AccountMergeAppService {
             AccountMergeSessionManager sessionManager,
             AccountMergeProviderProofService providerProofService,
             IdentityProviderRegistry providerRegistry,
+            ProviderLoginAppService providerLoginAppService,
             IdentityLinkIntentService identityLinkIntentService,
             IdentityLinkSessionManager
                     identityLinkSessionManager,
@@ -84,6 +86,7 @@ public class AccountMergeAppService {
         this.sessionManager = sessionManager;
         this.providerProofService = providerProofService;
         this.providerRegistry = providerRegistry;
+        this.providerLoginAppService = providerLoginAppService;
         this.identityLinkIntentService =
                 identityLinkIntentService;
         this.identityLinkSessionManager =
@@ -193,7 +196,8 @@ public class AccountMergeAppService {
                         authenticate(
                                 route,
                                 username,
-                                password),
+                                password,
+                                context),
                         context);
         return new AccountMergePrimaryProofResponse(
                 result.proof().method(),
@@ -324,7 +328,8 @@ public class AccountMergeAppService {
                         authenticate(
                                 route,
                                 username,
-                                password),
+                                password,
+                                context),
                         context));
     }
 
@@ -642,13 +647,18 @@ public class AccountMergeAppService {
             .ProviderAuthenticationResult authenticate(
                     IdentityProviderRegistry.CredentialRoute route,
                     String username,
-                    String password) {
+                    String password,
+                    IdentityLoginContext context) {
         try {
             return route.adapter().authenticate(
                     new CredentialAuthenticationRequest(
                             username,
                             password));
         } catch (ProviderAuthenticationException exception) {
+            providerLoginAppService.recordProviderAuthenticationFailure(
+                    route.provider(),
+                    exception,
+                    context);
             throw ProviderAuthenticationFailureMapper
                     .mapAccountMerge(exception);
         }

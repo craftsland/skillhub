@@ -24,6 +24,7 @@ public record ProviderInstanceDefinition(
         List<String> emailAttributes,
         List<String> avatarAttributes,
         EmailAssurance emailAssuranceLimit,
+        boolean authoritativeEmailSource,
         boolean enabled
 ) {
     private static final Pattern PROVIDER_CODE_PATTERN =
@@ -51,6 +52,11 @@ public record ProviderInstanceDefinition(
         Objects.requireNonNull(emailAttributes, "emailAttributes");
         Objects.requireNonNull(avatarAttributes, "avatarAttributes");
         Objects.requireNonNull(emailAssuranceLimit, "emailAssuranceLimit");
+        if (authoritativeEmailSource
+                && emailAssuranceLimit != EmailAssurance.AUTHORITATIVE) {
+            throw new IllegalArgumentException(
+                    "Authoritative email source requires authoritative assurance limit");
+        }
 
         if (!PROVIDER_CODE_PATTERN.matcher(providerCode).matches()) {
             throw new IllegalArgumentException("Invalid provider code");
@@ -112,6 +118,35 @@ public record ProviderInstanceDefinition(
             List<String> displayNameAttributes,
             List<String> emailAttributes,
             List<String> avatarAttributes,
+            EmailAssurance emailAssuranceLimit,
+            boolean enabled) {
+        this(
+                providerCode,
+                protocol,
+                canonicalAuthority,
+                displayName,
+                primarySubjectType,
+                legacyPrimarySubjectType,
+                subjectNormalizations,
+                displayNameAttributes,
+                emailAttributes,
+                avatarAttributes,
+                emailAssuranceLimit,
+                false,
+                enabled);
+    }
+
+    public ProviderInstanceDefinition(
+            String providerCode,
+            String protocol,
+            String canonicalAuthority,
+            String displayName,
+            String primarySubjectType,
+            String legacyPrimarySubjectType,
+            Map<String, SubjectNormalization> subjectNormalizations,
+            List<String> displayNameAttributes,
+            List<String> emailAttributes,
+            List<String> avatarAttributes,
             EmailAssurance emailAssuranceLimit) {
         this(
                 providerCode,
@@ -125,6 +160,7 @@ public record ProviderInstanceDefinition(
                 emailAttributes,
                 avatarAttributes,
                 emailAssuranceLimit,
+                false,
                 true);
     }
 

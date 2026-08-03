@@ -64,6 +64,7 @@ cp secret.yaml.example secret.yaml
 | bootstrap-admin-password | 管理员密码 | 是 |
 | oauth2-github-client-id | GitHub OAuth ID | 否 |
 | oauth2-github-client-secret | GitHub OAuth 密钥 | 否 |
+| ldap-bind-password | LDAP service account 密码 | 启用 LDAP/AD 时 |
 | skill-scanner-llm-api-key | LLM API 密钥 | 否 |
 | skill-scanner-llm-base-url | 本地/自定义 LLM 服务地址 | 否 |
 | skill-scanner-llm-model | Scanner 使用的 LLM 模型名 | 否 |
@@ -77,6 +78,11 @@ https://<skillhub-host>/api/v1/auth/cas/<provider-code>/callback
 
 完整字段、身份映射和验证步骤见
 [`docs/23-cas-integration.md`](../../docs/23-cas-integration.md)。
+
+LDAP/Active Directory 默认关闭。启用时修改 `base/configmap.yaml` 中的
+`auth-ldap-*` 字段，并在 `skillhub-secret` 中设置 `ldap-bind-password`。生产环境必须
+使用 LDAPS 或 StartTLS；完整配置、稳定 Subject 映射和验证步骤见
+[`docs/24-ldap-ad-integration.md`](../../docs/24-ldap-ad-integration.md)。
 
 ### 3. 选择部署方式
 
@@ -247,6 +253,7 @@ kubectl apply -k overlays/with-infra/  # 或 overlays/external/
 | bootstrap-admin-password | 管理员密码 | 是 |
 | oauth2-github-client-id | GitHub OAuth ID | 否 |
 | oauth2-github-client-secret | GitHub OAuth 密钥 | 否 |
+| ldap-bind-password | LDAP service account 密码 | 启用 LDAP/AD 时 |
 | skill-scanner-llm-api-key | LLM API 密钥 | 否 |
 | skill-scanner-llm-base-url | 本地/自定义 LLM 服务地址 | 否 |
 | skill-scanner-llm-model | LLM 模型名称 | 否 |

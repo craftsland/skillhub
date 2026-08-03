@@ -54,6 +54,33 @@ data:
   auth-account-merge-enabled: "false"
   auth-account-merge-session-cutover-complete: "false"
 
+  # LDAP/Active Directory 登录（默认关闭）
+  # 生产环境只使用 LDAPS，或 ldap:// 配合 start-tls=true。provider code、
+  # authority 和稳定 subject 映射在产生身份绑定后不得随意修改。
+  auth-ldap-enabled: "false"
+  auth-ldap-provider-code: ldap-main
+  auth-ldap-display-name: Corporate Directory
+  auth-ldap-authority: corp-directory
+  auth-ldap-url: ldaps://ldap.example.com:636
+  auth-ldap-start-tls: "false"
+  auth-ldap-directory-type: OPENLDAP
+  auth-ldap-base-dn: dc=example,dc=com
+  auth-ldap-user-search-base: ou=people
+  auth-ldap-user-search-filter: "(uid={0})"
+  auth-ldap-bind-dn: cn=skillhub,ou=services,dc=example,dc=com
+  auth-ldap-subject-attribute: ""
+  auth-ldap-subject-type: ""
+  auth-ldap-username-attribute: uid
+  auth-ldap-display-name-attribute: displayName
+  auth-ldap-email-attribute: mail
+  auth-ldap-avatar-url-attribute: ""
+  auth-ldap-email-authoritative: "false"
+  auth-ldap-connect-timeout: PT5S
+  auth-ldap-read-timeout: PT10S
+  auth-ldap-pool-wait-timeout: PT2S
+  auth-ldap-max-concurrent-requests: "16"
+  auth-ldap-max-attribute-values: "16"
+
   # CAS 2.0/3.0 登录（默认关闭）
   # service-url 必须是浏览器可访问的精确回调地址，且 provider code
   # 必须与路径中的值一致。

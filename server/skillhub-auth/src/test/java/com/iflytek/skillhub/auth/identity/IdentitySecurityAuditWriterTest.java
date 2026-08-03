@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
 import com.iflytek.skillhub.domain.audit.AuditLogService;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +35,31 @@ class IdentitySecurityAuditWriterTest {
         assertAuditAction(
                 IdentityFailureCode.ACCESS_DENIED,
                 "IDENTITY_LOGIN_DENIED");
+    }
+
+    @Test
+    void recordsCredentialProviderFailureAsLoginDenied() {
+        writer.recordProviderDenied(
+                "corporate-ldap",
+                "ldap",
+                ProviderAuthenticationFailureCode
+                        .UPSTREAM_IDENTITY_NOT_FOUND,
+                new IdentityLoginContext(
+                        "request-2",
+                        "127.0.0.2",
+                        "identity-test"));
+
+        verify(auditLogService).record(
+                isNull(),
+                eq("IDENTITY_LOGIN_DENIED"),
+                eq("IDENTITY_PROVIDER"),
+                isNull(),
+                eq("request-2"),
+                eq("127.0.0.2"),
+                eq("identity-test"),
+                eq("{\"providerCode\":\"corporate-ldap\","
+                        + "\"protocol\":\"ldap\","
+                        + "\"reason\":\"UPSTREAM_IDENTITY_NOT_FOUND\"}"));
     }
 
     private void assertAuditAction(

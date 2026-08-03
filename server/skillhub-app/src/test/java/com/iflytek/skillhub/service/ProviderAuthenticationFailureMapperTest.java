@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.iflytek.skillhub.auth.exception.AuthFlowException;
 import com.iflytek.skillhub.auth.identity.IdentityLinkException;
 import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
+import com.iflytek.skillhub.auth.merge.AccountMergeException;
+import com.iflytek.skillhub.auth.merge.AccountMergeFailureCode;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationException;
 import com.iflytek.skillhub.auth.provider.ProviderAuthenticationFailureCode;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,10 @@ class ProviderAuthenticationFailureMapperTest {
         assertMapping(
                 ProviderAuthenticationFailureCode
                         .UPSTREAM_INVALID_CREDENTIALS,
+                HttpStatus.UNAUTHORIZED);
+        assertMapping(
+                ProviderAuthenticationFailureCode
+                        .UPSTREAM_IDENTITY_NOT_FOUND,
                 HttpStatus.UNAUTHORIZED);
         assertMapping(
                 ProviderAuthenticationFailureCode.REPLAY_DETECTED,
@@ -46,6 +52,10 @@ class ProviderAuthenticationFailureMapperTest {
                         .UPSTREAM_INVALID_CREDENTIALS,
                 IdentityLinkFailureCode.PROVIDER_AUTHENTICATION_FAILED);
         assertIdentityLinkMapping(
+                ProviderAuthenticationFailureCode
+                        .UPSTREAM_IDENTITY_NOT_FOUND,
+                IdentityLinkFailureCode.PROVIDER_AUTHENTICATION_FAILED);
+        assertIdentityLinkMapping(
                 ProviderAuthenticationFailureCode.UPSTREAM_ACCESS_DENIED,
                 IdentityLinkFailureCode.PROVIDER_AUTHENTICATION_FAILED);
         assertIdentityLinkMapping(
@@ -64,6 +74,23 @@ class ProviderAuthenticationFailureMapperTest {
                 ProviderAuthenticationFailureCode
                         .UPSTREAM_INVALID_RESPONSE,
                 IdentityLinkFailureCode.PROVIDER_UNAVAILABLE);
+    }
+
+    @Test
+    void mapsStableProviderFailuresToAccountMergeReasonCodes() {
+        assertAccountMergeMapping(
+                ProviderAuthenticationFailureCode
+                        .UPSTREAM_INVALID_CREDENTIALS,
+                AccountMergeFailureCode
+                        .MERGE_PROVIDER_AUTHENTICATION_FAILED);
+        assertAccountMergeMapping(
+                ProviderAuthenticationFailureCode
+                        .UPSTREAM_IDENTITY_NOT_FOUND,
+                AccountMergeFailureCode
+                        .MERGE_PROVIDER_AUTHENTICATION_FAILED);
+        assertAccountMergeMapping(
+                ProviderAuthenticationFailureCode.UPSTREAM_UNAVAILABLE,
+                AccountMergeFailureCode.MERGE_PROVIDER_UNAVAILABLE);
     }
 
     private void assertMapping(
@@ -95,6 +122,24 @@ class ProviderAuthenticationFailureMapperTest {
                 .isEqualTo(identityLinkReasonCode.status());
         assertThat(mapped.getReasonCode())
                 .isEqualTo(identityLinkReasonCode);
+        assertThat(mapped.getMessage())
+                .doesNotContain("private upstream detail");
+    }
+
+    private void assertAccountMergeMapping(
+            ProviderAuthenticationFailureCode providerReasonCode,
+            AccountMergeFailureCode accountMergeReasonCode) {
+        AccountMergeException mapped =
+                ProviderAuthenticationFailureMapper.mapAccountMerge(
+                        new ProviderAuthenticationException(
+                                providerReasonCode,
+                                new IllegalStateException(
+                                        "private upstream detail")));
+
+        assertThat(mapped.getStatus())
+                .isEqualTo(accountMergeReasonCode.status());
+        assertThat(mapped.getReasonCode())
+                .isEqualTo(accountMergeReasonCode);
         assertThat(mapped.getMessage())
                 .doesNotContain("private upstream detail");
     }
