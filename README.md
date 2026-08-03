@@ -66,6 +66,7 @@ with the Skill's source and the problem it solves, or submit a PR by following t
 - 🛠️ **[Developer Docs](https://zread.ai/iflytek/skillhub)** — Architecture, API reference, local development, deployment and operations
 - 🔐 **[CAS 2.0/3.0 Integration](./docs/23-cas-integration.md)** — Provider configuration, identity mapping, deployment and verification
 - 🔐 **[LDAP/Active Directory Integration](./docs/24-ldap-ad-integration.md)** — Secure credential login, stable identity mapping and deployment
+- 🔐 **[Enterprise Identity Broker Integration](./docs/27-identity-broker-integration.md)** — Keycloak, authentik and Dex upstream federation through OIDC
 
 ## Highlights
 
