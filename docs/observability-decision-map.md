@@ -1,14 +1,15 @@
 # 通用可观测性决策图
 
 目标：为 SkillHub 建立独立、通用、可插拔的日志关联、指标和链路追踪基础设施。
-当前实现覆盖 HTTP、SkillHub 管理的线程池和明确接入的内部 HTTP Client；定时任务、
-Redis Stream 消费循环和 Reclaimer 是独立后台边界，不继承 HTTP 上下文。
-这些边界不进入业务模型和业务载荷。
+当前实现覆盖 HTTP、SkillHub 管理的线程池、Redis Stream 和明确接入的内部 HTTP Client；
+普通定时任务没有上游 carrier，仍是独立后台边界。Redis Stream 上下文只进入 transport
+metadata，不进入业务模型和业务载荷。
 
 边界：
 
-- Servlet Filter、执行器装饰器和明确接入的 Client Builder 负责建立/恢复上下文。
-- 定时任务和 Redis Stream 目前只输出自身执行日志，不自动继承请求或 Trace 上下文。
+- Servlet Filter、执行器装饰器、消息 Observation 和明确接入的 Client Builder 负责
+  建立/恢复上下文。
+- Redis Stream Producer 注入、Consumer/Reclaimer 逐条提取；定时任务不继承任意请求。
 - 业务代码不读写 MDC，不负责创建通用 Span，也不负责统计任务生命周期指标。
 - 使用 W3C Trace Context；日志后端、Metrics 后端和 Trace Exporter 均可替换。
 - 上下文是有长度限制的基础设施元数据，不进入业务 payload。
@@ -54,7 +55,8 @@ Type: Research
 - `requestId` 是 SkillHub 的请求/审计关联标识，不冒充分布式 Trace。
 - `traceId/spanId` 由 Tracer 生成，跨进程只使用 W3C `traceparent/tracestate`。
 - 定时任务或可靠任务的执行资源 ID 只作为当前执行作用域属性，不进入业务 payload。
-- HTTP 和线程池 carrier 的注入/提取位于基础设施拦截器；持久化任务不携带 HTTP Trace。
+- HTTP、线程池和消息 carrier 的注入/提取位于基础设施层；消息上下文是 transport
+  metadata，不是任务业务字段。
 - 不传播任意 MDC Map；baggage 默认关闭，任何允许项都必须低敏、限长、显式配置。
 - 无效或不可信的公网 Trace Context 按 W3C 规则丢弃，服务端控制采样。
 
@@ -88,9 +90,9 @@ Type: Prototype
 
 ### Question
 
-验证线程复用隔离、嵌套作用域、异步任务边界、采样、Exporter 超时、Collector 中断、
-队列打满和关闭观测能力等场景。调度任务和 Redis Stream 的独立后台边界只验证不继承
-请求上下文。
+验证线程复用隔离、嵌套作用域、异步任务边界、消息传播、采样、Exporter 超时、
+Collector 中断、队列打满和关闭观测能力等场景。调度任务验证不继承请求上下文；
+Redis Stream 验证逐条注入、提取和清理。
 
 ### Answer
 
@@ -99,10 +101,13 @@ Type: Prototype
 - Request ID Scope 在线程复用、嵌套 Scope、异常退出和 `CallerRunsPolicy` 下均能恢复并
   清理。
 - Micrometer 手工 Span 和 Observation 均能随 `skillhubEventExecutor` 传播。
+- Redis Stream Producer/Consumer 通过通用消息 Observation 传播 W3C Trace Context 和
+  受控 Request ID，Reclaimer 从原消息重新提取。
 - Scanner 使用 Spring 管理的 `WebClient.Builder` 传播 W3C `traceparent`。
 - 面向用户配置的 GitLab 外部 Client 不传播 Trace Context。
 - `none / otel-sdk / external-agent` 的应用上下文和 Exporter 条件符合设计。
-- `@Scheduled` 和 Redis Stream/Reclaimer 不继承请求上下文，保持独立后台执行边界。
+- `@Scheduled` 保持独立后台执行边界；Redis Stream/Reclaimer 不继承线程上下文，而是
+  从每条消息的 transport metadata 恢复。
 
 Collector 中断、日志背压、采样率和关闭行为仍由 `big-main` 精确 SHA 镜像的远端原型验证。
 

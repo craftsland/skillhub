@@ -91,17 +91,27 @@ Scanner 是当前已接入的内部客户端。新增内部客户端时，应补
 删除 Header。使用明确不接入 SkillHub Observation 的客户端，并补测试断言请求不包含
 `traceparent`。
 
-### 3.5 定时任务和 Redis Stream
+### 3.5 Redis Stream 和定时任务
 
-当前实现把定时任务、Redis Stream 消费循环和 Reclaimer 视为独立后台执行边界：
+Redis Stream 已通过 `MessageObservationSupport` 接入通用消息传播：
 
-- 不继承任意 HTTP 请求的 `request.id` 或 `trace.id`；
-- 不把 HTTP Trace Context 写入 Redis 业务载荷；
-- 日志仍可使用 ECS 格式和固定服务字段；
-- 若未来需要任务级关联，应增加独立的任务执行 ID/Observation carrier，并单独设计
-  持久化与重试语义。
+- Producer 把 `traceparent`、`tracestate` 和受控的 `skillhub.request_id` 写入 Stream
+  transport metadata，不修改 `ScanTask` 等业务对象；
+- `AbstractStreamConsumer` 逐条提取上下文并建立 `CONSUMER` Observation，在 `finally`
+  中恢复线程原状态；
+- Consumer 内部调用 Scanner 时，Spring 管理的 `WebClient` 自动创建同一 Trace 的子 Span；
+- 重试发布发生在当前 Consumer Scope 内，新消息继续携带关联上下文；Reclaimer 处理原消息
+  时重新从消息提取，不继承 Reclaimer 线程的上下文；
+- `none` 和 `external-agent` 模式仍传播 Request ID；应用保证完整 W3C Trace 的模式是
+  `otel-sdk`，外部 Agent 的跨 Stream Trace 能力取决于对应 Agent 插件。
 
-因此，不要假设在 `@Scheduled` 或 Stream consumer 中能自动查到发起 HTTP 请求的 Trace。
+新增 Redis Stream Consumer 应继承 `AbstractStreamConsumer`，新增 Producer 应调用
+`MessageObservationSupport.observePublish`。其他消息中间件只实现自身 carrier 的
+`MessageCarrierAdapter`；传播核心不依赖 Redis、Redisson 或 `Map`。不要在业务 DTO、MDC
+或日志代码中复制上下文。
+
+普通 `@Scheduled` 任务没有上游消息 carrier，仍是独立后台边界；需要长期任务关联时应使用
+稳定任务 ID，而不是把任意历史 HTTP Span 保持为超长父 Span。
 
 ## 4. 可扩展点
 
@@ -113,6 +123,7 @@ Scanner 是当前已接入的内部客户端。新增内部客户端时，应补
 | 新增日志字段 | `SkillHubEcsEncoder` 白名单 | “输出全部 MDC” |
 | 新增内部 HTTP 客户端 | Spring `WebClient.Builder` + propagation test | URL 正则删 Header |
 | 新增外部 HTTP 客户端 | 独立客户端构建入口 + no-propagation test | 依赖全局默认行为 |
+| 新增消息队列边界 | `MessageObservationSupport` + `MessageCarrierAdapter` | 业务 DTO、手工 MDC/OTel API |
 
 ## 5. 接入验收清单
 
@@ -124,6 +135,7 @@ Scanner 是当前已接入的内部客户端。新增内部客户端时，应补
 4. 线程复用后上下文被清理，不发生串号；
 5. 日志只出现 `request.id`、`trace.id`、`span.id` 等白名单字段；
 6. Collector 不可用时不影响业务结果。
+7. 消息 Producer/Consumer 使用同一 Trace，Request ID 不串号，重试和 Reclaimer 不丢关联。
 
 运行后端验证使用：
 

@@ -282,12 +282,16 @@ MANAGEMENT_OTLP_TRACING_ENDPOINT=http://otel-collector:4318/v1/traces
 
 测试必须重复复用同一工作线程，证明不同请求之间不会串号。
 
-### 10.2 长生命周期后台线程
+### 10.2 消息队列与长生命周期后台线程
 
-Redis Stream 消费循环、Reclaimer 和其他长生命周期线程不继承应用启动线程或任意请求的
-MDC。需要追踪具体任务时，由通用任务执行边界建立新的上下文。
+Redis Stream 消费循环和 Reclaimer 不继承应用启动线程或任意请求的 MDC。Producer 通过
+通用消息 Observation 把 W3C Trace Context 与受控 Request ID 注入 transport metadata；
+Consumer/Reclaimer 逐条提取、建立 Scope，并在处理结束后清理。Scanner HTTP 调用自然成为
+Consumer Span 的子调用。
 
-一期不把 HTTP Trace Context 写入搜索业务 payload，也不改造可靠任务状态机。
+上下文不写入 `ScanTask` 或搜索业务 payload，也不改变可靠任务状态机。普通定时任务没有
+上游 carrier，仍建立独立执行上下文；长期延迟任务使用稳定任务 ID 或 Span Link，不维持
+超长父 Span。
 
 ### 10.3 HTTP 出站
 
@@ -434,6 +438,8 @@ Kibana 使用 `trace.id` 查询日志，SkyWalking 使用同一个 Trace ID 查�
 - `none`、`otel-sdk`、`external-agent` 的 Spring Context 互斥。
 - 未配置 OTLP endpoint 时不创建网络导出。
 - 内部 Scanner 请求携带 `traceparent`。
+- Redis Stream Producer/Consumer 保持同一 Trace 和 Request ID，处理结束后线程不串号。
+- 重试发布和 Reclaimer 重新消费仍能恢复消息关联上下文。
 - 外部 HTTP 请求不携带 `traceparent`。
 
 ### 13.2 远端原型
@@ -463,6 +469,7 @@ Kibana 使用 `trace.id` 查询日志，SkyWalking 使用同一个 Trace ID 查�
 - HTTP 成功、4xx、5xx 和未认证请求。
 - Scanner 成功、超时和失败。
 - 异步事件正常执行和抛出异常。
+- Redis Stream 正常消费、失败重试、Pending Reclaim 和重复投递。
 - 并发请求重复使用线程池。
 - Collector 启动、停止和恢复。
 - 日志采集器停止或消费变慢。
@@ -479,6 +486,7 @@ Kibana 使用 `trace.id` 查询日志，SkyWalking 使用同一个 Trace ID 查�
 - [ ] Request ID 校验、响应和审计关联测试通过。
 - [ ] 日志字段符合约定，且不输出完整 MDC。
 - [ ] Spring 异步执行器上下文传播和隔离测试通过。
+- [ ] Redis Stream 消息上下文传播、重试、Reclaimer 和隔离测试通过。
 - [ ] 内外部 HTTP 传播边界测试通过。
 - [ ] 无 OTLP endpoint 时不存在外部连接尝试。
 - [ ] Collector 中断不影响 SkillHub 业务结果。
