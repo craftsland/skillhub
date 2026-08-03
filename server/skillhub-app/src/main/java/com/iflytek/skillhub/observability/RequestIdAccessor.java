@@ -4,6 +4,7 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * Holds the current SkillHub request identifier independently from the logging implementation.
@@ -16,6 +17,9 @@ public class RequestIdAccessor {
 
     public static final String MDC_KEY = "requestId";
 
+    private static final Pattern VALID_REQUEST_ID =
+            Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$");
+
     private final ThreadLocal<String> currentRequestId = new ThreadLocal<>();
 
     /**
@@ -23,6 +27,13 @@ public class RequestIdAccessor {
      */
     public String current() {
         return currentRequestId.get();
+    }
+
+    /**
+     * Returns whether a value is safe to use as a request identifier across transport boundaries.
+     */
+    public static boolean isValid(String requestId) {
+        return requestId != null && VALID_REQUEST_ID.matcher(requestId).matches();
     }
 
     /**
@@ -34,6 +45,10 @@ public class RequestIdAccessor {
             throw new IllegalArgumentException("requestId must not be blank");
         }
 
+        return openNullable(requestId);
+    }
+
+    Scope openNullable(String requestId) {
         String previousRequestId = currentRequestId.get();
         replace(requestId);
         return new Scope(previousRequestId, requestId);

@@ -12,7 +12,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 /**
  * Ensures every request has a request identifier for logs, responses, and downstream audit
@@ -23,8 +22,6 @@ import java.util.regex.Pattern;
 public class RequestIdFilter extends OncePerRequestFilter {
 
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
-    private static final Pattern VALID_REQUEST_ID =
-            Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$");
 
     private final RequestIdAccessor requestIdAccessor;
 
@@ -36,7 +33,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String requestId = request.getHeader(REQUEST_ID_HEADER);
-        if (requestId == null || !VALID_REQUEST_ID.matcher(requestId).matches()) {
+        if (!RequestIdAccessor.isValid(requestId)) {
             requestId = UUID.randomUUID().toString();
         }
 

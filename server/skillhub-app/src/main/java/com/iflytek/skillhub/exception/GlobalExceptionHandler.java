@@ -3,14 +3,13 @@ package com.iflytek.skillhub.exception;
 import com.iflytek.skillhub.auth.exception.AuthFlowException;
 import com.iflytek.skillhub.auth.config.AccountMergeRouteRequestMatcher;
 import com.iflytek.skillhub.auth.config.IdentityLinkRouteRequestMatcher;
-import com.iflytek.skillhub.auth.merge.AccountMergeException;
-import com.iflytek.skillhub.auth.merge.AccountMergeFailureCode;
 import com.iflytek.skillhub.auth.identity.IdentityLinkException;
 import com.iflytek.skillhub.auth.identity.IdentityLinkFailureCode;
-import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
+import com.iflytek.skillhub.auth.merge.AccountMergeException;
+import com.iflytek.skillhub.auth.merge.AccountMergeFailureCode;
+import com.iflytek.skillhub.dto.AccountMergeErrorResponse;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
-import com.iflytek.skillhub.dto.AccountMergeErrorResponse;
 import com.iflytek.skillhub.dto.IdentityLinkErrorResponse;
 import com.iflytek.skillhub.domain.shared.exception.LocalizedDomainException;
 import com.iflytek.skillhub.domain.shared.exception.LocalizedMessage;
@@ -244,11 +243,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleStorageAccess(StorageAccessException ex, HttpServletRequest request) {
         metrics.incrementStorageAccessFailure(ex.getOperation());
         logger.warn(
-                "Object storage unavailable [requestId={}, method={}, path={}, userId={}, operation={}, key={}]",
+                "Object storage unavailable [requestId={}, method={}, path={}, authentication={}, operation={}, key={}]",
                 requestIdAccessor.current(),
                 request.getMethod(),
                 sensitiveLogSanitizer.sanitizeRequestTarget(request),
-                resolveUserId(request),
+                resolveAuthenticationState(request),
                 ex.getOperation(),
                 ex.getKey(),
                 ex
@@ -273,11 +272,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex, HttpServletRequest request) {
         logger.error(
-                "Unhandled API exception [requestId={}, method={}, path={}, userId={}]",
+                "Unhandled API exception [requestId={}, method={}, path={}, authentication={}]",
                 requestIdAccessor.current(),
                 request.getMethod(),
                 sensitiveLogSanitizer.sanitizeRequestTarget(request),
-                resolveUserId(request),
+                resolveAuthenticationState(request),
                 ex
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
@@ -286,12 +285,12 @@ public class GlobalExceptionHandler {
 
     private void logHandledException(HttpStatus status, String messageCode, HttpServletRequest request) {
         logger.info(
-                "API request failed [requestId={}, status={}, method={}, path={}, userId={}, code={}]",
+                "API request failed [requestId={}, status={}, method={}, path={}, authentication={}, code={}]",
                 requestIdAccessor.current(),
                 status.value(),
                 request.getMethod(),
                 sensitiveLogSanitizer.sanitizeRequestTarget(request),
-                resolveUserId(request),
+                resolveAuthenticationState(request),
                 messageCode
         );
     }
@@ -304,13 +303,11 @@ public class GlobalExceptionHandler {
                 apiResponseFactory.error(status.value(), error.messageCode(), error.messageArgs()));
     }
 
-    private String resolveUserId(HttpServletRequest request) {
-        if (!(request.getUserPrincipal() instanceof Authentication authentication)) {
-            return "anonymous";
+    private String resolveAuthenticationState(HttpServletRequest request) {
+        if (request.getUserPrincipal() instanceof Authentication authentication
+                && authentication.isAuthenticated()) {
+            return "authenticated";
         }
-        if (authentication.getPrincipal() instanceof PlatformPrincipal principal) {
-            return principal.userId();
-        }
-        return authentication.getName();
+        return "anonymous";
     }
 }

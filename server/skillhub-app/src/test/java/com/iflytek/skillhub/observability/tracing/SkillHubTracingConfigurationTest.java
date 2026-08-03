@@ -64,6 +64,24 @@ class SkillHubTracingConfigurationTest {
     }
 
     @Test
+    void otelSdkModeWithEmptyEndpointShouldCreateInProcessTracerOnly() {
+        contextRunner
+                .withPropertyValues(
+                        "skillhub.observability.tracing-mode=otel-sdk",
+                        "management.otlp.tracing.endpoint=",
+                        "management.tracing.sampling.probability=1.0",
+                        "management.tracing.baggage.enabled=false",
+                        "management.tracing.propagation.type=W3C"
+                )
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(Tracer.class)).isInstanceOf(OtelTracer.class);
+                    assertThat(context).hasSingleBean(OpenTelemetry.class);
+                    assertThat(context).doesNotHaveBean(OtlpHttpSpanExporter.class);
+                });
+    }
+
+    @Test
     void otelSdkModeShouldCreateExporterOnlyWhenEndpointIsConfigured() {
         contextRunner
                 .withPropertyValues(

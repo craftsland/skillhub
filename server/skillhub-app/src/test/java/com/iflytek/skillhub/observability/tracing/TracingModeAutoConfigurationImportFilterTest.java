@@ -47,7 +47,31 @@ class TracingModeAutoConfigurationImportFilterTest {
                         "otel-sdk"
                 ));
 
+        assertThat(matches()).containsExactly(true, true, false, true, false);
+    }
+
+    @Test
+    void shouldEnableOtlpExporterOnlyWhenEndpointHasText() {
+        filter.setEnvironment(new MockEnvironment()
+                .withProperty(
+                        TracingModeAutoConfigurationImportFilter.TRACING_MODE_PROPERTY,
+                        "otel-sdk"
+                )
+                .withProperty("management.otlp.tracing.endpoint", "http://127.0.0.1:4318/v1/traces"));
+
         assertThat(matches()).containsExactly(true, true, true, true, false);
+    }
+
+    @Test
+    void shouldExcludeOtlpExporterWhenEndpointIsEmpty() {
+        filter.setEnvironment(new MockEnvironment()
+                .withProperty(
+                        TracingModeAutoConfigurationImportFilter.TRACING_MODE_PROPERTY,
+                        "otel-sdk"
+                )
+                .withProperty("management.otlp.tracing.endpoint", ""));
+
+        assertThat(matches()).containsExactly(true, true, false, true, false);
     }
 
     private boolean[] matches() {

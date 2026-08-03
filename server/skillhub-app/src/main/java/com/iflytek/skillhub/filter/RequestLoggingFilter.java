@@ -17,7 +17,6 @@ import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.Set;
 
 /**
@@ -28,17 +27,11 @@ import java.util.Set;
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
-    private static final int MAX_LOG_BODY_LENGTH = 200;
-
     private static final Set<String> SKIP_PREFIXES = Set.of(
             "/actuator", "/favicon.ico", "/assets/"
     );
     private static final Set<String> SKIP_SUFFIXES = Set.of(
             "/sse"
-    );
-    private static final Set<String> SENSITIVE_BODY_PREFIXES = Set.of(
-            "/api/v1/auth/",
-            "/api/v1/account/merge"
     );
     private final SensitiveLogSanitizer sensitiveLogSanitizer;
 
@@ -95,13 +88,6 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
             sb.append(" | UA: ").append(truncate(userAgent, 80));
         }
 
-        String requestBody = shouldLogBody(request.getRequestURI())
-                ? getRequestBody(request)
-                : null;
-        if (requestBody != null && !requestBody.isBlank()) {
-            sb.append(" | Body: ").append(requestBody);
-        }
-
         log.info(sb.toString());
     }
 
@@ -119,11 +105,6 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         return false;
     }
 
-    private boolean shouldLogBody(String uri) {
-        return SENSITIVE_BODY_PREFIXES.stream()
-                .noneMatch(uri::startsWith);
-    }
-
     private boolean isNotificationSse(String uri) {
         return uri != null && uri.endsWith("/notifications/sse");
     }
@@ -132,18 +113,6 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform");
         response.setHeader("X-Accel-Buffering", "no");
-    }
-
-    private String getRequestBody(ContentCachingRequestWrapper request) {
-        byte[] buf = request.getContentAsByteArray();
-        if (buf.length > 0) {
-            try {
-                return truncate(new String(buf, request.getCharacterEncoding()), MAX_LOG_BODY_LENGTH);
-            } catch (UnsupportedEncodingException e) {
-                return "[unknown encoding]";
-            }
-        }
-        return null;
     }
 
     private String truncate(String value, int maxLength) {
