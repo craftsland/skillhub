@@ -28,6 +28,14 @@ csrf_token() {
   awk '$6 == "XSRF-TOKEN" { print $7 }' "$COOKIE_JAR" | tail -n 1
 }
 
+refresh_csrf() {
+  # Logout invalidates the server session; warm a fresh anonymous session so
+  # the next direct-login request uses a token bound to that new session.
+  curl --max-time 10 -s -c "$COOKIE_JAR" \
+    "$BASE_URL/api/v1/auth/me" >/dev/null || true
+  CSRF_TOKEN="$(csrf_token)"
+}
+
 check_status() {
   local description="$1"
   local actual="$2"
@@ -94,9 +102,7 @@ else
 fi
 
 # Obtain a CSRF token before the first state-changing request.
-curl --max-time 10 -s -c "$COOKIE_JAR" \
-  "$BASE_URL/api/v1/auth/me" >/dev/null || true
-CSRF_TOKEN="$(csrf_token)"
+refresh_csrf
 if [[ -z "$CSRF_TOKEN" ]]; then
   echo "FAIL: server did not issue an XSRF token"
   FAIL=$((FAIL + 1))
@@ -149,7 +155,7 @@ if [[ "$LOGIN_STATUS" == "200" ]]; then
   fi
 fi
 
-CSRF_TOKEN="$(csrf_token)"
+refresh_csrf
 REPEAT_STATUS="$(curl --max-time 15 -s \
   -o "$RESPONSE_FILE" -w "%{http_code}" \
   -X POST "$BASE_URL/api/v1/auth/direct/login" \
@@ -184,7 +190,7 @@ if [[ -n "$RENAMED_USERNAME" && "$REPEAT_STATUS" == "200" ]]; then
     -X POST "$BASE_URL/api/v1/auth/logout" \
     -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
     -H "X-XSRF-TOKEN: $LOGOUT_CSRF" || true
-  CSRF_TOKEN="$(csrf_token)"
+  refresh_csrf
   RENAMED_STATUS="$(curl --max-time 15 -s \
     -o "$RESPONSE_FILE" -w "%{http_code}" \
     -X POST "$BASE_URL/api/v1/auth/direct/login" \
@@ -222,9 +228,10 @@ if [[ "$REPEAT_STATUS" == "200" ]]; then
     -X POST "$BASE_URL/api/v1/auth/logout" \
     -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
     -H "X-XSRF-TOKEN: $LOGOUT_CSRF" || true
+  refresh_csrf
 fi
 
-CSRF_TOKEN="$(csrf_token)"
+refresh_csrf
 INVALID_PASSWORD_STATUS="$(curl --max-time 15 -s \
   -o "$RESPONSE_FILE" -w "%{http_code}" \
   -X POST "$BASE_URL/api/v1/auth/direct/login" \
@@ -250,7 +257,7 @@ else
   PASS=$((PASS + 1))
 fi
 
-CSRF_TOKEN="$(csrf_token)"
+refresh_csrf
 UNKNOWN_STATUS="$(curl --max-time 15 -s \
   -o "$RESPONSE_FILE" -w "%{http_code}" \
   -X POST "$BASE_URL/api/v1/auth/direct/login" \
