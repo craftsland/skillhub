@@ -19,7 +19,8 @@ SkillHub 已经支持通过 manifest 将远程 Skill 包同步到 `@global`。�
 2. 完成协议、许可证、安全和可用性检查。
 3. 将审查后源码、来源和回归用例纳入开源仓库。
 4. 确定性打包并上传官方云存储。
-5. 加入 `builtin-skills/manifest.json`。
+5. 将不可变 URL 和制品 SHA-256 加入
+   `server/skillhub-app/src/main/resources/builtin-skills/manifest.json`。
 6. 随 SkillHub 默认部署同步到 `@global`。
 
 目标总量为 30～50 个。当前已有的 `skillhub-hello` 和 `agentguard` 也需要重新检查，通过质量
@@ -121,7 +122,7 @@ Catalog 按单个 Skill 的许可证筛选。Anthropic 的 `docx`、`pdf`、`ppt
 - 跑通批量检查、打包、上传和 manifest 更新流程。
 - 已从 70 个候选中选定 A05、A07–A15、B06、B07、B10、B11、B24，共 15 个。
 - 15 个候选均已完成必要适配、来源与许可证登记、生产包校验和静态安全复测。
-- 待完成不可变制品上传、manifest 哈希登记和干净实例同步验证。
+- 已完成不可变制品上传和 manifest 哈希登记，待完成干净实例同步验证。
 - 不要求第一批为了形式上覆盖全部类别而降低门槛；旅行规划等缺少合格候选的场景留到第二批。
 
 ### 第二批：扩充到 30 个

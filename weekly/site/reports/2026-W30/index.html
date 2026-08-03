@@ -1193,7 +1193,17 @@ footer {
 </head>
 <body>
   <a class="skip-link" href="#report-content">跳到报告正文</a>
-  <article class="report">
+  <article class="report"
+    data-period-start="2026-07-17T00:00:00+08:00"
+    data-period-end="2026-07-24T00:00:00+08:00"
+    data-period-boundary="[)"
+    data-snapshot-at="2026-07-24T00:00:00+08:00"
+    data-star-evidence="current-visible-arrivals"
+    data-star-api-status="success"
+    data-star-arrivals="803"
+    data-star-observed-at="2026-07-31T16:35:58+08:00"
+    data-star-start-at=""
+    data-star-end-at="">
     <header class="masthead">
       <div class="topline">
         <div class="brand">
@@ -1214,11 +1224,11 @@ footer {
           <div class="meta-grid">
             <div class="meta-item">
               <span class="key">统计周期</span>
-              <span class="value">2026-07-16 00:00—2026-07-23 22:00（Asia/Shanghai）</span>
+              <span class="value">2026-07-17 00:00—2026-07-23 23:59 · Asia/Shanghai</span>
             </div>
             <div class="meta-item">
-              <span class="key">当前状态快照</span>
-              <span class="value">2026-07-23 22:00（Asia/Shanghai）</span>
+              <span class="key">期末状态复核</span>
+              <span class="value">2026-07-24 00:00（Asia/Shanghai）</span>
             </div>
             <div class="meta-item">
               <span class="key">项目仓库</span>
@@ -1226,7 +1236,7 @@ footer {
             </div>
             <div class="meta-item">
               <span class="key">数据来源</span>
-              <span class="value">GitHub REST API · Actions · Git · npm Downloads API</span>
+              <span class="value">GitHub API（认证）· Actions · Git · npm Downloads API</span>
             </div>
           </div>
         </div>
@@ -1240,9 +1250,9 @@ footer {
         </div>
       </div>
       <div class="metrics" aria-label="四项核心指标">
-        <div class="metric"><strong>4,823</strong><span>Stars · 统计期增量未取得</span></div>
-        <div class="metric"><strong>652</strong><span>Forks · 本期新增 27</span></div>
-        <div class="metric"><strong>91.3%</strong><span>Actions 有效成功率 · 126/138</span></div>
+        <div class="metric"><strong>4,823</strong><span>Stars · 本期当前可见新增 803</span></div>
+        <div class="metric"><strong>652</strong><span>Forks · 本期当前可见创建 26</span></div>
+        <div class="metric"><strong>90.8%</strong><span>Actions 有效成功率 · 118/130</span></div>
         <div class="metric"><strong>1 / 1</strong><span>应用 / CLI Release · W30</span></div>
       </div>
     </header>
@@ -1277,26 +1287,26 @@ footer {
                 <div class="snapshot-row">
                   <span class="snapshot-label">Stars</span>
                   <strong>4,823</strong>
-                  <span class="snapshot-change missing">期初快照未取得，不能计算净增量</span>
+                  <span class="snapshot-change positive">本期当前可见新增 803</span>
                 </div>
                 <div class="snapshot-row">
                   <span class="snapshot-label">Forks</span>
                   <strong>652</strong>
-                  <span class="snapshot-change positive">本期新增 27</span>
+                  <span class="snapshot-change positive">本期当前可见创建 26</span>
                 </div>
               </div>
-              <p class="chart-note">规模快照截至 7 月 23 日 22:00；Fork 新增按创建时间统计，Star 期初净快照未取得。</p>
+              <p class="chart-note">Stars 与 Forks 的本期值按认证 API 中当前仍可见、创建时间落入半开周期的记录统计；分别为 803 与 26，不代表库存净增长。</p>
             </div>
             <div class="chart-box" data-module="weekly-collaboration-chart">
               <h3>本周协作流转</h3>
-              <div class="bars" role="img" aria-label="W30 协作流转：Issue 新增 8 个、关闭 3 个；PR 新增 12 个、合并 5 个、关闭未合并 9 个">
-                <div class="bar-row"><span class="bar-label">Issue 新增</span><span class="bar-track"><span class="bar-fill" style="width:66.7%"></span></span><span class="bar-value">8</span></div>
+              <div class="bars" role="img" aria-label="W30 协作流转：Issue 新增 7 个、关闭 3 个；PR 新增 12 个、合并 5 个、关闭未合并 9 个">
+                <div class="bar-row"><span class="bar-label">Issue 新增</span><span class="bar-track"><span class="bar-fill" style="width:58.3%"></span></span><span class="bar-value">7</span></div>
                 <div class="bar-row"><span class="bar-label">Issue 关闭</span><span class="bar-track"><span class="bar-fill" style="width:25%"></span></span><span class="bar-value">3</span></div>
                 <div class="bar-row"><span class="bar-label">PR 新增</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-value">12</span></div>
                 <div class="bar-row"><span class="bar-label">PR 合并</span><span class="bar-track"><span class="bar-fill" style="width:41.7%"></span></span><span class="bar-value">5</span></div>
                 <div class="bar-row"><span class="bar-label">PR 关闭未合并</span><span class="bar-track"><span class="bar-fill" style="width:75%"></span></span><span class="bar-value">9</span></div>
               </div>
-              <p class="chart-note">Issue 净增 5、当前开放 21；PR 净减 2、当前开放 19。主分支新增 19 个提交，其中 5 个 Merge Commit。</p>
+              <p class="chart-note">Issue 净增 4、期末开放 21；PR 净减 2、期末开放 19。主分支新增 18 个提交，本期合并 5 个 PR。</p>
             </div>
           </div>
           <p class="risk-note"><strong>主要风险：</strong>发布目标已经恢复，但开放 Issue 和 PR 中分别有 52.4% 与 52.6% 超过 30 天，且 PR E2E 本期有 8 次失败。</p>
@@ -1325,9 +1335,9 @@ footer {
                   <td>本周合并并关闭 #582，形成新的 Agent 生态接入路径。</td>
                 </tr>
                 <tr>
-                  <td><span class="status warn">推进中</span></td>
+                  <td><span class="status warn">期后完成</span></td>
                   <td><a href="https://github.com/iflytek/skillhub/issues/596">#596</a> / <a href="https://github.com/iflytek/skillhub/pull/601">PR #601 驳回版本重传 500</a></td>
-                  <td>发布核心流程修复已提交；需解决本周 CI/E2E 失败并完成回归。</td>
+                  <td>7 月 23 日本期提交，期后合并并完成回归。</td>
                 </tr>
                 <tr>
                   <td><span class="status warn">推进中</span></td>
@@ -1342,10 +1352,10 @@ footer {
         <section class="report-section" data-module="ecosystem-progress" aria-labelledby="ecosystem-title">
           <h2 id="ecosystem-title">三、生态相关进展</h2>
           <div class="ecosystem-signals" data-module="ecosystem-signals" role="img"
-            aria-label="W30 开源生态参与信号：8 位新 Issue 作者、5 位新 PR 作者、3 位合并作者；本期新增 27 个 Fork；SkillHub CLI npm 下载 856 次">
-            <div class="ecosystem-signal"><strong>8 / 5 / 3</strong><span>新 Issue 作者 / 新 PR 作者 / 合并作者</span></div>
-            <div class="ecosystem-signal"><strong>+27</strong><span>本期新增 Fork</span></div>
-            <div class="ecosystem-signal"><strong>856</strong><span>SkillHub CLI npm 下载</span></div>
+            aria-label="W30 开源生态参与信号：7 位新 Issue 作者、5 位新 PR 作者、3 位合并作者；当前可见本期创建 Fork 26 个；SkillHub CLI 在 2026 年 7 月 17 日至 23 日 UTC 日桶下载 746 次">
+            <div class="ecosystem-signal"><strong>7 / 5 / 3</strong><span>新 Issue 作者 / 新 PR 作者 / 合并作者</span></div>
+            <div class="ecosystem-signal"><strong>26</strong><span>当前可见本期创建 Fork</span></div>
+            <div class="ecosystem-signal"><strong>746</strong><span>CLI 下载 · 7 个 UTC 日桶</span></div>
             <p class="ecosystem-signal-note">以上为独立参与信号，不构成转化漏斗。</p>
           </div>
           <ul class="ecosystem-list">
@@ -1377,19 +1387,19 @@ footer {
           <div class="health-cards">
             <article class="health-card">
               <div class="top"><span class="name">工程稳定性</span><span class="status warn">需关注</span></div>
-              <div class="health-metric">91.3% <small>126/138</small></div>
+              <div class="health-metric">90.8% <small>118/130</small></div>
               <p>12 次失败中有 8 次来自 PR E2E。</p>
               <div class="detail">失败覆盖多个开发分支，需要区分回归与环境问题。</div>
             </article>
             <article class="health-card">
               <div class="top"><span class="name">安全流水线</span><span class="status ok">稳定</span></div>
-              <div class="health-metric">32 / 32 <small>执行成功</small></div>
+              <div class="health-metric">31 / 31 <small>执行成功</small></div>
               <p>另有 9 次等待授权、1 次条件跳过。</p>
               <div class="detail">执行成功不代表公开漏洞数量为 0。</div>
             </article>
             <article class="health-card">
               <div class="top"><span class="name">自动化运营</span><span class="status warn">需关注</span></div>
-              <div class="health-metric">31 / 32 <small>Backlog Rescore</small></div>
+              <div class="health-metric">27 / 28 <small>Backlog Rescore</small></div>
               <p>DeepWiki 1 次失败；镜像发布 2 成功、1 失败。</p>
               <div class="detail">治理自动化整体可用，但存在分散失败点。</div>
             </article>
@@ -1416,18 +1426,18 @@ footer {
 
         <section class="report-section" data-module="workflow-execution" aria-labelledby="ci-title">
           <h2 id="ci-title">CI 与自动化执行</h2>
-          <p class="section-lead">统计期内有 213 条 Actions 记录，其中 126 次成功、12 次失败、32 次等待授权、42 次跳过、1 次取消。</p>
+          <p class="section-lead">统计期内有 205 条 Actions 记录，其中 118 次成功、12 次失败、32 次等待授权、42 次跳过、1 次取消。</p>
           <div class="chart-box" data-module="actions-outcome-chart">
             <h3>Actions 结果构成</h3>
-            <div class="segbar" role="img" aria-label="W30 Actions 共 213 条记录：成功 126，失败 12，等待授权 32，条件跳过 42，取消 1">
-              <span class="seg-success" style="width:59.15%"></span>
-              <span class="seg-failure" style="width:5.63%"></span>
-              <span class="seg-auth" style="width:15.02%"></span>
-              <span class="seg-skipped" style="width:19.72%"></span>
-              <span class="seg-cancelled" style="width:.47%"></span>
+            <div class="segbar" role="img" aria-label="W30 Actions 共 205 条记录：成功 118，失败 12，等待授权 32，条件跳过 42，取消 1">
+              <span class="seg-success" style="width:57.56%"></span>
+              <span class="seg-failure" style="width:5.85%"></span>
+              <span class="seg-auth" style="width:15.61%"></span>
+              <span class="seg-skipped" style="width:20.49%"></span>
+              <span class="seg-cancelled" style="width:.49%"></span>
             </div>
             <div class="chart-legend" aria-hidden="true">
-              <span><i class="seg-success"></i>成功 <b>126</b></span>
+              <span><i class="seg-success"></i>成功 <b>118</b></span>
               <span><i class="seg-failure"></i>失败 <b>12</b></span>
               <span><i class="seg-auth"></i>等待授权 <b>32</b></span>
               <span><i class="seg-skipped"></i>跳过 <b>42</b></span>
@@ -1441,21 +1451,21 @@ footer {
                 <tr><th>工作流</th><th class="number">总记录</th><th class="number">成功</th><th class="number">失败</th><th class="number">等待授权</th><th class="number">跳过/取消</th></tr>
               </thead>
               <tbody>
-                <tr><td>PR Tests</td><td class="number">36</td><td class="number">24</td><td class="number">1</td><td class="number">9</td><td class="number">2</td></tr>
-                <tr><td>PR E2E Tests</td><td class="number">22</td><td class="number">6</td><td class="number">8</td><td class="number">8</td><td class="number">0</td></tr>
+                <tr><td>PR Tests</td><td class="number">35</td><td class="number">23</td><td class="number">1</td><td class="number">9</td><td class="number">2</td></tr>
+                <tr><td>PR E2E Tests</td><td class="number">21</td><td class="number">5</td><td class="number">8</td><td class="number">8</td><td class="number">0</td></tr>
                 <tr><td>PR CLI</td><td class="number">6</td><td class="number">5</td><td class="number">0</td><td class="number">1</td><td class="number">0</td></tr>
                 <tr><td>PR Scripts</td><td class="number">12</td><td class="number">7</td><td class="number">0</td><td class="number">5</td><td class="number">0</td></tr>
                 <tr><td>PR Helm Chart</td><td class="number">1</td><td class="number">1</td><td class="number">0</td><td class="number">0</td><td class="number">0</td></tr>
-                <tr><td>Security</td><td class="number">42</td><td class="number">32</td><td class="number">0</td><td class="number">9</td><td class="number">1</td></tr>
-                <tr><td>Issue Backlog Rescore</td><td class="number">32</td><td class="number">31</td><td class="number">1</td><td class="number">0</td><td class="number">0</td></tr>
-                <tr><td>Issue Triage</td><td class="number">50</td><td class="number">13</td><td class="number">0</td><td class="number">0</td><td class="number">37</td></tr>
+                <tr><td>Security</td><td class="number">41</td><td class="number">31</td><td class="number">0</td><td class="number">9</td><td class="number">1</td></tr>
+                <tr><td>Issue Backlog Rescore</td><td class="number">28</td><td class="number">27</td><td class="number">1</td><td class="number">0</td><td class="number">0</td></tr>
+                <tr><td>Issue Triage</td><td class="number">49</td><td class="number">12</td><td class="number">0</td><td class="number">0</td><td class="number">37</td></tr>
                 <tr><td>Publish Images</td><td class="number">3</td><td class="number">2</td><td class="number">1</td><td class="number">0</td><td class="number">0</td></tr>
                 <tr><td>Release CLI</td><td class="number">1</td><td class="number">1</td><td class="number">0</td><td class="number">0</td><td class="number">0</td></tr>
                 <tr><td>其他自动化</td><td class="number">8</td><td class="number">4</td><td class="number">1</td><td class="number">0</td><td class="number">3</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="risk-note"><strong>本期薄弱点：</strong>PR E2E 实际形成结论的 14 次运行中有 8 次失败；需区分真实回归、环境不稳定和分支早期失败，不能只看最终合并结果。</p>
+          <p class="risk-note"><strong>本期薄弱点：</strong>PR E2E 实际形成结论的 13 次运行中有 8 次失败；需区分真实回归、环境不稳定和分支早期失败，不能只看最终合并结果。</p>
         </section>
 
         <section class="report-section" data-module="delivery-and-backlog" aria-labelledby="delivery-title">
@@ -1463,7 +1473,7 @@ footer {
           <div class="health-grid">
             <article class="health-note">
               <h3>安全与供应链</h3>
-              <p>Security 32 次实际执行全部成功。公开数据无法确认 Dependabot、CodeQL 未修复告警和生产扫描任务数量。</p>
+              <p>Security 31 次实际执行全部成功，另有 9 次等待授权、1 次条件跳过。公开数据无法确认 Dependabot、CodeQL 未修复告警和生产扫描任务数量。</p>
             </article>
             <article class="health-note">
               <h3>Release 交付</h3>
@@ -1510,7 +1520,7 @@ footer {
 
         <section class="report-section" data-module="observable-response" aria-labelledby="response-title">
           <h2 id="response-title">社区响应</h2>
-          <p>本期 8 个新增 Issue 中，#582、#586、#594 已关闭，#596 在约 23 小时后形成配对 PR #601，#597 由 PR #592 继续跟踪。按“关闭或形成明确配对实现”统计，可观察处置覆盖为 5/8；该口径不等同于首次维护者响应 SLA。</p>
+          <p>本期 7 个新增 Issue 中，#586、#594 已关闭，#596 在期后形成配对 PR #601，#597 由 PR #592 继续跟踪。按“关闭或形成明确配对实现”统计，截至快照可观察处置覆盖为 4/7；该口径不等同于首次维护者响应 SLA。</p>
         </section>
       </div>
 
@@ -1524,8 +1534,8 @@ footer {
         <section class="report-section" data-module="weekly-flow" aria-labelledby="flow-title">
           <h2 id="flow-title">本周 Issue 与 PR 流转</h2>
           <div class="flow-summary">
-            <div class="flow-item"><strong>Issue +8 / -3</strong><span>净增 5 · 当前快照开放 21</span></div>
-            <div class="flow-item"><strong>PR +12 / 合并 5</strong><span>关闭未合并 9 · 净减 2 · 当前快照开放 19</span></div>
+            <div class="flow-item"><strong>Issue +7 / -3</strong><span>净增 4 · 期末开放 21</span></div>
+            <div class="flow-item"><strong>PR +12 / 合并 5</strong><span>关闭未合并 9 · 净减 2 · 期末开放 19</span></div>
           </div>
 
           <h3>新增 Issue（按价值排序）</h3>
@@ -1537,11 +1547,10 @@ footer {
                 <tr><td><span class="value-level value-a">A</span></td><td><a href="https://github.com/iflytek/skillhub/issues/596">#596 驳回版本同版本号重传返回 500</a></td><td>直接阻断发布核心流程。</td><td>配对 PR #601 已提交，CI/E2E 待修复。</td></tr>
                 <tr><td><span class="value-level value-a">A</span></td><td><a href="https://github.com/iflytek/skillhub/issues/586">#586 启动脚本缺少 Cookie Secret</a></td><td>阻断依赖 OSS 脚本部署的用户。</td><td>本期完成同步并关闭。</td></tr>
                 <tr><td><span class="value-level value-a">A</span></td><td><a href="https://github.com/iflytek/skillhub/issues/594">#594 GitLab OAuth Base URI 不生效</a></td><td>影响企业身份接入，官方标记 high risk。</td><td>本周约 4 小时内关闭；需保留关闭依据。</td></tr>
-                <tr><td><span class="value-level value-b">B</span></td><td><a href="https://github.com/iflytek/skillhub/issues/583">#583 DingTalk OAuth</a></td><td>身份接入价值高，安全边界也需要严格审查。</td><td>与 PR #467 配对，期末仍开放。</td></tr>
+                <tr><td><span class="value-level value-b">B</span></td><td><a href="https://github.com/iflytek/skillhub/issues/602">#602 MCP 广场与专家包</a></td><td>有生态价值，但会扩大产品与维护边界。</td><td>需先确认与 Registry 集合、Agent 集成的关系。</td></tr>
                 <tr><td><span class="value-level value-b">B</span></td><td><a href="https://github.com/iflytek/skillhub/issues/597">#597 搜索异步重建缺少 MDC、重试与指标</a></td><td>关系到索引长期一致性和可运维性。</td><td>作为 PR #592 的稳健性后续。</td></tr>
                 <tr><td><span class="value-level value-c">C</span></td><td><a href="https://github.com/iflytek/skillhub/issues/587">#587 Skill Health Score</a></td><td>治理价值存在，但需先定义外部遥测契约。</td><td>当前信息不足，需明确遥测来源与责任边界。</td></tr>
                 <tr><td><span class="value-level value-d">D</span></td><td><a href="https://github.com/iflytek/skillhub/issues/589">#589 Skill 工作台</a></td><td>可能把 Registry 扩展为创作 IDE。</td><td>已标记 deferred，建议独立验证。</td></tr>
-                <tr><td><span class="value-level value-d">D</span></td><td><a href="https://github.com/iflytek/skillhub/issues/602">#602 MCP 广场和专家包</a></td><td>涉及产品边界扩张。</td><td>已标记 deferred，先澄清定位。</td></tr>
               </tbody>
             </table>
           </div>
@@ -1552,12 +1561,13 @@ footer {
               <caption class="sr-only">W30 关键 PR 流转</caption>
               <thead><tr><th>类型</th><th>价值</th><th>PR</th><th>结果与判断</th></tr></thead>
               <tbody>
-                <tr><td>新增</td><td><span class="value-level value-a">A</span></td><td><a href="https://github.com/iflytek/skillhub/pull/601">#601 驳回版本重传修复</a></td><td>发布核心修复；本周 PR Tests 与 E2E 失败。</td></tr>
+                <tr><td>新增</td><td><span class="value-level value-a">A</span></td><td><a href="https://github.com/iflytek/skillhub/pull/601">#601 驳回版本重传修复</a></td><td>7 月 23 日本期提交，期后合并并完成回归。</td></tr>
                 <tr><td>新增</td><td><span class="value-level value-a">A</span></td><td><a href="https://github.com/iflytek/skillhub/pull/592">#592 搜索索引异步重建</a></td><td>修复标签变化后的搜索一致性，当前仍开放。</td></tr>
                 <tr><td>合并</td><td><span class="value-level value-b">B</span></td><td><a href="https://github.com/iflytek/skillhub/pull/529">#529 双语 FAQ</a> / <a href="https://github.com/iflytek/skillhub/pull/591">#591 Scanner 依赖固定</a> / <a href="https://github.com/iflytek/skillhub/pull/595">#595 CLI 0.1.9</a></td><td>完成社区文档、镜像构建和 CLI 发版闭环。</td></tr>
                 <tr><td>合并</td><td><span class="value-level value-b">B</span></td><td><a href="https://github.com/iflytek/skillhub/pull/584">#584 Hermes 指南</a> / <a href="https://github.com/iflytek/skillhub/pull/585">#585 通用安装目标</a></td><td>完成 Agent 集成和跨 Agent 安装路径。</td></tr>
                 <tr><td>新增</td><td><span class="value-level value-c">C</span></td><td><a href="https://github.com/iflytek/skillhub/pull/593">#593 运维 FAQ</a> / <a href="https://github.com/iflytek/skillhub/pull/598">#598 HarnessClaw 指南</a></td><td>文档型贡献，完成事实核对后可小步合并。</td></tr>
-                <tr><td>其他新增</td><td>—</td><td>#588 / #590 / #599 / #600</td><td>覆盖俄语本地化、安全修复、README 传播与站点文档；#588、#590、#600 在本期关闭未合并。</td></tr>
+                <tr><td>新增</td><td><span class="value-level value-c">C</span></td><td><a href="https://github.com/iflytek/skillhub/pull/599">#599 README 引导</a> / <a href="https://github.com/iflytek/skillhub/pull/600">#600 项目网站</a></td><td>#599 期后合并；#600 本期关闭未合并。</td></tr>
+                <tr><td>其他新增</td><td>—</td><td>#588 / #590</td><td>覆盖俄语本地化与安全修复，均在本期关闭未合并。</td></tr>
                 <tr><td>关闭未合并</td><td>—</td><td>#317 / #459 / #569 / #572 / #575 / #578</td><td>配合新增后关闭的 #588、#590、#600，本期共完成 9 个未合并关闭决策。</td></tr>
               </tbody>
             </table>
@@ -1630,11 +1640,11 @@ footer {
         <section class="report-section" data-module="metric-definitions" aria-labelledby="method-title">
           <h2 id="method-title">统计口径</h2>
           <ul class="method-list">
-            <li><strong>统计周期</strong><span>2026-07-16 00:00—2026-07-23 22:00，Asia/Shanghai；按“上周四到本周四”回溯统计。</span></li>
-            <li><strong>当前快照</strong><span>2026-07-23 22:00；开放队列与仓库累计数均取该时点。</span></li>
-            <li><strong>Star 比较</strong><span>期初净 Star 快照未取得，因此只展示期末 4,823，不推断统计期净增长。</span></li>
-            <li><strong>历史衔接</strong><span>本报告由原周一—周日口径回溯调整；7 月 16 日和 7 月 23 日是周四边界日期，也会出现在相邻报告的展示周期中。</span></li>
-            <li><strong>期后进展</strong><span>7 月 23 日 22:00 以后发生的合并、关闭和 Release 只作为后续状态，不计入 W30。</span></li>
+            <li><strong>统计周期</strong><span>展示为 2026-07-17 00:00—2026-07-23 23:59，Asia/Shanghai；程序过滤采用等价半开区间 <code>[2026-07-17 00:00, 2026-07-24 00:00)</code>，对应 UTC 为 7 月 16 日 16:00 至 7 月 23 日 16:00。</span></li>
+            <li><strong>期末状态</strong><span>仓库累计数与开放队列取 2026-07-23 22:00 快照；复核后续两小时 Issue/PR 事件流无变化，因此期末开放 Issue 21、PR 19。Star 当前可见新增另按 7 月 31 日认证列表重算。</span></li>
+            <li><strong>Star 证据</strong><span>803 表示 7 月 31 日 16:35 认证 API 中，<code>starred_at</code> 落入本期且当前仍可见的 Stargazer；它不代表 Star 库存净增长。</span></li>
+            <li><strong>周期衔接</strong><span>W29 的排他截止与 W30 起始均为 7 月 17 日 00:00；W30 的排他截止与 W31 起始均为 7 月 24 日 00:00，相邻报告无重叠。</span></li>
+            <li><strong>期后进展</strong><span>7 月 24 日 00:00 及以后发生的合并、关闭和 Release 只作为后续状态，不计入 W30。</span></li>
             <li><strong>Actions 成功率</strong><span><code>success / (success + failure)</code>；等待授权、条件跳过和取消不进入分母。</span></li>
             <li><strong>Issue / PR</strong><span>GitHub Issues API 会同时返回 PR，本报告分开统计；价值 A—D 为人工治理判断。</span></li>
             <li><strong>推广数据</strong><span>推广动作由维护者补录；Fork、下载、Issue 作者和 PR 作者不组成转化漏斗。</span></li>
@@ -1648,14 +1658,14 @@ footer {
               <caption>来源覆盖</caption>
               <thead><tr><th>来源</th><th>用途</th><th>限制</th></tr></thead>
               <tbody>
-                <tr><td>GitHub REST API</td><td>仓库、Issue、PR、Release、Actions、Fork、Stargazer</td><td>Traffic 与私有安全告警不可见。</td></tr>
+                <tr><td>GitHub API（认证）</td><td>仓库、Issue、PR、Release、Actions、Fork、Stargazer <code>starred_at</code></td><td>没有周期起止两份库存快照；当前可见新增不等于净增长。</td></tr>
                 <tr><td>Git 标签与提交历史</td><td>核对 v0.2.14 交付内容</td><td>只用于补充公开 Release 信息。</td></tr>
-                <tr><td>npm Downloads API</td><td><code>@astron-team/skillhub</code> 本期下载</td><td>856 次下载不等同于独立用户。</td></tr>
+                <tr><td>npm Downloads API</td><td><code>@astron-team/skillhub</code> 的 7 个 UTC 日桶</td><td>746 次下载不等同于独立用户，且覆盖范围与 Asia/Shanghai 周期不完全对齐。</td></tr>
                 <tr><td>维护者人工判断</td><td>价值排序、推广动作和产品边界</td><td>推广动作尚未提供。</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="risk-note"><strong>未取得：</strong>GitHub Traffic、Referrers、期初净 Star 快照、私有安全告警，以及生产 SkillHub 实例的可用率、延迟、Skill 数量和扫描成功率。</p>
+          <p class="risk-note"><strong>未取得：</strong>GitHub Traffic、Referrers、W30 起止两份可比 Star/Fork 库存快照、私有安全告警，以及生产 SkillHub 实例的可用率、延迟、Skill 数量和扫描成功率。</p>
         </section>
       </div>
     </main>

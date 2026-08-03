@@ -37,6 +37,7 @@ POSTGRES_PASSWORD=strong-postgres-password
 SESSION_COOKIE_SECURE=true
 BOOTSTRAP_ADMIN_ENABLED=false
 SKILLHUB_TRUST_FORWARDED_PROTO=false
+SKILLHUB_BUILTIN_SKILLS_ENABLED=true
 SKILLHUB_STORAGE_PROVIDER=s3
 SKILLHUB_STORAGE_S3_ENDPOINT=https://storage.example.com
 SKILLHUB_STORAGE_S3_BUCKET=skillhub
@@ -69,6 +70,11 @@ valid_env="$tmp/valid.env"
 write_env "$valid_env" "release-download-secret-32-bytes-minimum"
 "$SCRIPT" "$valid_env" >/dev/null
 
+disabled_builtin_skills_env="$tmp/disabled-builtin-skills.env"
+write_env "$disabled_builtin_skills_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' "SKILLHUB_BUILTIN_SKILLS_ENABLED=false" >>"$disabled_builtin_skills_env"
+"$SCRIPT" "$disabled_builtin_skills_env" >/dev/null
+
 missing_env="$tmp/missing.env"
 write_env "$missing_env" "" no
 expect_fail "$missing_env" "SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET is required"
@@ -85,6 +91,11 @@ invalid_forwarded_proto_env="$tmp/invalid-forwarded-proto.env"
 write_env "$invalid_forwarded_proto_env" "release-download-secret-32-bytes-minimum"
 printf '%s\n' "SKILLHUB_TRUST_FORWARDED_PROTO=yes" >>"$invalid_forwarded_proto_env"
 expect_fail "$invalid_forwarded_proto_env" "SKILLHUB_TRUST_FORWARDED_PROTO must be true or false"
+
+invalid_builtin_skills_env="$tmp/invalid-builtin-skills.env"
+write_env "$invalid_builtin_skills_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' "SKILLHUB_BUILTIN_SKILLS_ENABLED=yes" >>"$invalid_builtin_skills_env"
+expect_fail "$invalid_builtin_skills_env" "SKILLHUB_BUILTIN_SKILLS_ENABLED must be true or false"
 
 valid_redis_cluster_env="$tmp/valid-redis-cluster.env"
 write_env "$valid_redis_cluster_env" "release-download-secret-32-bytes-minimum"
