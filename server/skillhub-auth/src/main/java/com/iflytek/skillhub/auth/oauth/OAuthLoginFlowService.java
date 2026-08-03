@@ -64,7 +64,6 @@ public class OAuthLoginFlowService {
     private final AccountMergeProviderProofService
             accountMergeProviderProofService;
 
-    @Autowired
     public OAuthLoginFlowService(List<OAuthClaimsExtractor> extractorList,
                                  TrustedProviderRouteResolver providerRouteResolver,
                                  ExternalIdentityLoginService identityLoginService,
@@ -82,6 +81,29 @@ public class OAuthLoginFlowService {
                 accountMergeSessionManager,
                 accountMergeProviderProofService,
                 new DefaultOAuth2UserService());
+    }
+
+    @Autowired
+    OAuthLoginFlowService(
+            List<OAuthClaimsExtractor> extractorList,
+            TrustedProviderRouteResolver providerRouteResolver,
+            ExternalIdentityLoginService identityLoginService,
+            ExternalIdentityLinkService identityLinkService,
+            IdentityLinkSessionManager identityLinkSessionManager,
+            AccountMergeSessionManager accountMergeSessionManager,
+            AccountMergeProviderProofService
+                    accountMergeProviderProofService,
+            ProviderAwareOAuth2UserService providerAwareUserService) {
+        this(
+                extractorList,
+                providerRouteResolver,
+                identityLoginService,
+                identityLinkService,
+                identityLinkSessionManager,
+                accountMergeSessionManager,
+                accountMergeProviderProofService,
+                (OAuth2UserService<OAuth2UserRequest, OAuth2User>)
+                        providerAwareUserService);
     }
 
     OAuthLoginFlowService(

@@ -4,6 +4,7 @@ import com.iflytek.skillhub.auth.oauth.CustomOAuth2UserService;
 import com.iflytek.skillhub.auth.oauth.CustomOidcUserService;
 import com.iflytek.skillhub.auth.oauth.OAuth2LoginFailureHandler;
 import com.iflytek.skillhub.auth.oauth.OAuth2LoginSuccessHandler;
+import com.iflytek.skillhub.auth.oauth.ProviderAwareAccessTokenResponseClient;
 import com.iflytek.skillhub.auth.oauth.IdentityProviderRouteReadinessFilter;
 import com.iflytek.skillhub.auth.oauth.SkillHubOAuth2AuthorizationRequestResolver;
 import com.iflytek.skillhub.auth.identity.IdentityProviderReadinessService;
@@ -64,6 +65,8 @@ public class SecurityConfig {
     private final SkillHubOAuth2AuthorizationRequestResolver authorizationRequestResolver;
     private final OAuth2LoginSuccessHandler successHandler;
     private final OAuth2LoginFailureHandler failureHandler;
+    private final ProviderAwareAccessTokenResponseClient
+            accessTokenResponseClient;
     private final ApiTokenAuthenticationFilter apiTokenAuthenticationFilter;
     private final ApiTokenScopeFilter apiTokenScopeFilter;
     private final AuthenticationEntryPoint apiAuthenticationEntryPoint;
@@ -78,6 +81,8 @@ public class SecurityConfig {
                           SkillHubOAuth2AuthorizationRequestResolver authorizationRequestResolver,
                           OAuth2LoginSuccessHandler successHandler,
                           OAuth2LoginFailureHandler failureHandler,
+                          ProviderAwareAccessTokenResponseClient
+                                  accessTokenResponseClient,
                           ApiTokenAuthenticationFilter apiTokenAuthenticationFilter,
                           ApiTokenScopeFilter apiTokenScopeFilter,
                           AuthenticationEntryPoint apiAuthenticationEntryPoint,
@@ -91,6 +96,7 @@ public class SecurityConfig {
         this.authorizationRequestResolver = authorizationRequestResolver;
         this.successHandler = successHandler;
         this.failureHandler = failureHandler;
+        this.accessTokenResponseClient = accessTokenResponseClient;
         this.apiTokenAuthenticationFilter = apiTokenAuthenticationFilter;
         this.apiTokenScopeFilter = apiTokenScopeFilter;
         this.apiAuthenticationEntryPoint = apiAuthenticationEntryPoint;
@@ -130,6 +136,9 @@ public class SecurityConfig {
             })
             .oauth2Login(oauth2 -> oauth2
                 .authorizationEndpoint(endpoint -> endpoint.authorizationRequestResolver(authorizationRequestResolver))
+                .tokenEndpoint(endpoint -> endpoint
+                    .accessTokenResponseClient(
+                        accessTokenResponseClient))
                 .userInfoEndpoint(userInfo -> userInfo
                     .userService(customOAuth2UserService)
                     .oidcUserService(customOidcUserService))

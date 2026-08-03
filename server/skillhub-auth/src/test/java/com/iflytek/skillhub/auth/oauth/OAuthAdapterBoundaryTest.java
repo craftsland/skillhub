@@ -14,6 +14,9 @@ class OAuthAdapterBoundaryTest {
             OAuthClaimsExtractor.class,
             GitHubClaimsExtractor.class,
             GitLabClaimsExtractor.class,
+            DingTalkClaimsExtractor.class,
+            DingTalkOAuth2UserService.class,
+            DingTalkTokenResponseClient.class,
             CustomOAuth2UserService.class,
             CustomOidcUserService.class);
 

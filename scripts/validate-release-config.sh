@@ -229,6 +229,7 @@ validate_boolean SKILLHUB_AUTH_LDAP_ALLOW_INSECURE_FOR_TESTING
 validate_boolean SKILLHUB_AUTH_LDAP_EMAIL_AUTHORITATIVE
 validate_boolean SKILLHUB_AUTH_CAS_ENABLED
 validate_boolean SKILLHUB_AUTH_CAS_ALLOW_INSECURE_FOR_TESTING
+validate_boolean SKILLHUB_AUTH_DINGTALK_ENABLED
 validate_boolean SPRING_DATA_REDIS_SSL_ENABLED
 validate_boolean SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST
 
@@ -304,6 +305,43 @@ if [ "${SKILLHUB_AUTH_CAS_ENABLED:-false}" = "true" ]; then
   if [ "${SKILLHUB_AUTH_CAS_ALLOW_INSECURE_FOR_TESTING:-false}" = "true" ]; then
     error "SKILLHUB_AUTH_CAS_ALLOW_INSECURE_FOR_TESTING cannot be true in release deployments"
   fi
+fi
+
+if [ "${SKILLHUB_AUTH_DINGTALK_ENABLED:-false}" = "true" ]; then
+  require_non_empty SKILLHUB_AUTH_DINGTALK_AUTHORITY
+  require_non_empty SKILLHUB_AUTH_DINGTALK_CONNECT_TIMEOUT
+  require_non_empty SKILLHUB_AUTH_DINGTALK_READ_TIMEOUT
+  require_non_empty SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES
+  require_non_empty OAUTH2_DINGTALK_CLIENT_ID
+  require_non_empty OAUTH2_DINGTALK_CLIENT_SECRET
+  reject_values OAUTH2_DINGTALK_CLIENT_ID "placeholder" "local-placeholder"
+  reject_values OAUTH2_DINGTALK_CLIENT_SECRET "placeholder" "local-placeholder"
+  case "${SKILLHUB_AUTH_DINGTALK_AUTHORITY:-}" in
+    [a-z0-9]*) ;;
+    *) error "SKILLHUB_AUTH_DINGTALK_AUTHORITY must start with a lowercase letter or digit" ;;
+  esac
+  case "${SKILLHUB_AUTH_DINGTALK_AUTHORITY:-}" in
+    *[!a-z0-9._:-]*) error "SKILLHUB_AUTH_DINGTALK_AUTHORITY contains invalid characters" ;;
+  esac
+  validate_non_negative_integer SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES
+  case "${SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES:-}" in
+    "") ;;
+    *)
+      if [ "$SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES" -lt 1024 ] \
+          || [ "$SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES" -gt 1048576 ]; then
+        error "SKILLHUB_AUTH_DINGTALK_MAX_RESPONSE_BYTES must be between 1024 and 1048576"
+      fi
+      ;;
+  esac
+fi
+
+dingtalk_id="${OAUTH2_DINGTALK_CLIENT_ID:-}"
+dingtalk_secret="${OAUTH2_DINGTALK_CLIENT_SECRET:-}"
+if [ -n "$dingtalk_id" ] && [ -z "$dingtalk_secret" ]; then
+  error "OAUTH2_DINGTALK_CLIENT_SECRET is required when OAUTH2_DINGTALK_CLIENT_ID is set"
+fi
+if [ -n "$dingtalk_secret" ] && [ -z "$dingtalk_id" ]; then
+  error "OAUTH2_DINGTALK_CLIENT_ID is required when OAUTH2_DINGTALK_CLIENT_SECRET is set"
 fi
 
 validate_port POSTGRES_PORT

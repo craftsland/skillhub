@@ -68,6 +68,13 @@ auth:
       displayName: displayName
       email: mail
       avatarUrl: ""
+  dingtalk:
+    enabled: false
+    displayName: DingTalk
+    authority: dingtalk.corp
+    connectTimeout: PT5S
+    readTimeout: PT10S
+    maxResponseBytes: 1048576
 
 builtinSkills:
   enabled: true
@@ -143,6 +150,8 @@ secrets:
   downloadAnonCookieSecret: ""
   oauth2GithubClientId: ""
   oauth2GithubClientSecret: ""
+  oauth2DingtalkClientId: ""
+  oauth2DingtalkClientSecret: ""
   ldapBindPassword: ""
   scannerLlmApiKey: ""
   scannerLlmBaseUrl: ""

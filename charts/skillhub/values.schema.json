@@ -21,7 +21,7 @@
     "auth": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["direct", "accountMerge", "ldap", "cas"],
+      "required": ["direct", "accountMerge", "ldap", "cas", "dingtalk"],
       "properties": {
         "direct": {
           "type": "object",
@@ -99,6 +99,19 @@
                 "avatarUrl": { "type": "string" }
               }
             }
+          }
+        },
+        "dingtalk": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "displayName", "authority", "connectTimeout", "readTimeout", "maxResponseBytes"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "displayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "authority": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$" },
+            "connectTimeout": { "type": "string", "minLength": 1 },
+            "readTimeout": { "type": "string", "minLength": 1 },
+            "maxResponseBytes": { "type": "integer", "minimum": 1024, "maximum": 1048576 }
           }
         }
       }
@@ -230,6 +243,8 @@
         "downloadAnonCookieSecret": { "type": "string" },
         "oauth2GithubClientId": { "type": "string" },
         "oauth2GithubClientSecret": { "type": "string" },
+        "oauth2DingtalkClientId": { "type": "string" },
+        "oauth2DingtalkClientSecret": { "type": "string" },
         "ldapBindPassword": { "type": "string" },
         "scannerLlmApiKey": { "type": "string" },
         "scannerLlmBaseUrl": { "type": "string" },

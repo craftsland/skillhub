@@ -100,6 +100,15 @@ data:
   auth-cas-attribute-display-name: displayName
   auth-cas-attribute-email: mail
   auth-cas-attribute-avatar-url: ""
+
+  # DingTalk native OAuth2 browser login（默认关闭）
+  # authority 是维护者定义的稳定身份命名空间，不是上游 URL。
+  auth-dingtalk-enabled: "false"
+  auth-dingtalk-display-name: DingTalk
+  auth-dingtalk-authority: dingtalk.corp
+  auth-dingtalk-connect-timeout: PT5S
+  auth-dingtalk-read-timeout: PT10S
+  auth-dingtalk-max-response-bytes: "1048576"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

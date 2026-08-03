@@ -110,6 +110,8 @@ helm -n skillhub upgrade -i skillhub ./charts/skillhub \
 | `skillhub-download-anon-cookie-secret` | 是 | 至少 32 字符的匿名下载 Cookie 签名密钥 |
 | `oauth2-github-client-id` | 否 | GitHub OAuth2 Client ID |
 | `oauth2-github-client-secret` | 否 | GitHub OAuth2 Client Secret |
+| `oauth2-dingtalk-client-id` | 启用 DingTalk 时 | DingTalk OAuth2 Client ID |
+| `oauth2-dingtalk-client-secret` | 启用 DingTalk 时 | DingTalk OAuth2 Client Secret |
 | `skill-scanner-llm-api-key` | 否 | Scanner LLM API Key |
 | `skill-scanner-llm-base-url` | 否 | Scanner 自定义 LLM API 地址 |
 | `skill-scanner-llm-model` | 否 | Scanner LLM 模型名称 |
@@ -184,6 +186,28 @@ auth:
 `serviceUrl` 必须使用 HTTPS，并以当前 `providerCode` 对应的精确 callback 结尾。
 普通 CAS email attribute 只按 asserted 处理。完整说明见
 [`docs/23-cas-integration.md`](../../docs/23-cas-integration.md)。
+
+### DingTalk OAuth2
+
+```yaml
+auth:
+  dingtalk:
+    enabled: true
+    displayName: DingTalk
+    authority: dingtalk.corp
+    connectTimeout: PT5S
+    readTimeout: PT10S
+    maxResponseBytes: 1048576
+secrets:
+  oauth2DingtalkClientId: your-client-id
+  oauth2DingtalkClientSecret: your-client-secret
+```
+
+使用 `existingSecret` 时，该 Secret 必须提供
+`oauth2-dingtalk-client-id` 和 `oauth2-dingtalk-client-secret` 两个 key。authority 是
+SkillHub 维护的稳定身份命名空间，不是 URL；产生身份绑定后不得修改。DingTalk
+`unionId` 是唯一 primary subject，普通 email 不能用于自动绑定。完整说明见
+[`docs/26-dingtalk-unified-identity-integration.md`](../../docs/26-dingtalk-unified-identity-integration.md)。
 
 ### 副本数配置
 

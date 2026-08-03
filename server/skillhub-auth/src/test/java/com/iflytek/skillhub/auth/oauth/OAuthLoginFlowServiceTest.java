@@ -11,6 +11,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.iflytek.skillhub.auth.identity.ExternalIdentityLoginService;
 import com.iflytek.skillhub.auth.identity.ExternalIdentityLinkService;
@@ -25,6 +29,8 @@ import com.iflytek.skillhub.auth.identity.IdentityLoginOutcome;
 import com.iflytek.skillhub.auth.identity.IdentityLinkSessionManager;
 import com.iflytek.skillhub.auth.identity.ProtocolAuthenticationEvidence;
 import com.iflytek.skillhub.auth.identity.ProviderAuthenticationResult;
+import com.iflytek.skillhub.auth.identity.ProviderAttributeTrust;
+import com.iflytek.skillhub.auth.identity.ProviderAttributeValue;
 import com.iflytek.skillhub.auth.identity.ResolvedProviderHandle;
 import com.iflytek.skillhub.auth.identity.ResolvedProviderHandleTestFixture;
 import com.iflytek.skillhub.auth.identity.SubjectCandidate;
@@ -48,16 +54,21 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.client.RestTemplate;
 
 class OAuthLoginFlowServiceTest {
 
@@ -159,6 +170,95 @@ class OAuthLoginFlowServiceTest {
 
         verifyNoInteractions(delegate, identityLoginService);
         verify(extractor, never()).authenticate(any());
+    }
+
+    @Test
+    void dingtalkCallbackUsesNativeUserInfoAndUnifiedIdentityCore() {
+        OAuthClaimsExtractor extractor = new DingTalkClaimsExtractor();
+        TrustedProviderRouteResolver resolver =
+                mock(TrustedProviderRouteResolver.class);
+        ExternalIdentityLoginService identityLoginService =
+                mock(ExternalIdentityLoginService.class);
+        ClientRegistration registration = dingtalkRegistration();
+        ResolvedProviderHandle provider =
+                ResolvedProviderHandleTestFixture.handle("dingtalk");
+        when(resolver.resolve(registration)).thenReturn(provider);
+        when(identityLoginService.authenticate(
+                eq(provider),
+                any(ProviderAuthenticationResult.class),
+                eq(context())))
+                .thenReturn(new IdentityLoginOutcome.Authenticated(
+                        principal(),
+                        false,
+                        false));
+
+        DingTalkProperties properties = new DingTalkProperties();
+        properties.setEnabled(true);
+        properties.setAuthority("dingtalk.corp");
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server =
+                MockRestServiceServer.bindTo(restTemplate).build();
+        server.expect(requestTo(DingTalkOAuth2Constants.USER_INFO_URI))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(
+                        DingTalkOAuth2Constants.ACCESS_TOKEN_HEADER,
+                        "access-token"))
+                .andRespond(withSuccess(
+                        """
+                        {
+                          "unionId":"union-123",
+                          "openId":"open-456",
+                          "userId":"user-789",
+                          "nick":"Alice",
+                          "email":"alice@example.com"
+                        }
+                        """,
+                        MediaType.APPLICATION_JSON));
+
+        OAuth2AccessToken accessToken = new OAuth2AccessToken(
+                OAuth2AccessToken.TokenType.BEARER,
+                "access-token",
+                Instant.parse("2026-08-03T00:00:00Z"),
+                Instant.parse("2026-08-03T01:00:00Z"));
+        OAuth2UserRequest request = new OAuth2UserRequest(
+                registration,
+                accessToken);
+        OAuthLoginFlowService service = new OAuthLoginFlowService(
+                List.of(extractor),
+                resolver,
+                identityLoginService,
+                mock(ExternalIdentityLinkService.class),
+                mock(IdentityLinkSessionManager.class),
+                mock(AccountMergeSessionManager.class),
+                mock(AccountMergeProviderProofService.class),
+                new DingTalkOAuth2UserService(
+                        properties,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        restTemplate));
+
+        service.loadLoginContext(request, context());
+
+        var result = org.mockito.ArgumentCaptor.forClass(
+                ProviderAuthenticationResult.class);
+        verify(identityLoginService).authenticate(
+                eq(provider),
+                result.capture(),
+                eq(context()));
+        assertThat(result.getValue().primarySubject())
+                .isEqualTo(new SubjectCandidate(
+                        "dingtalk_union_id",
+                        "union-123"));
+        assertThat(result.getValue().alternateSubjects())
+                .containsExactly(
+                        new SubjectCandidate("dingtalk_open_id", "open-456"),
+                        new SubjectCandidate("dingtalk_user_id", "user-789"));
+        assertThat(result.getValue().attributes())
+                .containsEntry(
+                        "dingtalk_email",
+                        List.of(new ProviderAttributeValue(
+                                "alice@example.com",
+                                ProviderAttributeTrust.ASSERTED)));
+        server.verify();
     }
 
     @Test
@@ -650,6 +750,24 @@ class OAuthLoginFlowServiceTest {
                 .userInfoUri("https://api.github.com/user")
                 .userNameAttributeName("id")
                 .clientName("GitHub")
+                .build();
+    }
+
+    private static ClientRegistration dingtalkRegistration() {
+        return ClientRegistration.withRegistrationId("dingtalk")
+                .clientId("client-id")
+                .clientSecret("client-secret")
+                .authorizationGrantType(
+                        AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri(
+                        "{baseUrl}/login/oauth2/code/{registrationId}")
+                .scope(DingTalkOAuth2Constants.AUTHORIZATION_SCOPE)
+                .authorizationUri(DingTalkOAuth2Constants.AUTHORIZATION_URI)
+                .tokenUri(DingTalkOAuth2Constants.TOKEN_URI)
+                .userInfoUri(DingTalkOAuth2Constants.USER_INFO_URI)
+                .userNameAttributeName(
+                        DingTalkOAuth2Constants.SUBJECT_ATTRIBUTE)
+                .clientName("DingTalk")
                 .build();
     }
 }
