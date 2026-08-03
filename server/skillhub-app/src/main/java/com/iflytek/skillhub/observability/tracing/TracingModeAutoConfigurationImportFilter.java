@@ -19,7 +19,10 @@ public final class TracingModeAutoConfigurationImportFilter
 
     private static final Set<String> OTEL_AUTO_CONFIGURATIONS = Set.of(
             "org.springframework.boot.actuate.autoconfigure.opentelemetry.OpenTelemetryAutoConfiguration",
-            "org.springframework.boot.actuate.autoconfigure.tracing.OpenTelemetryAutoConfiguration",
+            "org.springframework.boot.actuate.autoconfigure.tracing.OpenTelemetryAutoConfiguration"
+    );
+
+    private static final Set<String> OTLP_EXPORT_AUTO_CONFIGURATIONS = Set.of(
             "org.springframework.boot.actuate.autoconfigure.tracing.otlp.OtlpAutoConfiguration"
     );
 
@@ -34,12 +37,16 @@ public final class TracingModeAutoConfigurationImportFilter
                 && "otel-sdk".equalsIgnoreCase(
                         environment.getProperty(TRACING_MODE_PROPERTY, "none")
                 );
+        boolean otlpExportEnabled = otelSdkEnabled
+                && hasText(environment.getProperty("management.otlp.tracing.endpoint"));
         boolean[] matches = new boolean[autoConfigurationClasses.length];
         for (int index = 0; index < autoConfigurationClasses.length; index++) {
             String autoConfigurationClass = autoConfigurationClasses[index];
             matches[index] = autoConfigurationClass != null
-                    && (otelSdkEnabled
-                    || !OTEL_AUTO_CONFIGURATIONS.contains(autoConfigurationClass));
+                    && ((otelSdkEnabled
+                    || !OTEL_AUTO_CONFIGURATIONS.contains(autoConfigurationClass))
+                    && (otlpExportEnabled
+                    || !OTLP_EXPORT_AUTO_CONFIGURATIONS.contains(autoConfigurationClass)));
         }
         return matches;
     }
@@ -47,5 +54,9 @@ public final class TracingModeAutoConfigurationImportFilter
     @Override
     public void setEnvironment(Environment environment) {
         this.environment = environment;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
