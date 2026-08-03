@@ -6,6 +6,10 @@ import java.util.Map;
 
 /**
  * Adapts Redis Stream field maps to the transport-neutral message observation boundary.
+ *
+ * <p>Redis Stream entries do not have a separate header collection, so reserved propagation fields
+ * share the entry map with business fields. {@code MessageObservationSupport} owns and sanitizes
+ * those reserved fields; business payload types remain unaware of them.</p>
  */
 final class RedisStreamMessageCarrier {
 

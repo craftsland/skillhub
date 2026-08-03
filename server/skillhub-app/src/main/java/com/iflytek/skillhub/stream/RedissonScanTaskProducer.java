@@ -50,6 +50,7 @@ public class RedissonScanTaskProducer implements ScanTaskProducer {
         }
 
         RStream<String, String> stream = redissonClient.getStream(streamKey, StringCodec.INSTANCE);
+        // Starting the producer Observation injects trusted propagation fields before XADD.
         StreamMessageId messageId = messageObservationSupport.observePublish(
                 RedisStreamMessageCarrier.MESSAGING_SYSTEM,
                 streamKey,

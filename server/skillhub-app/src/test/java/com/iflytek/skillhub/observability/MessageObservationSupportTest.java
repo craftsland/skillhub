@@ -1,7 +1,9 @@
 package com.iflytek.skillhub.observability;
 
 import com.iflytek.skillhub.observability.tracing.SkillHubTracingConfiguration;
+import io.micrometer.common.KeyValue;
 import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
@@ -149,6 +151,74 @@ class MessageObservationSupportTest {
         assertThat(carrier.get("traceparent")).isNull();
         assertThat(carrier.get(MessageObservationSupport.REQUEST_ID_FIELD))
                 .isEqualTo("trusted-request");
+    }
+
+    @Test
+    void shouldUseOpenTelemetryMessagingOperationSemantics() {
+        ObservationRegistry observationRegistry = ObservationRegistry.create();
+        List<Observation.Context> stoppedContexts = new ArrayList<>();
+        observationRegistry.observationConfig().observationHandler(
+                new ObservationHandler<Observation.Context>() {
+                    @Override
+                    public void onStop(Observation.Context context) {
+                        stoppedContexts.add(context);
+                    }
+
+                    @Override
+                    public boolean supportsContext(Observation.Context context) {
+                        return true;
+                    }
+                }
+        );
+        MessageObservationSupport support = new MessageObservationSupport(
+                observationRegistry,
+                new RequestIdAccessor()
+        );
+        TestCarrier carrier = new TestCarrier();
+
+        support.observePublish(
+                "redis",
+                "skillhub:scan:requests",
+                carrier,
+                TEST_CARRIER_ADAPTER,
+                () -> null
+        );
+        support.observeProcess(
+                "redis",
+                "skillhub:scan:requests",
+                carrier,
+                TEST_CARRIER_ADAPTER,
+                () -> null
+        );
+
+        Observation.Context publish = findContext(stoppedContexts, "skillhub.message.publish");
+        assertThat(publish.getContextualName()).isEqualTo("publish skillhub:scan:requests");
+        assertThat(lowCardinalityValue(publish, "messaging.operation.name")).isEqualTo("publish");
+        assertThat(lowCardinalityValue(publish, "messaging.operation.type")).isEqualTo("send");
+
+        Observation.Context process = findContext(stoppedContexts, "skillhub.message.process");
+        assertThat(process.getContextualName()).isEqualTo("process skillhub:scan:requests");
+        assertThat(lowCardinalityValue(process, "messaging.operation.name")).isEqualTo("process");
+        assertThat(lowCardinalityValue(process, "messaging.operation.type")).isEqualTo("process");
+    }
+
+    private Observation.Context findContext(
+            List<Observation.Context> contexts,
+            String observationName
+    ) {
+        return contexts.stream()
+                .filter(context -> observationName.equals(context.getName()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private String lowCardinalityValue(Observation.Context context, String key) {
+        for (KeyValue keyValue : context.getLowCardinalityKeyValues()) {
+            if (key.equals(keyValue.getKey())) {
+                return keyValue.getValue();
+            }
+        }
+        return null;
     }
 
     private ContextValues currentValues(RequestIdAccessor requestIdAccessor, Tracer tracer) {

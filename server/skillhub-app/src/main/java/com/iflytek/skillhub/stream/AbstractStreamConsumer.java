@@ -205,6 +205,7 @@ public abstract class AbstractStreamConsumer<T> {
         if (messages == null || messages.isEmpty()) {
             return;
         }
+        // Scope each entry independently because one XREADGROUP batch may contain unrelated traces.
         messages.forEach(this::handleMessage);
     }
 
@@ -243,6 +244,8 @@ public abstract class AbstractStreamConsumer<T> {
 
     private void handleFailure(T payload, int retryCount, Exception e) {
         if (retryCount < MAX_RETRY_COUNT) {
+            // Retry publication remains inside the current consumer scope, so the new producer
+            // span and message carrier continue the original trace.
             retryMessage(payload, retryCount + 1);
             return;
         }
